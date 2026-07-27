@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
-import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { uploadToGCS, getSignedReadUrl, isGcsRef, signGcsRef } from '@/lib/gcs';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -15,11 +15,36 @@ export async function GET(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { requestId } = await params;
+    const mediaType = request.nextUrl.searchParams.get('mediaType') === 'image'
+      ? 'image'
+      : 'video';
 
     // The endpoint must match whatever was used to submit the job.
     // The client passes it as a query param so we don't have to hardcode a model.
     const endpoint = request.nextUrl.searchParams.get('endpoint')
       ?? 'fal-ai/kling-video/v3/pro/text-to-video';
+
+    const { data: existingGeneration, error: lookupError } = await supabase
+      .from('generations')
+      .select('id, media_url, status')
+      .eq('fal_request_id', requestId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (lookupError) {
+      throw new Error(`Could not load queued generation: ${lookupError.message}`);
+    }
+
+    if (existingGeneration?.status === 'completed' && existingGeneration.media_url) {
+      const mediaUrl = isGcsRef(existingGeneration.media_url)
+        ? await signGcsRef(existingGeneration.media_url)
+        : existingGeneration.media_url;
+      return NextResponse.json({
+        status: 'completed',
+        mediaUrls: [mediaUrl],
+        generationId: existingGeneration.id,
+      });
+    }
 
     const status = await fal.queue.status(endpoint, {
       requestId,
@@ -28,6 +53,50 @@ export async function GET(
 
     if (status.status === 'COMPLETED') {
       const result = await fal.queue.result(endpoint, { requestId });
+
+      if (mediaType === 'image') {
+        const falResult = result.data as { images?: Array<{ url: string }> };
+        const imageUrl = falResult.images?.[0]?.url;
+
+        if (!imageUrl) {
+          return NextResponse.json({ status: 'failed', error: 'FAL returned no image URL in the result.' });
+        }
+        if (!existingGeneration) {
+          return NextResponse.json({ status: 'failed', error: 'Queued generation record was not found.' });
+        }
+
+        const imageRes = await fetch(imageUrl);
+        if (!imageRes.ok) {
+          throw new Error(`Could not download completed FAL image (${imageRes.status}).`);
+        }
+        const imageBuffer = await imageRes.arrayBuffer();
+        const contentType = imageRes.headers.get('content-type') ?? 'image/jpeg';
+        const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg';
+        const objectPath = `${user.id}/${existingGeneration.id}.${ext}`;
+        const gcsRef = await uploadToGCS(imageBuffer, objectPath, contentType);
+        const signedUrl = await getSignedReadUrl(objectPath);
+
+        const { error: updateError } = await supabase
+          .from('generations')
+          .update({
+            media_url: gcsRef,
+            status: 'completed',
+            fal_request_id: requestId,
+          })
+          .eq('id', existingGeneration.id)
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          throw new Error(`Could not save completed generation: ${updateError.message}`);
+        }
+
+        return NextResponse.json({
+          status: 'completed',
+          mediaUrls: [signedUrl],
+          generationId: existingGeneration.id,
+        });
+      }
+
       const falResult = result.data as { video?: { url: string } };
       const videoUrl = falResult.video?.url;
 
@@ -37,7 +106,7 @@ export async function GET(
 
       const videoRes = await fetch(videoUrl);
       const videoBuffer = await videoRes.arrayBuffer();
-      const genId = crypto.randomUUID();
+      const genId = existingGeneration?.id ?? crypto.randomUUID();
       const objectPath = `${user.id}/${genId}.mp4`;
       const gcsRef = await uploadToGCS(videoBuffer, objectPath, 'video/mp4');
       const signedUrl = await getSignedReadUrl(objectPath);

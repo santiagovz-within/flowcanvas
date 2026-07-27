@@ -184,7 +184,13 @@ export default function ImageVideoPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        const result = await res.json();
+        const result = await res.json() as {
+          generationId?: string;
+          requestId?: string;
+          endpoint?: string;
+          status?: string;
+          requests?: Array<{ requestId: string; generationId?: string; endpoint: string }>;
+        };
 
         if (result.generationId) {
           generationIds.push(result.generationId);
@@ -208,14 +214,21 @@ export default function ImageVideoPage() {
           }
         }
 
-        // Handle async video
-        if (result.requestId && result.status === 'pending') {
+        const pendingRequest = result.requests?.[0];
+        const requestId = pendingRequest?.requestId ?? result.requestId;
+        const requestEndpoint = pendingRequest?.endpoint ?? result.endpoint;
+
+        // Handle queued image and video generation
+        if (requestId && result.status === 'pending') {
           // Poll
           let attempts = 0;
           const pollInterval = setInterval(async () => {
             attempts++;
             if (attempts > 100) { clearInterval(pollInterval); return; }
-            const statusRes = await fetch(`/api/fal/status/${result.requestId}`);
+            const query = new URLSearchParams();
+            if (requestEndpoint) query.set('endpoint', requestEndpoint);
+            if (mode === 'image') query.set('mediaType', 'image');
+            const statusRes = await fetch(`/api/fal/status/${requestId}?${query.toString()}`);
             const status = await statusRes.json();
             if (status.status === 'completed' && status.generationId) {
               clearInterval(pollInterval);
@@ -225,7 +238,9 @@ export default function ImageVideoPage() {
                 .eq('id', status.generationId)
                 .single();
               if (gen) {
-                generationIds.push(status.generationId);
+                if (!generationIds.includes(status.generationId)) {
+                  generationIds.push(status.generationId);
+                }
                 addGeneration(gen as Generation);
                 addToGallery(gen as Generation);
                 updateGeneration(status.generationId, gen as Partial<Generation>);

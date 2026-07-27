@@ -160,6 +160,7 @@ export interface ImageGenNodeData extends Record<string, unknown> {
   generationHistory?: string[][];
   status: NodeStatus;
   errorMessage?: string;
+  pendingRequests?: Array<{ requestId: string; endpoint: string }>;
   label?: string;
 }
 

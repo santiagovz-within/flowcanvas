@@ -25,6 +25,7 @@ export const FAL_MODELS = {
     editEndpoint: 'bytedance/seedream/v5/pro/edit',
     editImageParam: 'image_urls',
     usesImageSize: true,
+    usesQueue: true,
     maxReferenceImages: 10,
     type: 'image' as const,
   },

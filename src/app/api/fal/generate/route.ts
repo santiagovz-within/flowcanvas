@@ -127,15 +127,21 @@ export async function POST(request: NextRequest) {
         .select()
         .single();
 
-      return NextResponse.json({ generationId: gen?.id, requestId: request_id, status: 'pending' });
+      return NextResponse.json({
+        generationId: gen?.id,
+        requestId: request_id,
+        endpoint,
+        status: 'pending',
+      });
     }
 
-    // Image generation — synchronous
+    // Image generation
     const useEditEndpoint = referenceImageUrls.length > 0 && 'editEndpoint' in modelConfig;
     const endpoint = useEditEndpoint ? modelConfig.editEndpoint : modelConfig.endpoint;
     const usesAspectRatio = 'usesAspectRatio' in modelConfig && modelConfig.usesAspectRatio;
     const supportsResolution = 'supportsResolution' in modelConfig && (modelConfig as { supportsResolution: boolean }).supportsResolution;
     const usesImageSize = 'usesImageSize' in modelConfig && modelConfig.usesImageSize;
+    const usesQueue = 'usesQueue' in modelConfig && modelConfig.usesQueue;
     const editImageParam = 'editImageParam' in modelConfig ? (modelConfig as { editImageParam: string }).editImageParam : null;
     const hasOwnQuality = 'hasOwnQuality' in modelConfig && (modelConfig as { hasOwnQuality: boolean }).hasOwnQuality;
     const maxReferenceImages = 'maxReferenceImages' in modelConfig
@@ -148,30 +154,77 @@ export async function POST(request: NextRequest) {
 
     console.log('[fal/generate] endpoint:', endpoint, '| refs:', referenceImageUrls.length, '| usesAspectRatio:', usesAspectRatio, '| editImageParam:', editImageParam);
 
-    for (let i = 0; i < numImages; i++) {
-      const baseInput: Record<string, unknown> = {
-        prompt,
-        ...(usesAspectRatio
-          ? { aspect_ratio: aspectRatio, ...(supportsResolution ? { resolution } : {}) }
-          : usesImageSize
-            ? { image_size: { width, height } }
-            : hasOwnQuality
-              ? { image_size: { width, height }, quality: body.quality ?? 'high' }
-              : { image_size: { width, height }, num_inference_steps: body.quality === 'high' ? 40 : body.quality === 'low' ? 20 : 28 }),
-        ...(body.negativePrompt ? { negative_prompt: body.negativePrompt } : {}),
-      };
+    const baseInput: Record<string, unknown> = {
+      prompt,
+      ...(usesAspectRatio
+        ? { aspect_ratio: aspectRatio, ...(supportsResolution ? { resolution } : {}) }
+        : usesImageSize
+          ? { image_size: { width, height } }
+          : hasOwnQuality
+            ? { image_size: { width, height }, quality: body.quality ?? 'high' }
+            : { image_size: { width, height }, num_inference_steps: body.quality === 'high' ? 40 : body.quality === 'low' ? 20 : 28 }),
+      ...(body.negativePrompt ? { negative_prompt: body.negativePrompt } : {}),
+    };
 
-      if (referenceImageUrls[0]) {
-        if (editImageParam === 'image_urls') {
-          const usableReferenceImageUrls = referenceImageUrls.filter(Boolean);
-          baseInput.image_urls = maxReferenceImages === undefined
-            ? usableReferenceImageUrls
-            : usableReferenceImageUrls.slice(0, maxReferenceImages);
-        } else {
-          baseInput.image_url = referenceImageUrls[0];
+    if (referenceImageUrls[0]) {
+      if (editImageParam === 'image_urls') {
+        const usableReferenceImageUrls = referenceImageUrls.filter(Boolean);
+        baseInput.image_urls = maxReferenceImages === undefined
+          ? usableReferenceImageUrls
+          : usableReferenceImageUrls.slice(0, maxReferenceImages);
+      } else {
+        baseInput.image_url = referenceImageUrls[0];
+      }
+    }
+
+    if (usesQueue) {
+      const pendingRequests: Array<{ requestId: string; generationId?: string; endpoint: string }> = [];
+
+      for (let i = 0; i < numImages; i++) {
+        console.log(`[fal/generate] queue image ${i + 1}/${numImages} input:`, JSON.stringify(baseInput));
+        const { request_id } = await fal.queue.submit(endpoint as string, { input: baseInput });
+        const { data: gen, error: insertError } = await supabase
+          .from('generations')
+          .insert({
+            user_id: user.id,
+            source_type: sourceType,
+            source_id: sourceId,
+            node_id: nodeId,
+            model,
+            prompt,
+            parameters: { aspectRatio, resolution },
+            reference_image_urls: referenceImageUrls,
+            media_type: 'image',
+            media_url: '',
+            width,
+            height,
+            status: 'processing',
+            fal_request_id: request_id,
+          })
+          .select('id')
+          .single();
+
+        if (insertError) {
+          throw new Error(`Could not save queued generation: ${insertError.message}`);
         }
+
+        pendingRequests.push({
+          requestId: request_id,
+          generationId: gen?.id,
+          endpoint: endpoint as string,
+        });
       }
 
+      return NextResponse.json({
+        generationId: pendingRequests[0]?.generationId,
+        requestId: pendingRequests[0]?.requestId,
+        endpoint,
+        requests: pendingRequests,
+        status: 'pending',
+      });
+    }
+
+    for (let i = 0; i < numImages; i++) {
       console.log(`[fal/generate] image ${i + 1}/${numImages} input:`, JSON.stringify(baseInput));
       const result = await fal.subscribe(endpoint as string, { input: baseInput });
 

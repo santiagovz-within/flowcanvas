@@ -1,7 +1,7 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Aperture, Play, Download, ChevronLeft, ChevronRight, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { Aperture, Play, Download, ChevronLeft, ChevronRight, Image as ImageIcon, RefreshCw, AlertTriangle } from 'lucide-react';
 import { SendToFigmaButton } from './SendToFigmaButton';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { downloadAllFromUrls } from '@/lib/utils/download';
@@ -25,9 +25,31 @@ const RESOLUTIONS = ['1K', '2K', '4K'];
 const REF_ROW_HEIGHT = 36;
 const ROW_GAP = 25;
 
+type PendingImageRequest = NonNullable<ImageGenNodeData['pendingRequests']>[number];
+
+interface ImageGenerateResponse {
+  mediaUrls?: string[];
+  requests?: Array<PendingImageRequest & { generationId?: string }>;
+  error?: string;
+  details?: string;
+}
+
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
   el.style.height = `${el.scrollHeight}px`;
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      response.ok
+        ? 'The server returned an invalid response.'
+        : `Server error ${response.status}. The generation may still be running on FAL.`
+    );
+  }
 }
 
 export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGenNodeData }) {
@@ -94,6 +116,23 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     }));
   }
 
+  function completeGeneration(mediaUrls: string[]) {
+    const currentNodes = useFlowStore.getState().nodes;
+    const currentData = currentNodes.find((node) => node.id === id)?.data as ImageGenNodeData | undefined;
+    const newHistory = [...(currentData?.generationHistory ?? []), mediaUrls];
+    updateData({
+      generatedImages: mediaUrls,
+      generationHistory: newHistory,
+      status: 'completed',
+      errorMessage: undefined,
+      pendingRequests: undefined,
+    });
+    playSuccessSound();
+    document.dispatchEvent(new CustomEvent('node:image-propagate', {
+      detail: { sourceNodeId: id, imageUrl: mediaUrls[0] },
+    }));
+  }
+
   function navigateHistory(idx: number) {
     setHistIdx(idx);
     const images = genHistory[idx] ?? [];
@@ -141,7 +180,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   async function handleGenerate() {
     if (isGenerating) return;
     setIsGenerating(true);
-    updateData({ status: 'processing' });
+    updateData({ status: 'processing', errorMessage: undefined, pendingRequests: undefined });
 
     const endpoint = modelConfig?.provider === 'google' ? '/api/google/generate' : '/api/fal/generate';
     const inputImageUrls = (data.inputImageUrls ?? []).filter(Boolean);
@@ -164,22 +203,86 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const result = await res.json();
+      const result = await readJsonResponse<ImageGenerateResponse>(res);
       console.log('[ImageGenNode] API response ←', result);
 
+      if (!res.ok) {
+        throw new Error(result.details ?? result.error ?? `Server error ${res.status}`);
+      }
+
       if (result.mediaUrls?.length) {
-        const newHistory = [...(data.generationHistory ?? []), result.mediaUrls as string[]];
-        updateData({ generatedImages: result.mediaUrls, generationHistory: newHistory, status: 'completed', errorMessage: undefined });
-        playSuccessSound();
-        document.dispatchEvent(new CustomEvent('node:image-propagate', {
-          detail: { sourceNodeId: id, imageUrl: result.mediaUrls[0] },
+        completeGeneration(result.mediaUrls);
+      } else if (result.requests?.length) {
+        const pendingRequests = result.requests.map(({ requestId, endpoint: falEndpoint }) => ({
+          requestId,
+          endpoint: falEndpoint,
         }));
+        updateData({ pendingRequests });
+        await pollForResults(pendingRequests);
       } else {
-        updateData({ status: 'error', errorMessage: result.details ?? result.error ?? 'Image generation failed — no output returned.' });
+        throw new Error(result.details ?? result.error ?? 'Image generation failed - no output returned.');
       }
     } catch (err) {
       console.error('[ImageGenNode] fetch error', err);
       updateData({ status: 'error', errorMessage: err instanceof Error ? err.message : 'Network error — check your connection.' });
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function pollForResults(requests: PendingImageRequest[]) {
+    const completedUrls = new Map<string, string>();
+    const maxAttempts = 200;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      let terminalError: string | undefined;
+      const pending = requests.filter(({ requestId }) => !completedUrls.has(requestId));
+
+      await Promise.all(pending.map(async ({ requestId, endpoint }) => {
+        try {
+          const statusRes = await fetch(
+            `/api/fal/status/${requestId}?endpoint=${encodeURIComponent(endpoint)}&mediaType=image`
+          );
+          if (!statusRes.ok) return;
+
+          const result = await readJsonResponse<{ status: string; mediaUrls?: string[]; error?: string }>(statusRes);
+          if (result.status === 'completed' && result.mediaUrls?.[0]) {
+            completedUrls.set(requestId, result.mediaUrls[0]);
+          } else if (result.status === 'failed') {
+            terminalError = result.error ?? 'FAL reported that the image generation failed.';
+          }
+        } catch {
+          // Transient status errors are retried until the polling timeout.
+        }
+      }));
+
+      if (terminalError) {
+        updateData({ pendingRequests: undefined });
+        throw new Error(terminalError);
+      }
+
+      if (completedUrls.size === requests.length) {
+        const mediaUrls = requests
+          .map(({ requestId }) => completedUrls.get(requestId))
+          .filter((url): url is string => !!url);
+        completeGeneration(mediaUrls);
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+
+    throw new Error('Timed out while retrieving the generated images. Use "Check status on FAL" to resume.');
+  }
+
+  async function resumePolling() {
+    if (!data.pendingRequests?.length || isGenerating) return;
+    setIsGenerating(true);
+    updateData({ status: 'processing', errorMessage: undefined });
+    try {
+      await pollForResults(data.pendingRequests);
+    } catch (err) {
+      updateData({ status: 'error', errorMessage: err instanceof Error ? err.message : 'Could not retrieve the generated images.' });
     } finally {
       setIsGenerating(false);
     }
@@ -201,18 +304,29 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   }
 
   const sliderPct = ((data.numImages - 1) / 3) * 100;
+  const hasPendingRequests = !!data.pendingRequests?.length;
 
   const footer = (
     <div className="flex flex-col gap-2">
       <button
         onClick={handleGenerate}
-        disabled={isGenerating}
+        disabled={isGenerating || (data.status === 'processing' && hasPendingRequests)}
         className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
         style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
       >
         <Play size={12} />
         {isGenerating ? 'Generating…' : 'Generate'}
       </button>
+      {hasPendingRequests && !isGenerating && (
+        <button
+          onClick={resumePolling}
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium nodrag"
+          style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--color-error)', borderRadius: 11, border: '1px solid var(--color-error)' }}
+        >
+          <AlertTriangle size={12} />
+          Check status on FAL
+        </button>
+      )}
       {displayImages.length > 0 && (
         <div key={displayImages[0]} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
           <button
