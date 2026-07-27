@@ -15,6 +15,10 @@ interface GenerateRequestBody extends GenerateImageRequest {
   duration?: number;
 }
 
+const SEEDREAM_MIN_PIXELS = 1024 * 1024;
+const SEEDREAM_MAX_PIXELS = 2048 * 2048;
+const IMAGE_SIZE_MULTIPLE = 8;
+
 function getImageSize(aspectRatio: string, resolution: string): { width: number; height: number } {
   const baseSize = resolution === '4K' ? 3840 : resolution === '2K' ? 2048 : 1024;
   const [w, h] = aspectRatio.split(':').map(Number);
@@ -25,6 +29,24 @@ function getImageSize(aspectRatio: string, resolution: string): { width: number;
   } else {
     return { width: Math.round(baseSize * ratio), height: baseSize };
   }
+}
+
+function getSeedreamImageSize(aspectRatio: string, resolution: string): { width: number; height: number } {
+  // Preserve the shared UI tiers while respecting Seedream's 1–4 MP custom-size contract.
+  const nominal = getImageSize(aspectRatio, resolution);
+  const nominalPixels = nominal.width * nominal.height;
+  const targetPixels = Math.min(SEEDREAM_MAX_PIXELS, Math.max(SEEDREAM_MIN_PIXELS, nominalPixels));
+  const scale = Math.sqrt(targetPixels / nominalPixels);
+  const roundDimension = nominalPixels < SEEDREAM_MIN_PIXELS
+    ? Math.ceil
+    : nominalPixels > SEEDREAM_MAX_PIXELS
+      ? Math.floor
+      : Math.round;
+
+  return {
+    width: roundDimension((nominal.width * scale) / IMAGE_SIZE_MULTIPLE) * IMAGE_SIZE_MULTIPLE,
+    height: roundDimension((nominal.height * scale) / IMAGE_SIZE_MULTIPLE) * IMAGE_SIZE_MULTIPLE,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -109,15 +131,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Image generation — synchronous
-    const { width, height } = getImageSize(aspectRatio, resolution);
-    const results: string[] = [];
-
     const useEditEndpoint = referenceImageUrls.length > 0 && 'editEndpoint' in modelConfig;
     const endpoint = useEditEndpoint ? modelConfig.editEndpoint : modelConfig.endpoint;
     const usesAspectRatio = 'usesAspectRatio' in modelConfig && modelConfig.usesAspectRatio;
     const supportsResolution = 'supportsResolution' in modelConfig && (modelConfig as { supportsResolution: boolean }).supportsResolution;
+    const usesImageSize = 'usesImageSize' in modelConfig && modelConfig.usesImageSize;
     const editImageParam = 'editImageParam' in modelConfig ? (modelConfig as { editImageParam: string }).editImageParam : null;
     const hasOwnQuality = 'hasOwnQuality' in modelConfig && (modelConfig as { hasOwnQuality: boolean }).hasOwnQuality;
+    const maxReferenceImages = 'maxReferenceImages' in modelConfig
+      ? modelConfig.maxReferenceImages
+      : undefined;
+    const { width, height } = usesImageSize
+      ? getSeedreamImageSize(aspectRatio, resolution)
+      : getImageSize(aspectRatio, resolution);
+    const results: string[] = [];
 
     console.log('[fal/generate] endpoint:', endpoint, '| refs:', referenceImageUrls.length, '| usesAspectRatio:', usesAspectRatio, '| editImageParam:', editImageParam);
 
@@ -126,15 +153,20 @@ export async function POST(request: NextRequest) {
         prompt,
         ...(usesAspectRatio
           ? { aspect_ratio: aspectRatio, ...(supportsResolution ? { resolution } : {}) }
-          : hasOwnQuality
-            ? { image_size: { width, height }, quality: body.quality ?? 'high' }
-            : { image_size: { width, height }, num_inference_steps: body.quality === 'high' ? 40 : body.quality === 'low' ? 20 : 28 }),
+          : usesImageSize
+            ? { image_size: { width, height } }
+            : hasOwnQuality
+              ? { image_size: { width, height }, quality: body.quality ?? 'high' }
+              : { image_size: { width, height }, num_inference_steps: body.quality === 'high' ? 40 : body.quality === 'low' ? 20 : 28 }),
         ...(body.negativePrompt ? { negative_prompt: body.negativePrompt } : {}),
       };
 
       if (referenceImageUrls[0]) {
         if (editImageParam === 'image_urls') {
-          baseInput.image_urls = referenceImageUrls.filter(Boolean);
+          const usableReferenceImageUrls = referenceImageUrls.filter(Boolean);
+          baseInput.image_urls = maxReferenceImages === undefined
+            ? usableReferenceImageUrls
+            : usableReferenceImageUrls.slice(0, maxReferenceImages);
         } else {
           baseInput.image_url = referenceImageUrls[0];
         }

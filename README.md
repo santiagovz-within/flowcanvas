@@ -50,6 +50,7 @@ All generation runs through the [FAL AI](https://fal.ai) platform.
 |-------|------|
 | Nano Banana 2 | Image generation |
 | Nano Banana Pro | Image generation |
+| Seedream v5 (ByteDance) | Image generation and editing |
 | GPT Image 2 (OpenAI) | Image generation |
 | FLUX 2 Pro | Image generation |
 | Google Omni Flash | Image-to-video generation |

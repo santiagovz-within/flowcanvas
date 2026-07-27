@@ -21,6 +21,8 @@ function ModelIcon({ modelId, size = 13 }: { modelId: string; size?: number }) {
     case 'nano-banana-2':
     case 'nano-banana-pro':
       return <NanoBanana.Color size={size} />;
+    case 'seedream-5':
+      return <ByteDance.Color size={size} />;
     case 'gpt-image-2':
       return <OpenAI size={size} />;
     case 'flux-2-pro':
