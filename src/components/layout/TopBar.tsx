@@ -2,7 +2,19 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Cloud, UploadCloud, RotateCcw, RotateCw, Share2, Check, BookOpen } from 'lucide-react';
+import {
+  ChevronRight,
+  Cloud,
+  UploadCloud,
+  RotateCcw,
+  RotateCw,
+  Share2,
+  Check,
+  BookOpen,
+  HardDrive,
+  Loader2,
+  Lock,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { createClient } from '@/lib/supabase/client';
@@ -22,8 +34,13 @@ export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare
   const [titleValue, setTitleValue] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [savingBase, setSavingBase] = useState(false);
+  const [savingGcsOnly, setSavingGcsOnly] = useState(false);
+  const [gcsOnlyError, setGcsOnlyError] = useState<string | null>(null);
+  const [showGcsOnlyConfirm, setShowGcsOnlyConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
   const isBaseFlow = currentFlow?.is_template ?? false;
+  const isGcsOnly = currentFlow?.is_gcs_only ?? false;
+  const canEnableGcsOnly = currentFlow?.gcs_only_eligible ?? false;
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -84,6 +101,42 @@ export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare
       }));
     } finally {
       setSavingBase(false);
+    }
+  }
+
+  async function handleToggleGcsOnly() {
+    if (!currentFlow || savingGcsOnly || isGcsOnly || !canEnableGcsOnly) return;
+
+    setSavingGcsOnly(true);
+    setGcsOnlyError(null);
+    try {
+      const response = await fetch(`/api/flows/${flowId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_gcs_only: true }),
+      });
+      const result = await response.json().catch(() => ({})) as {
+        error?: string;
+        is_gcs_only?: boolean;
+      };
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Could not update GCS-only mode');
+      }
+
+      useFlowStore.setState((state) => ({
+        currentFlow: state.currentFlow
+          ? {
+              ...state.currentFlow,
+              is_gcs_only: result.is_gcs_only ?? true,
+              gcs_only_eligible: false,
+            }
+          : null,
+      }));
+      setShowGcsOnlyConfirm(false);
+    } catch (error) {
+      setGcsOnlyError(error instanceof Error ? error.message : 'Could not update GCS-only mode');
+    } finally {
+      setSavingGcsOnly(false);
     }
   }
 
@@ -188,6 +241,40 @@ export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare
 
             <div className="w-px h-4" style={{ background: 'var(--color-white-subtle)' }} />
 
+            {isAdmin && isGcsOnly && (
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{
+                  background: 'rgba(34,197,94,0.16)',
+                  color: '#4ade80',
+                  border: '1px solid rgba(74,222,128,0.35)',
+                }}
+                title="GCS-only mode is permanently enabled for this Flow"
+              >
+                <Lock size={12} />
+                GCS only
+              </div>
+            )}
+
+            {isAdmin && !isGcsOnly && canEnableGcsOnly && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGcsOnlyError(null);
+                  setShowGcsOnlyConfirm(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  color: 'var(--color-white-muted)',
+                  border: 'var(--border-default)',
+                }}
+                title="Permanently keep this new Flow's Fal generations in Glide storage only"
+              >
+                <HardDrive size={12} />
+                Enable GCS only
+              </button>
+            )}
+
             {/* Admin: Save as Base Flow toggle */}
             {isAdmin && (
               <button
@@ -236,6 +323,94 @@ export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare
           {copied ? 'Copied!' : isShared ? 'Shared' : 'Share'}
         </button>
       </div>
+
+      {showGcsOnlyConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-auto"
+          style={{ background: 'rgba(0,0,0,0.68)', backdropFilter: 'blur(4px)' }}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !savingGcsOnly) {
+              setShowGcsOnlyConfirm(false);
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gcs-only-title"
+            className="w-full max-w-md rounded-2xl p-5"
+            style={{
+              background: 'var(--color-bg-elevated)',
+              border: 'var(--border-default)',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+              style={{ background: 'rgba(34,197,94,0.16)', color: '#4ade80' }}
+            >
+              <HardDrive size={19} />
+            </div>
+            <h2
+              id="gcs-only-title"
+              className="text-base font-semibold"
+              style={{ color: 'var(--color-white)' }}
+            >
+              Enable GCS-only storage?
+            </h2>
+            <p
+              className="mt-2 text-sm leading-6"
+              style={{ color: 'var(--color-white-muted)' }}
+            >
+              Generations in this Flow will be stored only in Glide&apos;s cloud storage.
+              Fal uses a temporary 60-second transfer URL, then removes the media from
+              its CDN. This choice is permanent and cannot be changed later.
+            </p>
+            <p
+              className="mt-3 text-xs leading-5"
+              style={{ color: 'var(--color-white-muted)' }}
+            >
+              This must be enabled before the first Fal generation in this Flow.
+            </p>
+
+            {gcsOnlyError && (
+              <p
+                className="mt-3 text-xs"
+                role="alert"
+                style={{ color: 'var(--color-error)' }}
+              >
+                {gcsOnlyError}
+              </p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowGcsOnlyConfirm(false)}
+                disabled={savingGcsOnly}
+                className="px-4 py-2 rounded-lg text-xs font-medium transition-opacity disabled:opacity-40"
+                style={{
+                  color: 'var(--color-white-muted)',
+                  border: 'var(--border-default)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleGcsOnly}
+                disabled={savingGcsOnly}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-opacity disabled:opacity-40"
+                style={{ background: '#fff', color: '#000' }}
+              >
+                {savingGcsOnly && <Loader2 size={12} className="animate-spin" />}
+                {savingGcsOnly ? 'Enabling…' : 'Accept and enable'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

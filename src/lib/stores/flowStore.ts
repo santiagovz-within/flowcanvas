@@ -15,6 +15,7 @@ interface FlowStore {
   // Current flow meta
   currentFlow: Flow | null;
   setCurrentFlow: (flow: Flow | null) => void;
+  consumeGcsOnlyEligibility: () => void;
 
   // React Flow state
   nodes: Node<NodeData>[];
@@ -52,6 +53,13 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
     } else {
       set({ currentFlow: null, nodes: [], edges: [], isDirty: false });
     }
+  },
+  consumeGcsOnlyEligibility: () => {
+    set((state) => ({
+      currentFlow: state.currentFlow
+        ? { ...state.currentFlow, gcs_only_eligible: false }
+        : null,
+    }));
   },
 
   nodes: [],

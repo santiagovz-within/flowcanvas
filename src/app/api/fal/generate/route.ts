@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { FAL_MODELS } from '@/lib/api/models';
 import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getFalStorageHeaders } from '@/lib/falStorage';
 import type { GenerateImageRequest } from '@/types';
 
 fal.config({ credentials: process.env.FAL_KEY });
@@ -61,6 +62,12 @@ export async function POST(request: NextRequest) {
     const modelConfig = FAL_MODELS[model as keyof typeof FAL_MODELS];
     if (!modelConfig) return NextResponse.json({ error: 'Unknown model' }, { status: 400 });
 
+    const falHeaders = await getFalStorageHeaders({
+      userId: user.id,
+      sourceType,
+      sourceId,
+    });
+
     if (modelConfig.type === 'video') {
       // Video generation — submit async job
       const startFrameUrl      = (body as GenerateRequestBody & { startFrameUrl?: string }).startFrameUrl;
@@ -106,6 +113,7 @@ export async function POST(request: NextRequest) {
           ...(!isOmni && endFrameUrl ? { end_image_url: endFrameUrl } : {}),
           ...(isSeedance    ? { generate_audio: generateAudio !== false, resolution: seedanceResolution } : {}),
         },
+        headers: falHeaders,
       });
 
       const { data: gen } = await supabase
@@ -182,7 +190,10 @@ export async function POST(request: NextRequest) {
 
       for (let i = 0; i < numImages; i++) {
         console.log(`[fal/generate] queue image ${i + 1}/${numImages} input:`, JSON.stringify(baseInput));
-        const { request_id } = await fal.queue.submit(endpoint as string, { input: baseInput });
+        const { request_id } = await fal.queue.submit(endpoint as string, {
+          input: baseInput,
+          headers: falHeaders,
+        });
         const { data: gen, error: insertError } = await supabase
           .from('generations')
           .insert({
@@ -226,7 +237,10 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < numImages; i++) {
       console.log(`[fal/generate] image ${i + 1}/${numImages} input:`, JSON.stringify(baseInput));
-      const result = await fal.subscribe(endpoint as string, { input: baseInput });
+      const result = await fal.subscribe(endpoint as string, {
+        input: baseInput,
+        headers: falHeaders,
+      });
 
       const falResult = result.data as { images?: Array<{ url: string }>; image?: { url: string } };
       const imageUrl = falResult.images?.[0]?.url ?? falResult.image?.url;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getFalStorageHeaders } from '@/lib/falStorage';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -11,11 +12,17 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { imageUrl, sourceType = 'canvas', nodeId } = await request.json();
+    const { imageUrl, sourceType = 'canvas', sourceId, nodeId } = await request.json();
     if (!imageUrl) return NextResponse.json({ error: 'imageUrl is required' }, { status: 400 });
+    const falHeaders = await getFalStorageHeaders({
+      userId: user.id,
+      sourceType,
+      sourceId,
+    });
 
     const result = await fal.subscribe('fal-ai/ideogram/remove-background', {
       input: { image_url: imageUrl },
+      headers: falHeaders,
     });
 
     const falResult = result.data as { image?: { url: string } };
@@ -36,6 +43,7 @@ export async function POST(request: NextRequest) {
       id: genId,
       user_id: user.id,
       source_type: sourceType,
+      source_id: sourceId,
       node_id: nodeId,
       model: 'ideogram-remove-bg',
       parameters: {},

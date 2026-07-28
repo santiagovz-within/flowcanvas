@@ -90,7 +90,7 @@ export async function GET(
 }
 
 // PATCH /api/flows/[flowId]
-// Owner-only. Toggles is_shared.
+// Owner-only. GCS-only mode additionally requires an admin.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ flowId: string }> },
@@ -101,12 +101,15 @@ export async function PATCH(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { flowId } = await params;
-    const body = await request.json() as { is_shared: boolean };
+    const body = await request.json() as {
+      is_shared?: unknown;
+      is_gcs_only?: unknown;
+    };
 
     const admin = createAdminClient();
     const { data: flow } = await admin
       .from('flows')
-      .select('user_id')
+      .select('user_id, is_gcs_only, gcs_only_eligible')
       .eq('id', flowId)
       .single();
 
@@ -114,8 +117,72 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    await admin.from('flows').update({ is_shared: body.is_shared }).eq('id', flowId);
-    return NextResponse.json({ ok: true });
+    const updates: {
+      is_shared?: boolean;
+      is_gcs_only?: boolean;
+      gcs_only_eligible?: boolean;
+      updated_at?: string;
+    } = {};
+
+    if (typeof body.is_shared === 'boolean') {
+      updates.is_shared = body.is_shared;
+    }
+
+    if (typeof body.is_gcs_only === 'boolean') {
+      if (!body.is_gcs_only) {
+        return NextResponse.json(
+          { error: 'GCS-only mode cannot be disabled once enabled' },
+          { status: 409 },
+        );
+      }
+
+      if (flow.is_gcs_only) {
+        return NextResponse.json({ ok: true, is_gcs_only: true });
+      }
+
+      if (!flow.gcs_only_eligible) {
+        return NextResponse.json(
+          { error: 'GCS-only mode is only available on a new Flow before its first Fal generation' },
+          { status: 409 },
+        );
+      }
+
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.is_admin) {
+        return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      }
+      updates.is_gcs_only = true;
+      updates.gcs_only_eligible = false;
+    }
+
+    if (updates.is_shared === undefined && updates.is_gcs_only === undefined) {
+      return NextResponse.json({ error: 'No supported Flow setting provided' }, { status: 400 });
+    }
+
+    updates.updated_at = new Date().toISOString();
+    let updateQuery = admin.from('flows').update(updates).eq('id', flowId);
+    if (updates.is_gcs_only) {
+      // Eligibility may be consumed concurrently by the first Fal request.
+      updateQuery = updateQuery
+        .eq('is_gcs_only', false)
+        .eq('gcs_only_eligible', true);
+    }
+
+    const { data: updatedRows, error } = await updateQuery.select('id');
+    if (error) throw new Error(error.message);
+    if (updates.is_gcs_only && updatedRows?.length === 0) {
+      return NextResponse.json(
+        { error: 'This Flow started a Fal generation before GCS-only mode was enabled' },
+        { status: 409 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, ...updates });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     console.error('[flows/[flowId]] PATCH error:', detail);

@@ -42,6 +42,7 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
     if (!inputVideoUrl || isProcessing) return;
     setIsProcessing(true);
     updateData({ status: 'processing' });
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res = await fetch('/api/fal/video-upscale', {
@@ -50,6 +51,7 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
         body: JSON.stringify({
           videoUrl: inputVideoUrl,
           upscaleFactor,
+          sourceId: useFlowStore.getState().currentFlow?.id,
           nodeId: id,
         }),
       });

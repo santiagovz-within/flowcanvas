@@ -174,6 +174,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     updateData({ status: 'processing', errorMessage: undefined, pendingRequestId: undefined, pendingEndpoint: undefined });
 
     const endpoint = getFalEndpoint();
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res = await fetch('/api/fal/generate', {
@@ -189,6 +190,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
           generateAudio: data.generateAudio ?? true,
           seedanceResolution: data.seedanceResolution ?? '720p',
           sourceType: 'canvas',
+          sourceId: useFlowStore.getState().currentFlow?.id,
           nodeId: id,
         }),
       });

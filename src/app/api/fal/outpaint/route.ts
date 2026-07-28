@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getFalStorageHeaders } from '@/lib/falStorage';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
       expandLeft   = 0,
       resizeSourceTo,
       sourceType   = 'canvas',
+      sourceId,
       nodeId,
     } = await request.json();
 
@@ -26,6 +28,11 @@ export async function POST(request: NextRequest) {
     if (!expandTop && !expandRight && !expandBottom && !expandLeft) {
       return NextResponse.json({ error: 'No expansion specified' }, { status: 400 });
     }
+    const falHeaders = await getFalStorageHeaders({
+      userId: user.id,
+      sourceType,
+      sourceId,
+    });
 
     console.log('[fal/outpaint] input:', { imageUrl, expandTop, expandRight, expandBottom, expandLeft, resizeSourceTo });
 
@@ -51,6 +58,7 @@ export async function POST(request: NextRequest) {
         ...(expandBottom > 0 ? { expand_bottom: expandBottom } : {}),
         ...(expandLeft   > 0 ? { expand_left:   expandLeft   } : {}),
       },
+      headers: falHeaders,
     });
 
     const d = result.data as Record<string, unknown>;
@@ -79,6 +87,7 @@ export async function POST(request: NextRequest) {
       id:          genId,
       user_id:     user.id,
       source_type: sourceType,
+      source_id:   sourceId,
       node_id:     nodeId,
       model:       'flux-2-pro-outpaint',
       parameters:  { expandTop, expandRight, expandBottom, expandLeft },

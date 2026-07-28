@@ -145,6 +145,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps & { data: UpscaleN
     if (!inputImageUrl || isUpscaling) return;
     setIsUpscaling(true);
     updateData({ status: 'processing' });
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res = await fetch('/api/fal/upscale', {
@@ -155,6 +156,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps & { data: UpscaleN
           imageUrl: inputImageUrl,
           scaleFactor: validScaleFactor,
           sourceType: 'canvas',
+          sourceId: useFlowStore.getState().currentFlow?.id,
           nodeId: id,
         }),
       });

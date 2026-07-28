@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
+import { getFalStorageHeaders } from '@/lib/falStorage';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { videoUrl, upscaleFactor = 2, targetFps, h264Output, nodeId } = await request.json();
+    const { videoUrl, upscaleFactor = 2, targetFps, h264Output, sourceId, nodeId } = await request.json();
 
     if (!videoUrl) {
       return NextResponse.json({ error: 'videoUrl is required' }, { status: 400 });
@@ -21,6 +22,11 @@ export async function POST(request: NextRequest) {
     if (![2, 3, 4].includes(upscaleFactor)) {
       return NextResponse.json({ error: 'upscaleFactor must be 2, 3, or 4' }, { status: 400 });
     }
+    const falHeaders = await getFalStorageHeaders({
+      userId: user.id,
+      sourceType: 'canvas',
+      sourceId,
+    });
 
     const { request_id } = await fal.queue.submit(FAL_ENDPOINT, {
       input: {
@@ -29,11 +35,13 @@ export async function POST(request: NextRequest) {
         ...(targetFps != null ? { target_fps: targetFps } : {}),
         ...(h264Output === true ? { H264_output: true } : {}),
       },
+      headers: falHeaders,
     });
 
     await supabase.from('generations').insert({
       user_id: user.id,
       source_type: 'canvas',
+      source_id: sourceId,
       node_id: nodeId,
       model: FAL_ENDPOINT,
       parameters: { upscaleFactor, targetFps, h264Output },

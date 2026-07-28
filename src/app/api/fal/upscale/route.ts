@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { FAL_MODELS } from '@/lib/api/models';
 import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getFalStorageHeaders } from '@/lib/falStorage';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { model, imageUrl, scaleFactor = 2, sourceType, nodeId } = await request.json();
+    const { model, imageUrl, scaleFactor = 2, sourceType, sourceId, nodeId } = await request.json();
 
     const modelConfig = FAL_MODELS[model as keyof typeof FAL_MODELS];
     if (!modelConfig || modelConfig.type !== 'upscale') {
@@ -21,11 +22,19 @@ export async function POST(request: NextRequest) {
 
     const scaleParam = 'scaleParam' in modelConfig ? modelConfig.scaleParam : 'scale';
     const falInput = { image_url: imageUrl, [scaleParam]: scaleFactor };
+    const falHeaders = await getFalStorageHeaders({
+      userId: user.id,
+      sourceType: sourceType ?? 'canvas',
+      sourceId,
+    });
 
     console.log('[fal/upscale] endpoint:', modelConfig.endpoint, '| scaleParam:', scaleParam, '| scale:', scaleFactor);
     console.log('[fal/upscale] input:', JSON.stringify(falInput));
 
-    const result = await fal.subscribe(modelConfig.endpoint, { input: falInput });
+    const result = await fal.subscribe(modelConfig.endpoint, {
+      input: falInput,
+      headers: falHeaders,
+    });
 
     const d = result.data as Record<string, unknown>;
     const outputUrl =
@@ -56,6 +65,7 @@ export async function POST(request: NextRequest) {
       id: genId,
       user_id: user.id,
       source_type: sourceType ?? 'canvas',
+      source_id: sourceId,
       node_id: nodeId,
       model,
       parameters: { scaleFactor },

@@ -23,6 +23,8 @@ export interface Flow {
   is_template: boolean;
   base_flow_order: number | null;
   is_shared: boolean;
+  is_gcs_only: boolean;
+  gcs_only_eligible: boolean;
   created_at: string;
   updated_at: string;
 }

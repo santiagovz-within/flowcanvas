@@ -684,6 +684,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
 
     const aspectRatio = data.aspectRatio ?? '1:1';
     const resolution  = data.resolution  ?? '1K';
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res    = await fetch('/api/fal/generate', {
@@ -693,7 +694,9 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           model: data.model, prompt: data.prompt ?? '',
           aspectRatio, resolution, numImages: 1,
           referenceImageUrls: [selectedImage],
-          sourceType: 'canvas', nodeId: id,
+          sourceType: 'canvas',
+          sourceId: useFlowStore.getState().currentFlow?.id,
+          nodeId: id,
         }),
       });
       const result = await res.json();
@@ -723,6 +726,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
     updateData({ status: 'processing' });
 
     const plan = computeOutpaintResizePlan(naturalSize.w, naturalSize.h, expandTop, expandRight, expandBottom, expandLeft);
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res    = await fetch('/api/fal/outpaint', {
@@ -735,7 +739,9 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           expandBottom: plan.outpaintBottom,
           expandLeft:   plan.outpaintLeft,
           ...(plan.needsResize ? { resizeSourceTo: { width: plan.sourceW, height: plan.sourceH } } : {}),
-          sourceType: 'canvas', nodeId: id,
+          sourceType: 'canvas',
+          sourceId: useFlowStore.getState().currentFlow?.id,
+          nodeId: id,
         }),
       });
       const result = await res.json();
@@ -777,6 +783,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
     const fps         = data.outpaintFps         ?? 24;
     const negativePrompt = data.outpaintNegativePrompt ?? VIDEO_OUTPAINT_DEFAULT_NEGATIVE_PROMPT;
     const numFrames = videoDuration !== null ? Math.max(1, Math.round(videoDuration * fps)) : undefined;
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res = await fetch('/api/fal/video-outpaint', {
@@ -786,6 +793,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           videoUrl: inputVideoUrl,
           aspectRatio, resolution, fps, numFrames,
           prompt, negativePrompt,
+          sourceId: useFlowStore.getState().currentFlow?.id,
           nodeId: id,
         }),
       });

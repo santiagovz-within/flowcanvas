@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
+import { getFalStorageHeaders } from '@/lib/falStorage';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
       numFrames,
       prompt,
       negativePrompt,
+      sourceId,
       nodeId,
     } = await request.json();
 
@@ -33,6 +35,11 @@ export async function POST(request: NextRequest) {
     if (!prompt?.trim()) return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
 
     const dimensions = getOutpaintDimensions(aspectRatio, resolution as '720p' | '1080p');
+    const falHeaders = await getFalStorageHeaders({
+      userId: user.id,
+      sourceType: 'canvas',
+      sourceId,
+    });
 
     const { request_id } = await fal.queue.submit(FAL_ENDPOINT, {
       input: {
@@ -53,11 +60,13 @@ export async function POST(request: NextRequest) {
         video_quality: 'high',
         video_write_mode: 'balanced',
       },
+      headers: falHeaders,
     });
 
     await supabase.from('generations').insert({
       user_id: user.id,
       source_type: 'canvas',
+      source_id: sourceId,
       node_id: nodeId ?? null,
       model: FAL_ENDPOINT,
       prompt: prompt.trim(),

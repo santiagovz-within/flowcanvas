@@ -184,6 +184,9 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
 
     const endpoint = modelConfig?.provider === 'google' ? '/api/google/generate' : '/api/fal/generate';
     const inputImageUrls = (data.inputImageUrls ?? []).filter(Boolean);
+    if (endpoint === '/api/fal/generate') {
+      useFlowStore.getState().consumeGcsOnlyEligibility();
+    }
 
     const payload = {
       model: data.model,
@@ -193,6 +196,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       numImages: data.numImages,
       referenceImageUrls: inputImageUrls,
       sourceType: 'canvas',
+      sourceId: useFlowStore.getState().currentFlow?.id,
       nodeId: id,
     };
     console.log('[ImageGenNode] Outgoing payload →', JSON.stringify(payload, null, 2));

@@ -361,6 +361,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
     if (!inputImageUrl || isRunning) return;
     setIsRunning(true);
     dispatchUpdate({ status: 'processing' });
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res = await fetch('/api/fal/upscale', {
@@ -371,6 +372,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           imageUrl: inputImageUrl,
           scaleFactor: validScaleFactor,
           sourceType: 'canvas',
+          sourceId: useFlowStore.getState().currentFlow?.id,
           nodeId: id,
         }),
       });
@@ -397,6 +399,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
     if (!inputVideoUrl || isRunning) return;
     setIsRunning(true);
     dispatchUpdate({ status: 'processing' });
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res = await fetch('/api/fal/video-upscale', {
@@ -407,6 +410,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           upscaleFactor: data.upscaleFactor ?? 2,
           targetFps: data.targetFps ?? null,
           h264Output: data.h264Output ?? false,
+          sourceId: useFlowStore.getState().currentFlow?.id,
           nodeId: id,
         }),
       });
@@ -464,6 +468,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
 
   async function processImageItem(url: string, index: number): Promise<void> {
     updateBulkItem(index, { status: 'processing' });
+    useFlowStore.getState().consumeGcsOnlyEligibility();
     try {
       const res = await fetch('/api/fal/upscale', {
         method: 'POST',
@@ -473,6 +478,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           imageUrl: url,
           scaleFactor: validScaleFactor,
           sourceType: 'canvas',
+          sourceId: useFlowStore.getState().currentFlow?.id,
           nodeId: id,
         }),
       });
@@ -489,6 +495,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
 
   async function processVideoItem(url: string, index: number): Promise<void> {
     updateBulkItem(index, { status: 'processing' });
+    useFlowStore.getState().consumeGcsOnlyEligibility();
     try {
       const submitRes = await fetch('/api/fal/video-upscale', {
         method: 'POST',
@@ -498,6 +505,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           upscaleFactor: data.upscaleFactor ?? 2,
           targetFps: data.targetFps ?? null,
           h264Output: data.h264Output ?? false,
+          sourceId: useFlowStore.getState().currentFlow?.id,
           nodeId: id,
         }),
       });

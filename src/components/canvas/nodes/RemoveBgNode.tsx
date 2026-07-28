@@ -45,12 +45,18 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
     if (!inputImageUrl || isProcessing) return;
     setIsProcessing(true);
     updateData({ status: 'processing' });
+    useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
       const res = await fetch('/api/fal/remove-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: inputImageUrl, sourceType: 'canvas', nodeId: id }),
+        body: JSON.stringify({
+          imageUrl: inputImageUrl,
+          sourceType: 'canvas',
+          sourceId: useFlowStore.getState().currentFlow?.id,
+          nodeId: id,
+        }),
       });
       const result = await res.json();
 
