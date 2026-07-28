@@ -171,15 +171,16 @@ export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare
   }
 
   return (
-    <div
-      className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between px-4 py-2.5 rounded-xl pointer-events-none"
-      style={{
-        background: 'var(--topbar-bg)',
-        backdropFilter: 'blur(12px)',
-        border: 'var(--border-default)',
-        boxShadow: 'var(--shadow-node)',
-      }}
-    >
+    <>
+      <div
+        className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between px-4 py-2.5 rounded-xl pointer-events-none"
+        style={{
+          background: 'var(--topbar-bg)',
+          backdropFilter: 'blur(12px)',
+          border: 'var(--border-default)',
+          boxShadow: 'var(--shadow-node)',
+        }}
+      >
       {/* Left: breadcrumb */}
       <div className="flex items-center gap-2 pointer-events-auto">
         <Link
@@ -323,10 +324,11 @@ export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare
           {copied ? 'Copied!' : isShared ? 'Shared' : 'Share'}
         </button>
       </div>
+      </div>
 
       {showGcsOnlyConfirm && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-auto"
+          className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-auto"
           style={{ background: 'rgba(0,0,0,0.68)', backdropFilter: 'blur(4px)' }}
           role="presentation"
           onMouseDown={(event) => {
@@ -411,6 +413,6 @@ export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
