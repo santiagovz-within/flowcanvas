@@ -159,10 +159,11 @@ export interface ImageGenNodeData extends Record<string, unknown> {
   inputImageUrls?: string[];
   imagePortCount?: number;
   generatedImages?: string[];
+  generationSlots?: Array<string | null>;
   generationHistory?: string[][];
   status: NodeStatus;
   errorMessage?: string;
-  pendingRequests?: Array<{ requestId: string; endpoint: string }>;
+  pendingRequests?: Array<{ requestId: string; endpoint: string; slotIndex?: number }>;
   label?: string;
 }
 

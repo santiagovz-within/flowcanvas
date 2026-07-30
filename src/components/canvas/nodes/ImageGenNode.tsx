@@ -4,7 +4,7 @@ import { Position, type NodeProps } from '@xyflow/react';
 import { Aperture, Play, Download, ChevronLeft, ChevronRight, Image as ImageIcon, RefreshCw, AlertTriangle } from 'lucide-react';
 import { SendToFigmaButton } from './SendToFigmaButton';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { downloadAllFromUrls } from '@/lib/utils/download';
+import { downloadAllFromUrls, downloadFromUrl } from '@/lib/utils/download';
 import { playSuccessSound } from '@/lib/utils/sound';
 import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
 import { NodeWrapper } from './NodeWrapper';
@@ -55,6 +55,7 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
 export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGenNodeData }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadingImageIndex, setDownloadingImageIndex] = useState<number | null>(null);
   const storeEdges = useFlowStore((state) => state.edges);
   const isOutputConnected = storeEdges.some((edge) => edge.source === id && edge.sourceHandle === 'image');
   const genHistory = data.generationHistory ?? [];
@@ -103,7 +104,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     if (!promptSectionRef.current) return;
     const el = promptSectionRef.current;
     setPromptHandleTop(el.offsetTop + el.offsetHeight / 2);
-  });
+  }, [data.promptConnected, localPrompt]);
 
   useLayoutEffect(() => {
     if (!isMultiImageModel || !rowsListRef.current) return;
@@ -116,12 +117,17 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     }));
   }
 
+  function getCurrentData() {
+    const currentNode = useFlowStore.getState().nodes.find((node) => node.id === id);
+    return currentNode?.data as ImageGenNodeData | undefined;
+  }
+
   function completeGeneration(mediaUrls: string[]) {
-    const currentNodes = useFlowStore.getState().nodes;
-    const currentData = currentNodes.find((node) => node.id === id)?.data as ImageGenNodeData | undefined;
+    const currentData = getCurrentData();
     const newHistory = [...(currentData?.generationHistory ?? []), mediaUrls];
     updateData({
       generatedImages: mediaUrls,
+      generationSlots: undefined,
       generationHistory: newHistory,
       status: 'completed',
       errorMessage: undefined,
@@ -131,6 +137,31 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     document.dispatchEvent(new CustomEvent('node:image-propagate', {
       detail: { sourceNodeId: id, imageUrl: mediaUrls[0] },
     }));
+  }
+
+  function addPendingRequest(request: PendingImageRequest) {
+    const currentPending = getCurrentData()?.pendingRequests ?? [];
+    if (currentPending.some(({ requestId }) => requestId === request.requestId)) return;
+    updateData({ pendingRequests: [...currentPending, request] });
+  }
+
+  function removePendingRequest(requestId: string) {
+    const pendingRequests = (getCurrentData()?.pendingRequests ?? [])
+      .filter((request) => request.requestId !== requestId);
+    updateData({ pendingRequests: pendingRequests.length > 0 ? pendingRequests : undefined });
+  }
+
+  function publishCompletedImage(slotIndex: number, imageUrl: string, slotCount: number) {
+    const currentData = getCurrentData();
+    const currentSlots = currentData?.generationSlots?.length === slotCount
+      ? currentData.generationSlots
+      : Array<string | null>(slotCount).fill(null);
+    const generationSlots = [...currentSlots];
+    generationSlots[slotIndex] = imageUrl;
+    updateData({
+      generationSlots,
+      generatedImages: generationSlots.filter((url): url is string => !!url),
+    });
   }
 
   function navigateHistory(idx: number) {
@@ -180,7 +211,14 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   async function handleGenerate() {
     if (isGenerating) return;
     setIsGenerating(true);
-    updateData({ status: 'processing', errorMessage: undefined, pendingRequests: undefined });
+    const slotCount = Math.min(4, Math.max(1, Math.round(data.numImages)));
+    updateData({
+      status: 'processing',
+      errorMessage: undefined,
+      pendingRequests: undefined,
+      generatedImages: [],
+      generationSlots: Array<string | null>(slotCount).fill(null),
+    });
 
     const endpoint = modelConfig?.provider === 'google' ? '/api/google/generate' : '/api/fal/generate';
     const inputImageUrls = (data.inputImageUrls ?? []).filter(Boolean);
@@ -193,84 +231,101 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       prompt: data.prompt ?? '',
       aspectRatio: data.aspectRatio,
       resolution: data.resolution,
-      numImages: data.numImages,
       referenceImageUrls: inputImageUrls,
       sourceType: 'canvas',
       sourceId: useFlowStore.getState().currentFlow?.id,
       nodeId: id,
+      numImages: 1,
     };
     console.log('[ImageGenNode] Outgoing payload →', JSON.stringify(payload, null, 2));
 
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const result = await readJsonResponse<ImageGenerateResponse>(res);
-      console.log('[ImageGenNode] API response ←', result);
+      const results = await Promise.allSettled(
+        Array.from({ length: slotCount }, async (_, slotIndex) => {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const result = await readJsonResponse<ImageGenerateResponse>(res);
+          console.log(`[ImageGenNode] API response for image ${slotIndex + 1} ←`, result);
 
-      if (!res.ok) {
-        throw new Error(result.details ?? result.error ?? `Server error ${res.status}`);
-      }
+          if (!res.ok) {
+            throw new Error(result.details ?? result.error ?? `Server error ${res.status}`);
+          }
 
-      if (result.mediaUrls?.length) {
-        completeGeneration(result.mediaUrls);
-      } else if (result.requests?.length) {
-        const pendingRequests = result.requests.map(({ requestId, endpoint: falEndpoint }) => ({
-          requestId,
-          endpoint: falEndpoint,
-        }));
-        updateData({ pendingRequests });
-        await pollForResults(pendingRequests);
+          let imageUrl = result.mediaUrls?.[0];
+          if (!imageUrl && result.requests?.[0]) {
+            const request = {
+              requestId: result.requests[0].requestId,
+              endpoint: result.requests[0].endpoint,
+              slotIndex,
+            };
+            addPendingRequest(request);
+            imageUrl = await pollForResult(request);
+          }
+          if (!imageUrl) {
+            throw new Error(result.details ?? result.error ?? 'Image generation failed - no output returned.');
+          }
+
+          publishCompletedImage(slotIndex, imageUrl, slotCount);
+          return imageUrl;
+        })
+      );
+
+      const failed = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failed.length === 0) {
+        completeGeneration(results.map((result) => (result as PromiseFulfilledResult<string>).value));
       } else {
-        throw new Error(result.details ?? result.error ?? 'Image generation failed - no output returned.');
+        const currentData = getCurrentData();
+        const completedImages = (currentData?.generationSlots ?? [])
+          .filter((url): url is string => !!url);
+        updateData({
+          generatedImages: completedImages,
+          generationSlots: currentData?.generationSlots,
+          status: 'error',
+          errorMessage: failed[0].reason instanceof Error
+            ? failed[0].reason.message
+            : 'One or more images could not be generated.',
+        });
       }
     } catch (err) {
       console.error('[ImageGenNode] fetch error', err);
-      updateData({ status: 'error', errorMessage: err instanceof Error ? err.message : 'Network error — check your connection.' });
+      updateData({
+        status: 'error',
+        errorMessage: err instanceof Error ? err.message : 'Network error — check your connection.',
+        generationSlots: undefined,
+      });
     } finally {
       setIsGenerating(false);
     }
   }
 
-  async function pollForResults(requests: PendingImageRequest[]) {
-    const completedUrls = new Map<string, string>();
+  async function pollForResult(request: PendingImageRequest): Promise<string> {
     const maxAttempts = 200;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let terminalError: string | undefined;
-      const pending = requests.filter(({ requestId }) => !completedUrls.has(requestId));
-
-      await Promise.all(pending.map(async ({ requestId, endpoint }) => {
-        try {
-          const statusRes = await fetch(
-            `/api/fal/status/${requestId}?endpoint=${encodeURIComponent(endpoint)}&mediaType=image`
-          );
-          if (!statusRes.ok) return;
-
+      try {
+        const statusRes = await fetch(
+          `/api/fal/status/${request.requestId}?endpoint=${encodeURIComponent(request.endpoint)}&mediaType=image`
+        );
+        if (statusRes.ok) {
           const result = await readJsonResponse<{ status: string; mediaUrls?: string[]; error?: string }>(statusRes);
           if (result.status === 'completed' && result.mediaUrls?.[0]) {
-            completedUrls.set(requestId, result.mediaUrls[0]);
-          } else if (result.status === 'failed') {
+            removePendingRequest(request.requestId);
+            return result.mediaUrls[0];
+          }
+          if (result.status === 'failed') {
             terminalError = result.error ?? 'FAL reported that the image generation failed.';
           }
-        } catch {
-          // Transient status errors are retried until the polling timeout.
         }
-      }));
-
-      if (terminalError) {
-        updateData({ pendingRequests: undefined });
-        throw new Error(terminalError);
+      } catch {
+        // Transient status errors are retried until the polling timeout.
       }
-
-      if (completedUrls.size === requests.length) {
-        const mediaUrls = requests
-          .map(({ requestId }) => completedUrls.get(requestId))
-          .filter((url): url is string => !!url);
-        completeGeneration(mediaUrls);
-        return;
+      if (terminalError) {
+        removePendingRequest(request.requestId);
+        throw new Error(terminalError);
       }
 
       await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -284,9 +339,42 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     setIsGenerating(true);
     updateData({ status: 'processing', errorMessage: undefined });
     try {
-      await pollForResults(data.pendingRequests);
-    } catch (err) {
-      updateData({ status: 'error', errorMessage: err instanceof Error ? err.message : 'Could not retrieve the generated images.' });
+      const pendingRequests = data.pendingRequests;
+      const existingSlots = data.generationSlots ?? [];
+      const slotCount = Math.max(
+        existingSlots.length,
+        data.numImages,
+        ...pendingRequests.map((request, index) => (request.slotIndex ?? index) + 1)
+      );
+      if (existingSlots.length !== slotCount) {
+        updateData({
+          generationSlots: Array.from({ length: slotCount }, (_, index) => existingSlots[index] ?? null),
+        });
+      }
+
+      const results = await Promise.allSettled(
+        pendingRequests.map(async (request, index) => {
+          const slotIndex = request.slotIndex ?? index;
+          const imageUrl = await pollForResult(request);
+          publishCompletedImage(slotIndex, imageUrl, slotCount);
+          return imageUrl;
+        })
+      );
+      const failed = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      const currentData = getCurrentData();
+      const generationSlots = currentData?.generationSlots ?? [];
+
+      if (!failed && generationSlots.length > 0 && generationSlots.every((url) => !!url)) {
+        completeGeneration(generationSlots as string[]);
+      } else {
+        updateData({
+          status: 'error',
+          generationSlots,
+          errorMessage: failed?.reason instanceof Error
+            ? failed.reason.message
+            : 'Could not retrieve the complete image batch.',
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -295,10 +383,10 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   const displayImages = genHistory.length > 0 ? (genHistory[histIdx] ?? []) : (data.generatedImages ?? []);
 
   async function handleDownload() {
-    if (isDownloading || displayImages.length === 0) return;
+    if (isDownloading || downloadableImages.length === 0) return;
     setIsDownloading(true);
     try {
-      await downloadAllFromUrls(displayImages, `image-generation-v${histIdx + 1}`);
+      await downloadAllFromUrls(downloadableImages, `image-generation-v${displayVersion}`);
     } catch (error) {
       console.error('[ImageGenNode] Batch download failed', error);
       window.alert('Could not download this image batch. Please try again.');
@@ -307,8 +395,28 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     }
   }
 
+  async function handleImageDownload(url: string, imageIndex: number) {
+    if (downloadingImageIndex !== null) return;
+    setDownloadingImageIndex(imageIndex);
+    try {
+      await downloadFromUrl(url, `image-generation-v${displayVersion}-${imageIndex + 1}`);
+    } finally {
+      setDownloadingImageIndex(null);
+    }
+  }
+
   const sliderPct = ((data.numImages - 1) / 3) * 100;
   const hasPendingRequests = !!data.pendingRequests?.length;
+  const generationSlots = data.generationSlots ?? [];
+  const isShowingActiveGeneration = generationSlots.length > 0
+    && (isGenerating || data.status === 'processing' || data.status === 'error' || hasPendingRequests);
+  const hasActiveSlotRequests = isGenerating || data.status === 'processing' || hasPendingRequests;
+  const previewSlots: Array<string | null> = isShowingActiveGeneration
+    ? generationSlots
+    : displayImages;
+  const downloadableImages = previewSlots.filter((url): url is string => !!url);
+  const displayVersion = isShowingActiveGeneration ? genHistory.length + 1 : histIdx + 1;
+  const previewAspectRatio = data.aspectRatio.replace(':', ' / ');
 
   const footer = (
     <div className="flex flex-col gap-2">
@@ -331,8 +439,8 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           Check status on FAL
         </button>
       )}
-      {displayImages.length > 0 && (
-        <div key={displayImages[0]} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+      {downloadableImages.length > 0 && (
+        <div key={downloadableImages[0]} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
           <button
             onClick={handleDownload}
             disabled={isDownloading}
@@ -340,9 +448,9 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
             style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
           >
             {isDownloading ? <RefreshCw size={12} className="animate-spin" /> : <Download size={12} />}
-            {isDownloading ? 'Downloading…' : displayImages.length > 1 ? `Download All (${displayImages.length})` : 'Download'}
+            {isDownloading ? 'Downloading…' : downloadableImages.length > 1 ? `Download All (${downloadableImages.length})` : 'Download'}
           </button>
-          <SendToFigmaButton imageUrl={displayImages[0]} style={{ flex: 1, minWidth: 0 }} />
+          <SendToFigmaButton imageUrl={downloadableImages[0]} style={{ flex: 1, minWidth: 0 }} />
         </div>
       )}
     </div>
@@ -611,23 +719,67 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       )}
 
       {/* ── Generated previews ───────────────────────────────── */}
-      {displayImages.length > 0 && (
+      {previewSlots.length > 0 && (
         <div className="flex flex-col gap-2">
-          {displayImages.map((url, i) => (
+          {previewSlots.map((url, i) => (
             <div
-              key={i}
+              key={`${isShowingActiveGeneration ? 'active' : `history-${histIdx}`}-${i}`}
+              className="relative"
               style={{
+                aspectRatio: previewAspectRatio,
                 borderRadius: 8,
                 border: '1px solid rgba(255,255,255,0.08)',
                 overflow: 'hidden',
+                background: 'var(--color-bg-surface)',
               }}
             >
-              <ProgressiveImage
-                src={url}
-                alt={`Generated ${i + 1}`}
-                className="w-full block nodrag"
-                style={{ height: 'auto' }}
-              />
+              {url ? (
+                <>
+                  <ProgressiveImage
+                    src={url}
+                    alt={`Generated ${i + 1}`}
+                    className="w-full h-full object-cover nodrag"
+                    fill
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleImageDownload(url, i)}
+                    disabled={downloadingImageIndex !== null}
+                    className="absolute bottom-2 right-2 flex items-center justify-center nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50"
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      background: '#fff',
+                      color: '#111',
+                      boxShadow: '0 2px 10px rgba(0,0,0,0.28)',
+                    }}
+                    title={`Download image ${i + 1}`}
+                    aria-label={`Download image ${i + 1}`}
+                  >
+                    {downloadingImageIndex === i
+                      ? <RefreshCw size={13} className="animate-spin" />
+                      : <Download size={13} />}
+                  </button>
+                </>
+              ) : (
+                <div className="relative flex h-full w-full items-center justify-center">
+                  <div
+                    className={`absolute inset-0${hasActiveSlotRequests ? ' animate-pulse' : ''}`}
+                    style={{
+                      background: hasActiveSlotRequests
+                        ? 'rgba(255,255,255,0.09)'
+                        : 'rgba(248,113,113,0.12)',
+                    }}
+                  />
+                  <span
+                    className="relative text-xs font-medium"
+                    style={{ color: 'var(--color-white-muted)' }}
+                  >
+                    {hasActiveSlotRequests ? 'Generating' : 'Failed'}
+                  </span>
+                </div>
+              )}
             </div>
           ))}
         </div>

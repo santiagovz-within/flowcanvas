@@ -114,6 +114,7 @@ const PASTE_CLEAR_FIELDS = new Set([
   'outputImageUrl', 'outputVideoUrl',
   'inputImageUrl',
   'generatedImages',
+  'generationSlots',
   'pendingRequests',
   'startFrameUrl', 'endFrameUrl',
   'generatedPrompt',
