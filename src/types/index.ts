@@ -25,6 +25,7 @@ export interface Flow {
   is_shared: boolean;
   is_gcs_only: boolean;
   gcs_only_eligible: boolean;
+  lifecycle_state: 'draft' | 'active';
   created_at: string;
   updated_at: string;
 }

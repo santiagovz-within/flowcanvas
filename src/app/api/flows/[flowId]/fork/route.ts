@@ -33,6 +33,7 @@ export async function POST(
         flow_data: source.flow_data,
         is_template: false,
         is_shared: false,
+        lifecycle_state: 'active',
       })
       .select('id')
       .single();

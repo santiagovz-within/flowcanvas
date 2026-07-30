@@ -53,7 +53,10 @@ export async function GET() {
   }
 
   // Node usage — count how many times each node type appears across all saved flows
-  const { data: flows } = await supabase.from('flows').select('flow_data');
+  const { data: flows } = await supabase
+    .from('flows')
+    .select('flow_data')
+    .eq('lifecycle_state', 'active');
   const nodeCounts: Record<string, number> = {};
   for (const flow of flows ?? []) {
     const nodes = (flow.flow_data as { nodes?: { type?: string }[] })?.nodes ?? [];

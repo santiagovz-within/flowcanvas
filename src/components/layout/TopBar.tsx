@@ -98,13 +98,19 @@ export function TopBar({
     setSavingBase(true);
     try {
       if (isDirty && !(await onSave())) return;
+      const nextIsBaseFlow = !isBaseFlow;
       await supabase.from('flows').update({
-        is_template: !isBaseFlow,
+        is_template: nextIsBaseFlow,
+        ...(nextIsBaseFlow ? { lifecycle_state: 'active' as const } : {}),
         updated_at: new Date().toISOString(),
       }).eq('id', flowId);
       useFlowStore.setState((state) => ({
         currentFlow: state.currentFlow
-          ? { ...state.currentFlow, is_template: !isBaseFlow }
+          ? {
+              ...state.currentFlow,
+              is_template: nextIsBaseFlow,
+              ...(nextIsBaseFlow ? { lifecycle_state: 'active' as const } : {}),
+            }
           : null,
       }));
     } finally {

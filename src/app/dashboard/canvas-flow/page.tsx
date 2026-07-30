@@ -14,7 +14,6 @@ import { isGcsRef, isSignedGcsUrl, resolveGcsRefs } from '@/lib/utils/mediaUtils
 import { uploadImageRefToStorage } from '@/lib/utils/uploadImage';
 import { MAX_UPLOAD_SIZE_BYTES } from '@/lib/utils/constants';
 import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
-import { markNewFlowDraft } from '@/lib/utils/flowPersistence';
 
 // Number of base flows shown before the fade + "Explore all flows" button.
 const BASE_FLOWS_VISIBLE = 8;
@@ -254,11 +253,16 @@ export default function CanvasFlowPage() {
       return;
     }
 
+    // Opportunistic safety net for browser/tab exits that could not complete
+    // their draft deletion request. Drafts are filtered below regardless.
+    void fetch('/api/flows/drafts/cleanup', { method: 'POST' }).catch(() => {});
+
     const userFlowsPromise = supabase
       .from('flows')
       .select('id, title, description, thumbnail_url, created_at, updated_at')
       .eq('user_id', user.id)
       .eq('is_template', false)
+      .eq('lifecycle_state', 'active')
       .order('updated_at', { ascending: false });
     const profilePromise = supabase
       .from('profiles')
@@ -301,7 +305,7 @@ export default function CanvasFlowPage() {
   async function createNewFlow(
     title = 'Untitled Flow',
     flowData: Record<string, unknown> = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
-    discardIfAbandoned = true,
+    startAsDraft = true,
   ) {
     if (isCreatingFlow) return;
     setIsCreatingFlow(true);
@@ -313,7 +317,13 @@ export default function CanvasFlowPage() {
       }
       const { data, error } = await supabase
         .from('flows')
-        .insert({ user_id: user.id, title, flow_data: flowData, is_template: false })
+        .insert({
+          user_id: user.id,
+          title,
+          flow_data: flowData,
+          is_template: false,
+          lifecycle_state: startAsDraft ? 'draft' : 'active',
+        })
         .select()
         .single();
 
@@ -323,7 +333,6 @@ export default function CanvasFlowPage() {
         return;
       }
 
-      if (discardIfAbandoned) markNewFlowDraft(data.id);
       router.push(`/dashboard/canvas-flow/${data.id}`);
     } catch (error) {
       console.error('[CanvasFlow] Failed to create flow:', error);

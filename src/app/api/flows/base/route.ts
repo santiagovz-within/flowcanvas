@@ -23,6 +23,7 @@ export async function GET() {
       .from('flows')
       .select('id, title, description, thumbnail_url, base_flow_order, created_at, updated_at, user_id')
       .eq('is_template', true)
+      .eq('lifecycle_state', 'active')
       .order('base_flow_order', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
 

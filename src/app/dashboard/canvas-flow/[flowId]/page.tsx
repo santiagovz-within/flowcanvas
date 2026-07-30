@@ -10,8 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { AUTOSAVE_DEBOUNCE_MS } from '@/lib/utils/constants';
 import { createFlowThumbnail, extractFlowThumbnailSource } from '@/lib/utils/flowThumbnail';
 import {
-  clearNewFlowDraft,
-  isMarkedNewFlowDraft,
+  shouldActivateFlow,
   shouldDiscardAbandonedFlow,
 } from '@/lib/utils/flowPersistence';
 
@@ -26,7 +25,7 @@ export default function FlowEditorPage() {
   const supabase = useMemo(() => createClient(), []);
   const thumbnailAttempts = useRef({ sourceUrl: null as string | null, failures: 0 });
   const previousThumbnailSource = useRef<string | null | undefined>(undefined);
-  const isNewFlowDraft = useRef(false);
+  const isDraftFlow = useRef(false);
   const hasLoadedFlow = useRef(false);
   const discardRequested = useRef(false);
   const latestNodes = useRef(nodes);
@@ -44,6 +43,7 @@ export default function FlowEditorPage() {
     const { data, isOwner: owner } = await res.json();
     if (data) {
       hasLoadedFlow.current = true;
+      isDraftFlow.current = data.lifecycle_state === 'draft';
       setCurrentFlow(data);
       setIsOwner(owner ?? true);
       setIsShared(data.is_shared ?? false);
@@ -91,7 +91,7 @@ export default function FlowEditorPage() {
   }, [supabase]);
 
   useEffect(() => {
-    isNewFlowDraft.current = isMarkedNewFlowDraft(flowId);
+    isDraftFlow.current = false;
     hasLoadedFlow.current = false;
     discardRequested.current = false;
   }, [flowId]);
@@ -99,6 +99,10 @@ export default function FlowEditorPage() {
   useEffect(() => {
     latestNodes.current = nodes;
   }, [nodes]);
+
+  useEffect(() => {
+    if (currentFlow?.lifecycle_state === 'active') isDraftFlow.current = false;
+  }, [currentFlow]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => { void loadFlow(); }, 0);
@@ -114,6 +118,8 @@ export default function FlowEditorPage() {
 
     const snapshotNodes = snapshot.nodes;
     const snapshotEdges = snapshot.edges;
+    const shouldActivate = snapshot.currentFlow.lifecycle_state === 'draft'
+      && shouldActivateFlow(snapshotNodes);
     const thumbnailSource = extractFlowThumbnailSource(snapshotNodes);
     if (thumbnailAttempts.current.sourceUrl !== thumbnailSource) {
       thumbnailAttempts.current = { sourceUrl: thumbnailSource, failures: 0 };
@@ -152,26 +158,27 @@ export default function FlowEditorPage() {
             : thumbnailRef
               ? { thumbnail_url: thumbnailRef }
               : {}),
+          ...(shouldActivate ? { lifecycle_state: 'active' as const } : {}),
           updated_at: new Date().toISOString(),
         })
         .eq('id', flowId);
       if (error) throw error;
 
-      if (thumbnailRef || !thumbnailSource) {
+      if (thumbnailRef || !thumbnailSource || shouldActivate) {
         useFlowStore.setState((state) => ({
           currentFlow: state.currentFlow
-            ? { ...state.currentFlow, thumbnail_url: thumbnailRef ?? null }
+            ? {
+                ...state.currentFlow,
+                ...(thumbnailRef || !thumbnailSource
+                  ? { thumbnail_url: thumbnailRef ?? null }
+                  : {}),
+                ...(shouldActivate ? { lifecycle_state: 'active' as const } : {}),
+              }
             : null,
         }));
       }
 
-      if (
-        isNewFlowDraft.current
-        && !shouldDiscardAbandonedFlow(snapshotNodes)
-      ) {
-        clearNewFlowDraft(flowId);
-        isNewFlowDraft.current = false;
-      }
+      if (shouldActivate) isDraftFlow.current = false;
 
       const latest = useFlowStore.getState();
       const snapshotIsCurrent = latest.nodes === snapshotNodes && latest.edges === snapshotEdges;
@@ -189,22 +196,21 @@ export default function FlowEditorPage() {
     }
   }, [flowId, isOwner, setDirty, setLastSaved, setSaving, supabase]);
 
-  // Promote a draft as soon as it gains real content or a second node. The
-  // marker is cleared by saveFlow only after that content reaches the database.
+  // Promote a draft as soon as it gains meaningful content, a media upload, or
+  // its first node. The state changes in the same database update as flow_data.
   useEffect(() => {
     if (
       !currentFlow
       || !hasLoadedFlow.current
-      || !isNewFlowDraft.current
-      || shouldDiscardAbandonedFlow(nodes)
+      || currentFlow.lifecycle_state !== 'draft'
+      || !shouldActivateFlow(nodes)
       || !isDirty
       || isSaving
     ) {
       return;
     }
 
-    const timer = window.setTimeout(() => { void saveFlow(); }, 0);
-    return () => window.clearTimeout(timer);
+    void saveFlow();
   }, [currentFlow, isDirty, isSaving, nodes, saveFlow]);
 
   const discardAbandonedFlow = useCallback(async (
@@ -212,8 +218,7 @@ export default function FlowEditorPage() {
   ): Promise<'discarded' | 'keep' | 'failed'> => {
     if (
       !hasLoadedFlow.current
-      || !isNewFlowDraft.current
-      || !isMarkedNewFlowDraft(flowId)
+      || !isDraftFlow.current
       || !shouldDiscardAbandonedFlow(latestNodes.current)
     ) {
       return 'keep';
@@ -228,15 +233,13 @@ export default function FlowEditorPage() {
       });
 
       if (response.ok || response.status === 404) {
-        clearNewFlowDraft(flowId);
-        isNewFlowDraft.current = false;
+        isDraftFlow.current = false;
         return 'discarded';
       }
 
-      // The server is the final guard against a stale client deleting content.
+      // The server is the final guard against deleting a promoted Flow.
       if (response.status === 409) {
-        clearNewFlowDraft(flowId);
-        isNewFlowDraft.current = false;
+        isDraftFlow.current = false;
         return 'keep';
       }
 

@@ -70,7 +70,10 @@ export async function GET(
     if (error || !flow) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const isOwner = flow.user_id === user.id;
-    if (!isOwner && !flow.is_shared && !flow.is_template) {
+    if (
+      !isOwner
+      && (flow.lifecycle_state !== 'active' || (!flow.is_shared && !flow.is_template))
+    ) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -192,7 +195,7 @@ export async function PATCH(
 }
 
 // DELETE /api/flows/[flowId]
-// Removes only an abandoned, non-template flow with no meaningful content.
+// Removes only a blank draft owned by the current user.
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ flowId: string }> },
@@ -206,7 +209,7 @@ export async function DELETE(
     const admin = createAdminClient();
     const { data: flow, error: loadError } = await admin
       .from('flows')
-      .select('user_id, is_template, flow_data')
+      .select('user_id, is_template, lifecycle_state, flow_data')
       .eq('id', flowId)
       .single();
 
@@ -218,19 +221,31 @@ export async function DELETE(
     }
 
     const nodes = Array.isArray(flow.flow_data?.nodes) ? flow.flow_data.nodes : [];
-    if (flow.is_template || !shouldDiscardAbandonedFlow(nodes)) {
+    if (
+      flow.lifecycle_state !== 'draft'
+      || flow.is_template
+      || !shouldDiscardAbandonedFlow(nodes)
+    ) {
       return NextResponse.json(
-        { error: 'Flow contains content and cannot be discarded' },
+        { error: 'Flow is active or contains content and cannot be discarded' },
         { status: 409 },
       );
     }
 
-    const { error: deleteError } = await admin
+    const { data: deletedRows, error: deleteError } = await admin
       .from('flows')
       .delete()
       .eq('id', flowId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('lifecycle_state', 'draft')
+      .select('id');
     if (deleteError) throw new Error(deleteError.message);
+    if (deletedRows?.length === 0) {
+      return NextResponse.json(
+        { error: 'Flow was activated before it could be discarded' },
+        { status: 409 },
+      );
+    }
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {
