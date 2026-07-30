@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { getSignedReadUrl } from '@/lib/gcs';
 
 const BUCKET = process.env.GCS_BUCKET_NAME ?? 'within-glide';
 // Matches any signed GCS URL for our bucket
@@ -14,13 +13,12 @@ function extractPath(url: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-/** Recursively walks any JSON value, re-signing every stale GCS signed URL. */
-async function resignValue(value: unknown): Promise<{ value: unknown; count: number }> {
+/** Recursively replaces expiring signed URLs with stable `gcs:` references. */
+function canonicalizeValue(value: unknown): { value: unknown; count: number } {
   if (typeof value === 'string') {
     const path = extractPath(value);
     if (path) {
-      const url = await getSignedReadUrl(path);
-      return { value: url, count: 1 };
+      return { value: `gcs:${path}`, count: 1 };
     }
     return { value, count: 0 };
   }
@@ -28,7 +26,7 @@ async function resignValue(value: unknown): Promise<{ value: unknown; count: num
     let count = 0;
     const arr: unknown[] = [];
     for (const item of value) {
-      const r = await resignValue(item);
+      const r = canonicalizeValue(item);
       arr.push(r.value);
       count += r.count;
     }
@@ -38,7 +36,7 @@ async function resignValue(value: unknown): Promise<{ value: unknown; count: num
     let count = 0;
     const obj: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      const r = await resignValue(v);
+      const r = canonicalizeValue(v);
       obj[k] = r.value;
       count += r.count;
     }
@@ -47,7 +45,7 @@ async function resignValue(value: unknown): Promise<{ value: unknown; count: num
   return { value, count: 0 };
 }
 
-// POST — re-signs all stale GCS signed URLs stored in flow_data and thumbnail_url
+// POST — migrates expiring GCS URLs in flow_data and thumbnail_url to stable refs
 // across ALL users. Safe to run multiple times.
 export async function POST() {
   try {
@@ -72,23 +70,23 @@ export async function POST() {
     for (const flow of flows) {
       try {
         const updates: Record<string, unknown> = {};
-        let urlsResigned = 0;
+        let urlsCanonicalized = 0;
 
-        // Re-sign thumbnail_url if it's a stale signed URL
+        // Persist a stable reference instead of another seven-day URL.
         if (flow.thumbnail_url && extractPath(flow.thumbnail_url as string)) {
           const path = extractPath(flow.thumbnail_url as string)!;
-          updates.thumbnail_url = await getSignedReadUrl(path);
-          urlsResigned++;
+          updates.thumbnail_url = `gcs:${path}`;
+          urlsCanonicalized++;
         }
 
-        // Walk every node's data in flow_data and re-sign URLs
+        // Walk every node's data in flow_data and canonicalize signed URLs.
         if (flow.flow_data) {
-          const r = await resignValue(flow.flow_data);
-          urlsResigned += r.count;
+          const r = canonicalizeValue(flow.flow_data);
+          urlsCanonicalized += r.count;
           if (r.count > 0) updates.flow_data = r.value;
         }
 
-        if (urlsResigned === 0) { skipped++; continue; }
+        if (urlsCanonicalized === 0) { skipped++; continue; }
 
         await adminDb.from('flows').update(updates).eq('id', flow.id);
         updated++;
@@ -97,8 +95,7 @@ export async function POST() {
       }
     }
 
-    // Also re-sign chat_sessions thumbnail_url values that are signed URLs
-    // (gcs: refs are fine since they're resolved at display time)
+    // Chat thumbnails are also resolved at display time, so persist stable refs.
     let sessionsUpdated = 0;
     const { data: sessions } = await adminDb
       .from('chat_sessions')
@@ -109,8 +106,10 @@ export async function POST() {
       const path = extractPath(session.thumbnail_url as string);
       if (!path) continue;
       try {
-        const url = await getSignedReadUrl(path);
-        await adminDb.from('chat_sessions').update({ thumbnail_url: url }).eq('id', session.id);
+        await adminDb
+          .from('chat_sessions')
+          .update({ thumbnail_url: `gcs:${path}` })
+          .eq('id', session.id);
         sessionsUpdated++;
       } catch { /* skip */ }
     }

@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { Flow } from '@/types';
 import { formatDistanceToNow } from '@/lib/utils/date';
 import { isGcsRef, isSignedGcsUrl, resolveGcsRefs } from '@/lib/utils/mediaUtils';
-import { uploadImageToStorage } from '@/lib/utils/uploadImage';
+import { uploadImageRefToStorage } from '@/lib/utils/uploadImage';
 import { MAX_UPLOAD_SIZE_BYTES } from '@/lib/utils/constants';
 import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
 
@@ -105,7 +105,7 @@ function EditOverlay({ flow, onSave, onClose }: EditOverlayProps) {
       }
 
       // Upload directly to GCS so animated GIFs do not hit Vercel's request-size limit.
-      setThumbnailUrl(await uploadImageToStorage(uploadFile));
+      setThumbnailUrl(await uploadImageRefToStorage(uploadFile));
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Upload failed');
     } finally {

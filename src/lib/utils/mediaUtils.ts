@@ -2,22 +2,42 @@
 
 const resolvedRefCache = new Map<string, string>();
 
-function isFreshSignedUrl(url: string): boolean {
-  const signedAtMatch = url.match(/[?&]X-Goog-Date=(\d{8}T\d{6}Z)/);
-  const expiresMatch = url.match(/[?&]X-Goog-Expires=(\d+)/);
-  if (!signedAtMatch || !expiresMatch) return true;
+const SIGNED_URL_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
-  const signedAt = signedAtMatch[1];
-  const signedAtMs = Date.UTC(
-    Number(signedAt.slice(0, 4)),
-    Number(signedAt.slice(4, 6)) - 1,
-    Number(signedAt.slice(6, 8)),
-    Number(signedAt.slice(9, 11)),
-    Number(signedAt.slice(11, 13)),
-    Number(signedAt.slice(13, 15)),
-  );
-  const expiresAtMs = signedAtMs + Number(expiresMatch[1]) * 1000;
-  return expiresAtMs > Date.now() + 5 * 60 * 1000;
+function signedUrlExpiryMs(url: string): number | null {
+  try {
+    const params = new URL(url).searchParams;
+
+    // GCS V2 signed URLs use an absolute Unix timestamp.
+    const v2Expires = params.get('Expires');
+    if (v2Expires) {
+      const expiresAtMs = Number(v2Expires) * 1000;
+      return Number.isFinite(expiresAtMs) ? expiresAtMs : null;
+    }
+
+    // GCS V4 signed URLs use a signing time plus a lifetime in seconds.
+    const signedAt = params.get('X-Goog-Date');
+    const lifetime = params.get('X-Goog-Expires');
+    if (!signedAt || !lifetime || !/^\d{8}T\d{6}Z$/.test(signedAt)) return null;
+
+    const signedAtMs = Date.UTC(
+      Number(signedAt.slice(0, 4)),
+      Number(signedAt.slice(4, 6)) - 1,
+      Number(signedAt.slice(6, 8)),
+      Number(signedAt.slice(9, 11)),
+      Number(signedAt.slice(11, 13)),
+      Number(signedAt.slice(13, 15)),
+    );
+    const lifetimeMs = Number(lifetime) * 1000;
+    return Number.isFinite(lifetimeMs) ? signedAtMs + lifetimeMs : null;
+  } catch {
+    return null;
+  }
+}
+
+function isFreshSignedUrl(url: string): boolean {
+  const expiresAtMs = signedUrlExpiryMs(url);
+  return expiresAtMs !== null && expiresAtMs > Date.now() + SIGNED_URL_REFRESH_BUFFER_MS;
 }
 
 /** Returns true when `url` is a GCS canonical reference (`gcs:<objectPath>`). */
@@ -32,16 +52,35 @@ export function gcsPathFromRef(ref: string): string {
 
 /**
  * Returns true when `url` is an old stored signed GCS URL
- * (https://storage.googleapis.com/<bucket>/<path>?...X-Goog-Signature=...).
+ * (V2 uses `Signature`; V4 uses `X-Goog-Signature`).
  * These were stored directly in the DB before canonical gcs: refs were adopted,
  * and they expire after 7 days.
  */
 export function isSignedGcsUrl(url: string | null | undefined): url is string {
-  return (
-    typeof url === 'string' &&
-    url.startsWith('https://storage.googleapis.com/') &&
-    url.includes('X-Goog-Signature=')
-  );
+  if (typeof url !== 'string') return false;
+
+  try {
+    const parsed = new URL(url);
+    const isGcsHost = (
+      parsed.protocol === 'https:'
+      && (
+        parsed.hostname === 'storage.googleapis.com'
+        || parsed.hostname.endsWith('.storage.googleapis.com')
+      )
+    );
+    if (!isGcsHost) return false;
+
+    const params = parsed.searchParams;
+    const isV4 = params.has('X-Goog-Signature');
+    const isV2 = (
+      params.has('GoogleAccessId')
+      && params.has('Expires')
+      && params.has('Signature')
+    );
+    return isV2 || isV4;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -49,14 +88,17 @@ export function isSignedGcsUrl(url: string | null | undefined): url is string {
  * Returns null if the URL doesn't match the expected pattern.
  */
 export function extractGcsPathFromSignedUrl(url: string): string | null {
-  // Pattern: https://storage.googleapis.com/<bucket>/<path>?<query>
-  const withoutBase = url.slice('https://storage.googleapis.com/'.length);
-  const slashIdx = withoutBase.indexOf('/');
-  if (slashIdx === -1) return null;
-  const pathWithQuery = withoutBase.slice(slashIdx + 1);
-  const qIdx = pathWithQuery.indexOf('?');
-  const encoded = qIdx === -1 ? pathWithQuery : pathWithQuery.slice(0, qIdx);
-  return decodeURIComponent(encoded);
+  try {
+    const parsed = new URL(url);
+    const encodedPath = parsed.hostname === 'storage.googleapis.com'
+      // Path-style URL: first segment is the bucket name.
+      ? parsed.pathname.split('/').slice(2).join('/')
+      // Virtual-hosted URL: the pathname is already the object path.
+      : parsed.pathname.slice(1);
+    return encodedPath ? decodeURIComponent(encodedPath) : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

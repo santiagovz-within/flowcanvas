@@ -53,7 +53,11 @@ export async function getSignedReadUrl(objectPath: string): Promise<string> {
   const [url] = await getStorage()
     .bucket(BUCKET_NAME)
     .file(objectPath)
-    .getSignedUrl({ action: 'read', expires: Date.now() + READ_TTL_MS });
+    .getSignedUrl({
+      action: 'read',
+      version: 'v4',
+      expires: Date.now() + READ_TTL_MS,
+    });
   return url;
 }
 
@@ -88,6 +92,7 @@ export async function getSignedUploadUrl(
     .file(objectPath)
     .getSignedUrl({
       action: 'write',
+      version: 'v4',
       contentType,
       expires: Date.now() + UPLOAD_TTL_MS,
     });

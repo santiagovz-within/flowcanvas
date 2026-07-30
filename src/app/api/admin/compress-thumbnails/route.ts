@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { uploadToGCS } from '@/lib/gcs';
 
 const TARGET_BYTES = 150 * 1024;
 
@@ -52,8 +52,11 @@ export async function POST() {
     for (const flow of flows) {
       const thumb = flow.thumbnail_url as string;
 
-      // Skip if already a GCS signed URL (contains storage.googleapis.com)
-      if (thumb.includes('storage.googleapis.com')) { skipped++; continue; }
+      // Already-migrated refs and signed GCS URLs do not need another upload.
+      if (thumb.startsWith('gcs:') || thumb.includes('storage.googleapis.com')) {
+        skipped++;
+        continue;
+      }
 
       try {
         let imageBuffer: Buffer;
@@ -76,10 +79,9 @@ export async function POST() {
 
         const ownerId = (flow.user_id as string | null) ?? user.id;
         const objectPath = `thumbnails/${ownerId}/${flow.id}.jpg`;
-        await uploadToGCS(compressed, objectPath, 'image/jpeg');
-        const signedUrl = await getSignedReadUrl(objectPath);
+        const ref = await uploadToGCS(compressed, objectPath, 'image/jpeg');
 
-        await adminDb.from('flows').update({ thumbnail_url: signedUrl }).eq('id', flow.id);
+        await adminDb.from('flows').update({ thumbnail_url: ref }).eq('id', flow.id);
         updated++;
       } catch {
         failed++;

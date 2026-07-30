@@ -28,11 +28,12 @@ export async function POST(request: NextRequest) {
   }
 
   const objectPath = `${user.id}/refs/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const ref = `gcs:${objectPath}`;
 
   const [uploadUrl, readUrl] = await Promise.all([
     getSignedUploadUrl(objectPath, contentType as string),
     getSignedReadUrl(objectPath),
   ]);
 
-  return NextResponse.json({ uploadUrl, readUrl });
+  return NextResponse.json({ uploadUrl, readUrl, ref });
 }

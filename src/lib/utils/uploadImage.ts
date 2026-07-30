@@ -3,10 +3,12 @@
  * completely bypassing Vercel's serverless function payload limit (4.5 MB).
  *
  * Flow:
- *   1. POST /api/upload/sign  →  tiny JSON exchange, gets signed write + read URLs
+ *   1. POST /api/upload/sign  →  gets a signed write URL, read URL, and stable ref
  *   2. fetch(uploadUrl, PUT)  →  browser-to-GCS PUT, no Vercel involved
  */
-export async function uploadImageToStorage(file: File): Promise<string> {
+async function uploadFileToStorage(
+  file: File,
+): Promise<{ readUrl: string; ref: string }> {
   const signRes = await fetch('/api/upload/sign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -20,7 +22,11 @@ export async function uploadImageToStorage(file: File): Promise<string> {
     );
   }
 
-  const { uploadUrl, readUrl } = await signRes.json() as { uploadUrl: string; readUrl: string };
+  const { uploadUrl, readUrl, ref } = await signRes.json() as {
+    uploadUrl: string;
+    readUrl: string;
+    ref: string;
+  };
 
   const putRes = await fetch(uploadUrl, {
     method: 'PUT',
@@ -32,5 +38,20 @@ export async function uploadImageToStorage(file: File): Promise<string> {
     throw new Error(`Storage upload failed: ${putRes.status} ${putRes.statusText}`);
   }
 
-  return readUrl;
+  return { readUrl, ref };
+}
+
+/**
+ * Uploads an image and returns a signed URL for immediate canvas display.
+ * Canvas loading refreshes this URL before it expires.
+ */
+export async function uploadImageToStorage(file: File): Promise<string> {
+  return (await uploadFileToStorage(file)).readUrl;
+}
+
+/**
+ * Uploads an image and returns the non-expiring `gcs:` reference for persistence.
+ */
+export async function uploadImageRefToStorage(file: File): Promise<string> {
+  return (await uploadFileToStorage(file)).ref;
 }
