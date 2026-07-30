@@ -1,8 +1,14 @@
 'use client';
 
-import { Handle, Position, type HandleProps } from '@xyflow/react';
-import { Image, Film, Type, Minus } from 'lucide-react';
-import { useState } from 'react';
+import {
+  Handle,
+  Position,
+  useNodeId,
+  useUpdateNodeInternals,
+  type HandleProps,
+} from '@xyflow/react';
+import { Image as ImageIcon, Film, Type, Minus } from 'lucide-react';
+import { useLayoutEffect, useState } from 'react';
 
 export type PortType = 'text' | 'image' | 'video' | 'neutral';
 
@@ -65,7 +71,7 @@ export const PORT_TYPE_MAP: Record<string, PortType> = {
 };
 
 function PortIcon({ type, size = 9 }: { type: PortType; size?: number }) {
-  if (type === 'image')   return <Image size={size} />;
+  if (type === 'image')   return <ImageIcon size={size} />;
   if (type === 'video')   return <Film size={size} />;
   if (type === 'neutral') return <Minus size={size} />;
   return <Type size={size} />;
@@ -83,11 +89,20 @@ interface TypedHandleProps extends Omit<HandleProps, 'style'> {
 
 export function TypedHandle({ portType, offset, position, badge, connected, ...rest }: TypedHandleProps) {
   const [hovered, setHovered] = useState(false);
+  const nodeId = useNodeId();
+  const updateNodeInternals = useUpdateNodeInternals();
   const color = PORT_COLORS[portType];
-  const tint  = PORT_TINTS[portType];
   const isLeft = position === Position.Left;
   const isRight = position === Position.Right;
   const isActive = hovered || connected;
+
+  // React Flow measures handle bounds separately from node dimensions. Several
+  // nodes calculate their handle offsets after layout, so a handle can move
+  // without resizing its node. Re-measure when that calculated position changes
+  // to keep existing edges attached to the rendered circle.
+  useLayoutEffect(() => {
+    if (nodeId && offset !== undefined) updateNodeInternals(nodeId);
+  }, [nodeId, offset, position, updateNodeInternals]);
 
   const offsetStyle: React.CSSProperties = {
     ...(offset ? (isLeft || isRight ? { top: offset } : { left: offset }) : {}),
