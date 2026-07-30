@@ -192,9 +192,97 @@ body {
   animation: flow-card-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
+@keyframes new-flow-gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes new-flow-grain-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(-8px, 5px, 0);
+  }
+  50% {
+    transform: translate3d(6px, -7px, 0);
+  }
+  75% {
+    transform: translate3d(-4px, -3px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.new-flow-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.new-flow-button > * {
+  position: relative;
+  z-index: 1;
+}
+
+.new-flow-button::before,
+.new-flow-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+
+.new-flow-button::before {
+  background: linear-gradient(110deg, #2261AF, #D25112, #226443, #A17CF6, #388BF3, #2261AF);
+  background-size: 320% 320%;
+}
+
+.new-flow-button::after {
+  inset: -24px;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.38) 0 1px, transparent 1px),
+    radial-gradient(circle at 70% 60%, rgba(0, 0, 0, 0.24) 0 1px, transparent 1px);
+  background-size: 7px 7px, 11px 11px;
+  mix-blend-mode: overlay;
+}
+
+.new-flow-button:not(:disabled):hover {
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+.new-flow-button:not(:disabled):hover::before {
+  opacity: 1;
+  animation: new-flow-gradient-shift 2.4s linear infinite;
+}
+
+.new-flow-button:not(:disabled):hover::after {
+  opacity: 0.34;
+  animation: new-flow-grain-drift 650ms steps(2, end) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .flow-card-enter {
     animation: none;
+  }
+
+  .new-flow-button,
+  .new-flow-button::before,
+  .new-flow-button::after {
+    animation: none !important;
+    transition: none;
   }
 }
 

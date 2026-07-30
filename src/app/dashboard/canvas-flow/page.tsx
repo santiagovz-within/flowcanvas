@@ -228,6 +228,7 @@ export default function CanvasFlowPage() {
   const [baseFlows, setBaseFlows] = useState<FlowCardSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading]     = useState(true);
+  const [isCreatingFlow, setIsCreatingFlow] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editingBaseId, setEditingBaseId] = useState<string | null>(null);
   const [openingBaseId, setOpeningBaseId] = useState<string | null>(null);
@@ -300,14 +301,31 @@ export default function CanvasFlowPage() {
     title = 'Untitled Flow',
     flowData: Record<string, unknown> = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }
   ) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('flows')
-      .insert({ user_id: user.id, title, flow_data: flowData, is_template: false })
-      .select()
-      .single();
-    if (!error && data) router.push(`/dashboard/canvas-flow/${data.id}`);
+    if (isCreatingFlow) return;
+    setIsCreatingFlow(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsCreatingFlow(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('flows')
+        .insert({ user_id: user.id, title, flow_data: flowData, is_template: false })
+        .select()
+        .single();
+
+      if (error || !data) {
+        console.error('[CanvasFlow] Failed to create flow:', error);
+        setIsCreatingFlow(false);
+        return;
+      }
+
+      router.push(`/dashboard/canvas-flow/${data.id}`);
+    } catch (error) {
+      console.error('[CanvasFlow] Failed to create flow:', error);
+      setIsCreatingFlow(false);
+    }
   }
 
   async function createFlowFromBase(flow: FlowCardSummary) {
@@ -715,39 +733,40 @@ export default function CanvasFlowPage() {
 
       {/* Recent Flows */}
       <section>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--color-white-muted)' }}>
             RECENT FLOWS
           </h2>
-          <button
-            onClick={() => createNewFlow()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-opacity hover:opacity-80"
-            style={{ background: '#fff', color: '#000' }}
-          >
-            <Plus size={14} />
-            New Flow
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--color-white-muted)' }}
-          />
-          <input
-            type="text"
-            placeholder="Search flows..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full max-w-xs pl-9 pr-3 py-2 rounded-full text-sm outline-none"
-            style={{
-              background: 'var(--color-bg-elevated)',
-              border: '4px solid rgba(255, 255, 255, 0.12)',
-              color: 'var(--color-white)',
-            }}
-          />
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+            <button
+              onClick={() => createNewFlow()}
+              disabled={isCreatingFlow}
+              className="new-flow-button flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-bold disabled:cursor-wait disabled:opacity-80"
+              style={{ background: '#fff', color: '#000' }}
+            >
+              <Plus size={14} />
+              <span>{isCreatingFlow ? 'Creating...' : 'New Flow'}</span>
+            </button>
+            <div className="relative sm:w-80">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--color-white-muted)' }}
+              />
+              <input
+                type="text"
+                placeholder="Search Flow"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 w-full pl-9 pr-3 rounded-full text-sm outline-none"
+                style={{
+                  background: 'var(--color-bg-elevated)',
+                  border: '4px solid rgba(255, 255, 255, 0.12)',
+                  color: 'var(--color-white)',
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Grid */}
@@ -765,11 +784,12 @@ export default function CanvasFlowPage() {
             {!searchQuery && (
               <button
                 onClick={() => createNewFlow()}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-80"
+                disabled={isCreatingFlow}
+                className="new-flow-button flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-bold disabled:cursor-wait disabled:opacity-80"
                 style={{ background: '#fff', color: '#000' }}
               >
                 <Plus size={14} />
-                New Flow
+                <span>{isCreatingFlow ? 'Creating...' : 'New Flow'}</span>
               </button>
             )}
           </div>
