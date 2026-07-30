@@ -523,7 +523,7 @@ export default function CanvasFlowPage() {
         )}
 
         {loading ? (
-          <FlowCardSkeletonGrid count={5} />
+          <FlowCardSkeletonGrid count={5} columns="base" />
         ) : baseFlows.length === 0 ? (
           <div
             className="flex items-center gap-3 px-4 py-5 rounded-xl"
@@ -827,10 +827,18 @@ export default function CanvasFlowPage() {
 
 // ── Recent flow card ──────────────────────────────────────────────────────────
 
-function FlowCardSkeletonGrid({ count }: { count: number }) {
+function FlowCardSkeletonGrid({
+  count,
+  columns = 'recent',
+}: {
+  count: number;
+  columns?: 'base' | 'recent';
+}) {
   return (
     <div
-      className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+      className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4${
+        columns === 'recent' ? ' xl:grid-cols-5' : ''
+      }`}
       aria-hidden="true"
     >
       {Array.from({ length: count }).map((_, index) => (
