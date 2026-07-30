@@ -14,6 +14,7 @@ import { isGcsRef, isSignedGcsUrl, resolveGcsRefs } from '@/lib/utils/mediaUtils
 import { uploadImageRefToStorage } from '@/lib/utils/uploadImage';
 import { MAX_UPLOAD_SIZE_BYTES } from '@/lib/utils/constants';
 import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
+import { markNewFlowDraft } from '@/lib/utils/flowPersistence';
 
 // Number of base flows shown before the fade + "Explore all flows" button.
 const BASE_FLOWS_VISIBLE = 8;
@@ -299,7 +300,8 @@ export default function CanvasFlowPage() {
 
   async function createNewFlow(
     title = 'Untitled Flow',
-    flowData: Record<string, unknown> = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }
+    flowData: Record<string, unknown> = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+    discardIfAbandoned = true,
   ) {
     if (isCreatingFlow) return;
     setIsCreatingFlow(true);
@@ -321,6 +323,7 @@ export default function CanvasFlowPage() {
         return;
       }
 
+      if (discardIfAbandoned) markNewFlowDraft(data.id);
       router.push(`/dashboard/canvas-flow/${data.id}`);
     } catch (error) {
       console.error('[CanvasFlow] Failed to create flow:', error);
@@ -336,7 +339,7 @@ export default function CanvasFlowPage() {
       if (!response.ok) throw new Error('Unable to load this base flow');
       const result = await response.json() as { data?: { flow_data?: Record<string, unknown> } };
       if (!result.data?.flow_data) throw new Error('This base flow has no flow data');
-      await createNewFlow(flow.title, result.data.flow_data);
+      await createNewFlow(flow.title, result.data.flow_data, false);
     } catch (error) {
       console.error('[CanvasFlow] Failed to open base flow:', error);
       alert('Could not open this base flow. Please try again.');

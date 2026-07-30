@@ -25,9 +25,17 @@ interface TopBarProps {
   isShared?: boolean;
   onToggleShare?: () => void;
   onSave: () => Promise<boolean>;
+  onExit?: () => Promise<boolean>;
 }
 
-export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare, onSave }: TopBarProps) {
+export function TopBar({
+  flowId,
+  isOwner = true,
+  isShared = false,
+  onToggleShare,
+  onSave,
+  onExit,
+}: TopBarProps) {
   const router = useRouter();
   const { currentFlow, isDirty, isSaving } = useFlowStore();
   const [editingTitle, setEditingTitle] = useState(false);
@@ -141,6 +149,12 @@ export function TopBar({ flowId, isOwner = true, isShared = false, onToggleShare
   }
 
   async function handleFlowsNavigation(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (onExit) {
+      event.preventDefault();
+      if (await onExit()) router.push('/dashboard/canvas-flow');
+      return;
+    }
+
     if (!isDirty && !isSaving) return;
     event.preventDefault();
     if (useFlowStore.getState().isSaving) {

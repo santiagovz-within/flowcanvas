@@ -9,6 +9,11 @@ import { useFlowStore } from '@/lib/stores/flowStore';
 import { createClient } from '@/lib/supabase/client';
 import { AUTOSAVE_DEBOUNCE_MS } from '@/lib/utils/constants';
 import { createFlowThumbnail, extractFlowThumbnailSource } from '@/lib/utils/flowThumbnail';
+import {
+  clearNewFlowDraft,
+  isMarkedNewFlowDraft,
+  shouldDiscardAbandonedFlow,
+} from '@/lib/utils/flowPersistence';
 
 export default function FlowEditorPage() {
   const params = useParams<{ flowId: string }>();
@@ -21,6 +26,10 @@ export default function FlowEditorPage() {
   const supabase = useMemo(() => createClient(), []);
   const thumbnailAttempts = useRef({ sourceUrl: null as string | null, failures: 0 });
   const previousThumbnailSource = useRef<string | null | undefined>(undefined);
+  const isNewFlowDraft = useRef(false);
+  const hasLoadedFlow = useRef(false);
+  const discardRequested = useRef(false);
+  const latestNodes = useRef(nodes);
   const [isTestUser, setIsTestUser] = useState(false);
   const [isOwner, setIsOwner] = useState(true);
   const [isShared, setIsShared] = useState(false);
@@ -28,9 +37,13 @@ export default function FlowEditorPage() {
 
   const loadFlow = useCallback(async () => {
     const res = await fetch(`/api/flows/${flowId}`);
-    if (!res.ok) return;
+    if (!res.ok) {
+      router.replace('/dashboard/canvas-flow');
+      return;
+    }
     const { data, isOwner: owner } = await res.json();
     if (data) {
+      hasLoadedFlow.current = true;
       setCurrentFlow(data);
       setIsOwner(owner ?? true);
       setIsShared(data.is_shared ?? false);
@@ -39,7 +52,7 @@ export default function FlowEditorPage() {
         useFlowStore.getState().setDirty(true);
       }
     }
-  }, [flowId, setCurrentFlow]);
+  }, [flowId, router, setCurrentFlow]);
 
   async function handleToggleShare() {
     const next = !isShared;
@@ -76,6 +89,16 @@ export default function FlowEditorPage() {
     }
     checkTestUser();
   }, [supabase]);
+
+  useEffect(() => {
+    isNewFlowDraft.current = isMarkedNewFlowDraft(flowId);
+    hasLoadedFlow.current = false;
+    discardRequested.current = false;
+  }, [flowId]);
+
+  useEffect(() => {
+    latestNodes.current = nodes;
+  }, [nodes]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => { void loadFlow(); }, 0);
@@ -142,6 +165,14 @@ export default function FlowEditorPage() {
         }));
       }
 
+      if (
+        isNewFlowDraft.current
+        && !shouldDiscardAbandonedFlow(snapshotNodes)
+      ) {
+        clearNewFlowDraft(flowId);
+        isNewFlowDraft.current = false;
+      }
+
       const latest = useFlowStore.getState();
       const snapshotIsCurrent = latest.nodes === snapshotNodes && latest.edges === snapshotEdges;
       const shouldRetryThumbnail = !!thumbnailSource
@@ -157,6 +188,107 @@ export default function FlowEditorPage() {
       setSaving(false);
     }
   }, [flowId, isOwner, setDirty, setLastSaved, setSaving, supabase]);
+
+  // Promote a draft as soon as it gains real content or a second node. The
+  // marker is cleared by saveFlow only after that content reaches the database.
+  useEffect(() => {
+    if (
+      !currentFlow
+      || !hasLoadedFlow.current
+      || !isNewFlowDraft.current
+      || shouldDiscardAbandonedFlow(nodes)
+      || !isDirty
+      || isSaving
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => { void saveFlow(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [currentFlow, isDirty, isSaving, nodes, saveFlow]);
+
+  const discardAbandonedFlow = useCallback(async (
+    keepalive = false,
+  ): Promise<'discarded' | 'keep' | 'failed'> => {
+    if (
+      !hasLoadedFlow.current
+      || !isNewFlowDraft.current
+      || !isMarkedNewFlowDraft(flowId)
+      || !shouldDiscardAbandonedFlow(latestNodes.current)
+    ) {
+      return 'keep';
+    }
+    if (discardRequested.current) return 'failed';
+
+    discardRequested.current = true;
+    try {
+      const response = await fetch(`/api/flows/${flowId}`, {
+        method: 'DELETE',
+        keepalive,
+      });
+
+      if (response.ok || response.status === 404) {
+        clearNewFlowDraft(flowId);
+        isNewFlowDraft.current = false;
+        return 'discarded';
+      }
+
+      // The server is the final guard against a stale client deleting content.
+      if (response.status === 409) {
+        clearNewFlowDraft(flowId);
+        isNewFlowDraft.current = false;
+        return 'keep';
+      }
+
+      console.error(`[CanvasFlow] Failed to discard abandoned flow (${response.status})`);
+      discardRequested.current = false;
+      return 'failed';
+    } catch (error) {
+      console.error('[CanvasFlow] Failed to discard abandoned flow:', error);
+      discardRequested.current = false;
+      return 'failed';
+    }
+  }, [flowId]);
+
+  const prepareToExit = useCallback(async (): Promise<boolean> => {
+    if (useFlowStore.getState().isSaving) {
+      await new Promise<void>((resolve) => {
+        let unsubscribe = () => {};
+        const timeoutId = window.setTimeout(() => {
+          unsubscribe();
+          resolve();
+        }, 30_000);
+        unsubscribe = useFlowStore.subscribe((state) => {
+          if (state.isSaving) return;
+          window.clearTimeout(timeoutId);
+          unsubscribe();
+          resolve();
+        });
+      });
+    }
+
+    const discardResult = await discardAbandonedFlow();
+    if (discardResult === 'discarded') return true;
+    if (discardResult === 'failed') return false;
+
+    const snapshot = useFlowStore.getState();
+    if (snapshot.isDirty && !(await saveFlow())) return false;
+    return !useFlowStore.getState().isDirty;
+  }, [discardAbandonedFlow, saveFlow]);
+
+  // Cover browser back/refresh, closing the tab, and navigation through the
+  // surrounding dashboard rather than the editor breadcrumb.
+  useEffect(() => {
+    const handlePageHide = () => {
+      void discardAbandonedFlow(true);
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      void discardAbandonedFlow(true);
+    };
+  }, [discardAbandonedFlow]);
 
   const thumbnailSource = extractFlowThumbnailSource(nodes);
 
@@ -204,6 +336,7 @@ export default function FlowEditorPage() {
           isShared={isShared}
           onToggleShare={handleToggleShare}
           onSave={saveFlow}
+          onExit={prepareToExit}
         />
 
         {/* Banner shown to non-owners viewing a shared flow */}

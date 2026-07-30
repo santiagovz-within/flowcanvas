@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getSignedReadUrl, signGcsRef, isGcsRef } from '@/lib/gcs';
+import { shouldDiscardAbandonedFlow } from '@/lib/utils/flowPersistence';
 
 const BUCKET = process.env.GCS_BUCKET_NAME ?? 'within-glide';
 const SIGNED_URL_RE = new RegExp(
@@ -187,5 +188,54 @@ export async function PATCH(
     const detail = err instanceof Error ? err.message : String(err);
     console.error('[flows/[flowId]] PATCH error:', detail);
     return NextResponse.json({ error: 'Failed to update flow' }, { status: 500 });
+  }
+}
+
+// DELETE /api/flows/[flowId]
+// Removes only an abandoned, non-template flow with no meaningful content.
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ flowId: string }> },
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { flowId } = await params;
+    const admin = createAdminClient();
+    const { data: flow, error: loadError } = await admin
+      .from('flows')
+      .select('user_id, is_template, flow_data')
+      .eq('id', flowId)
+      .single();
+
+    if (loadError || !flow) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (flow.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const nodes = Array.isArray(flow.flow_data?.nodes) ? flow.flow_data.nodes : [];
+    if (flow.is_template || !shouldDiscardAbandonedFlow(nodes)) {
+      return NextResponse.json(
+        { error: 'Flow contains content and cannot be discarded' },
+        { status: 409 },
+      );
+    }
+
+    const { error: deleteError } = await admin
+      .from('flows')
+      .delete()
+      .eq('id', flowId)
+      .eq('user_id', user.id);
+    if (deleteError) throw new Error(deleteError.message);
+
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[flows/[flowId]] DELETE error:', detail);
+    return NextResponse.json({ error: 'Failed to discard flow' }, { status: 500 });
   }
 }
