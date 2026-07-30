@@ -347,7 +347,8 @@ function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLe
 
 // ── SourceThumbnails ───────────────────────────────────────────────────────────
 // 3-up grid so each option is large enough to tell apart, sized to the source
-// aspect ratio with a tight radius so the framing stays readable.
+// aspect ratio with a tight radius so the framing stays readable. Unselected
+// options are desaturated and dimmed so the active one reads at a glance.
 
 function SourceThumbnails({ images, selectedIndex, aspect, onSelect }: {
   images: string[];
@@ -360,22 +361,33 @@ function SourceThumbnails({ images, selectedIndex, aspect, onSelect }: {
       className="mb-3 nodrag"
       style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: 3 }}
     >
-      {images.map((url, i) => (
-        <button
-          key={i}
-          onClick={() => onSelect(i)}
-          className="nodrag"
-          style={{
-            width: '100%', aspectRatio: aspect, borderRadius: 3, padding: 0, overflow: 'hidden',
-            display: 'block', background: 'var(--color-bg-surface)',
-            outline: selectedIndex === i ? '2px solid #a855f7' : '2px solid transparent',
-            outlineOffset: 1,
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        </button>
-      ))}
+      {images.map((url, i) => {
+        const isSelected = selectedIndex === i;
+        return (
+          <button
+            key={i}
+            onClick={() => onSelect(i)}
+            className="nodrag"
+            style={{
+              width: '100%', aspectRatio: aspect, borderRadius: 3, padding: 0, overflow: 'hidden',
+              display: 'block', background: 'var(--color-bg-surface)',
+              outline: isSelected ? '2px solid #a855f7' : '2px solid transparent',
+              outlineOffset: 1,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={url}
+              alt=""
+              style={{
+                width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                filter: isSelected ? 'none' : 'grayscale(1) brightness(0.55)',
+                transition: 'filter 0.15s',
+              }}
+            />
+          </button>
+        );
+      })}
     </div>
   );
 }
