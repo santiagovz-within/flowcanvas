@@ -269,7 +269,9 @@ export interface ModifyNodeData extends Record<string, unknown> {
   outpaintPrompt?: string;
   outpaintNegativePrompt?: string;
   outputVideoUrl?: string;
+  // Queue-backed edit models (Seedream) resolve asynchronously
   pendingRequestId?: string;
+  pendingEndpoint?: string;
 }
 
 export interface VideoInputNodeData extends Record<string, unknown> {

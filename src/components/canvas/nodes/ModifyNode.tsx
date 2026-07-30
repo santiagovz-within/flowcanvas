@@ -1,7 +1,7 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Sliders, Play, Download } from 'lucide-react';
+import { Sliders, Play, Download, AlertTriangle } from 'lucide-react';
 import { SendToFigmaButton } from './SendToFigmaButton';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { playSuccessSound } from '@/lib/utils/sound';
@@ -23,6 +23,7 @@ import { getSourceMediaType } from '../mediaOutputs';
 const MODIFY_MODELS = [
   { id: 'nano-banana-2',   name: 'Nano Banana 2 Edit' },
   { id: 'nano-banana-pro', name: 'Nano Banana Pro Edit' },
+  { id: 'seedream-5',      name: 'Seedream v5 Edit' },
 ];
 
 const IMAGE_ROW_HEIGHT = 36;
@@ -56,6 +57,13 @@ const ANCHOR_GRID: AnchorKey[][] = [
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
   el.style.height = `${el.scrollHeight}px`;
+}
+
+// CSS `aspect-ratio` value for an "w:h" label, so source thumbnails match the
+// shape of the images they represent instead of being forced into squares.
+function cssAspectRatio(label: string): string {
+  const [w, h] = label.split(':').map(Number);
+  return w > 0 && h > 0 ? `${w} / ${h}` : '1 / 1';
 }
 
 function nearestAspectRatio(w: number, h: number): string {
@@ -333,6 +341,41 @@ function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLe
       >
         <div style={{ height: 20, width: 2, background: 'rgba(255,255,255,0.45)', borderRadius: 1 }} />
       </div>
+    </div>
+  );
+}
+
+// ── SourceThumbnails ───────────────────────────────────────────────────────────
+// 3-up grid so each option is large enough to tell apart, sized to the source
+// aspect ratio with a tight radius so the framing stays readable.
+
+function SourceThumbnails({ images, selectedIndex, aspect, onSelect }: {
+  images: string[];
+  selectedIndex: number;
+  aspect: string;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <div
+      className="mb-3 nodrag"
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: 3 }}
+    >
+      {images.map((url, i) => (
+        <button
+          key={i}
+          onClick={() => onSelect(i)}
+          className="nodrag"
+          style={{
+            width: '100%', aspectRatio: aspect, borderRadius: 3, padding: 0, overflow: 'hidden',
+            display: 'block', background: 'var(--color-bg-surface)',
+            outline: selectedIndex === i ? '2px solid #a855f7' : '2px solid transparent',
+            outlineOffset: 1,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </button>
+      ))}
     </div>
   );
 }
@@ -621,6 +664,8 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
     return undefined;
   })();
 
+  const thumbnailAspect = cssAspectRatio(derivedAspect ?? data.aspectRatio ?? '1:1');
+
   useEffect(() => {
     if (derivedAspect && derivedAspect !== data.aspectRatio) updateData({ aspectRatio: derivedAspect });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -677,10 +722,46 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
 
   // ── Image: Prompt generate ─────────────────────────────────────────────────
 
+  function completeModify(imageUrl: string) {
+    updateData({
+      outputImageUrl: imageUrl,
+      status: 'completed',
+      errorMessage: undefined,
+      pendingRequestId: undefined,
+      pendingEndpoint: undefined,
+    });
+    playSuccessSound();
+    document.dispatchEvent(new CustomEvent('node:image-propagate', {
+      detail: { sourceNodeId: id, imageUrl },
+    }));
+  }
+
+  // Queue-backed edit models (Seedream) return a request ID instead of an image.
+  async function pollForEditResult(requestId: string, endpoint: string): Promise<string> {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      let terminalError: string | undefined;
+      try {
+        const res = await fetch(
+          `/api/fal/status/${requestId}?endpoint=${encodeURIComponent(endpoint)}&mediaType=image`
+        );
+        if (res.ok) {
+          const result = await res.json();
+          if (result.status === 'completed' && result.mediaUrls?.[0]) return result.mediaUrls[0];
+          if (result.status === 'failed') terminalError = result.error ?? 'FAL reported that the edit failed.';
+        }
+      } catch {
+        // Transient status errors are retried until the polling timeout.
+      }
+      if (terminalError) throw new Error(terminalError);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+    throw new Error('Timed out while retrieving the modified image. Use "Check status on FAL" to resume.');
+  }
+
   async function handlePromptGenerate() {
     if (isGenerating || !selectedImage) return;
     setIsGenerating(true);
-    updateData({ status: 'processing' });
+    updateData({ status: 'processing', errorMessage: undefined, pendingRequestId: undefined, pendingEndpoint: undefined });
 
     const aspectRatio = data.aspectRatio ?? '1:1';
     const resolution  = data.resolution  ?? '1K';
@@ -700,17 +781,37 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
         }),
       });
       const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.details ?? result.error ?? `Server error ${res.status}`);
+      }
+
+      const queued = result.requests?.[0] ?? (result.requestId ? { requestId: result.requestId, endpoint: result.endpoint } : undefined);
+
       if (result.mediaUrls?.[0]) {
-        updateData({ outputImageUrl: result.mediaUrls[0], status: 'completed', errorMessage: undefined });
-        playSuccessSound();
-        document.dispatchEvent(new CustomEvent('node:image-propagate', {
-          detail: { sourceNodeId: id, imageUrl: result.mediaUrls[0] },
-        }));
+        completeModify(result.mediaUrls[0]);
+      } else if (queued?.requestId && queued.endpoint) {
+        updateData({ pendingRequestId: queued.requestId, pendingEndpoint: queued.endpoint });
+        completeModify(await pollForEditResult(queued.requestId, queued.endpoint));
       } else {
-        updateData({ status: 'error', errorMessage: result.details ?? result.error ?? 'Image generation failed — no output returned.' });
+        throw new Error(result.details ?? result.error ?? 'Image generation failed — no output returned.');
       }
     } catch (err) {
       updateData({ status: 'error', errorMessage: err instanceof Error ? err.message : 'Network error — check your connection.' });
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function resumeEditPolling() {
+    const { pendingRequestId, pendingEndpoint } = data;
+    if (!pendingRequestId || !pendingEndpoint || isGenerating) return;
+    setIsGenerating(true);
+    updateData({ status: 'processing', errorMessage: undefined });
+    try {
+      completeModify(await pollForEditResult(pendingRequestId, pendingEndpoint));
+    } catch (err) {
+      updateData({ status: 'error', errorMessage: err instanceof Error ? err.message : 'Could not retrieve the modified image.' });
     } finally {
       setIsGenerating(false);
     }
@@ -873,6 +974,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
   const outpaintFps        = data.outpaintFps         ?? 24;
   const hasOutpaintPrompt  = !!(data.outpaintPrompt?.trim() ?? VIDEO_OUTPAINT_DEFAULT_PROMPT);
   const hasVideoOutput     = inputMediaType === 'video' && !!data.outputVideoUrl;
+  const hasPendingEditRequest = !!data.pendingRequestId && !!data.pendingEndpoint;
 
   const nodeTitle = inputMediaType === 'video' ? 'Modify (Video Expand)' : 'Modify';
 
@@ -916,6 +1018,16 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
               : (isGenerating ? 'Expanding…' : 'Expand')
             }
           </button>
+          {hasPendingEditRequest && !isGenerating && (
+            <button
+              onClick={resumeEditPolling}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium nodrag"
+              style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--color-error)', borderRadius: 11, border: '1px solid var(--color-error)' }}
+            >
+              <AlertTriangle size={12} />
+              Check status on FAL
+            </button>
+          )}
           {data.outputImageUrl && (
             <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
               <button
@@ -1056,16 +1168,12 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
               </div>
 
               {availableImages.length > 1 && (
-                <div className="flex gap-1.5 mb-3 nodrag" style={{ padding: '3px', overflowX: 'auto' }}>
-                  {availableImages.map((url, i) => (
-                    <button key={i} onClick={() => setSelectedIndex(i)} className="shrink-0 nodrag"
-                      style={{ width: 40, height: 40, borderRadius: 6, padding: 0, overflow: 'hidden',
-                        outline: safeIndex === i ? '2px solid #a855f7' : '2px solid transparent', outlineOffset: 1 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    </button>
-                  ))}
-                </div>
+                <SourceThumbnails
+                  images={availableImages}
+                  selectedIndex={safeIndex}
+                  aspect={thumbnailAspect}
+                  onSelect={setSelectedIndex}
+                />
               )}
 
               <div className="mb-3">
@@ -1111,16 +1219,12 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
               </div>
 
               {availableImages.length > 1 && (
-                <div className="flex gap-1.5 mb-3 nodrag" style={{ padding: '3px', overflowX: 'auto' }}>
-                  {availableImages.map((url, i) => (
-                    <button key={i} onClick={() => setSelectedIndex(i)} className="shrink-0 nodrag"
-                      style={{ width: 40, height: 40, borderRadius: 6, padding: 0, overflow: 'hidden',
-                        outline: safeIndex === i ? '2px solid #a855f7' : '2px solid transparent', outlineOffset: 1 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    </button>
-                  ))}
-                </div>
+                <SourceThumbnails
+                  images={availableImages}
+                  selectedIndex={safeIndex}
+                  aspect={thumbnailAspect}
+                  onSelect={setSelectedIndex}
+                />
               )}
 
               <div className="flex items-start gap-3 mb-3">
