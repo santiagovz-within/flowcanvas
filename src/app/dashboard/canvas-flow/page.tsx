@@ -584,7 +584,7 @@ export default function CanvasFlowPage() {
                           {bf.title}
                         </p>
                         <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-white-muted)' }}>
-                          Created By: {bf.author_username ?? 'unknown'}
+                          By {bf.author_username ?? 'unknown'}
                         </p>
                       </div>
                       {isReorderingBaseFlows ? (
