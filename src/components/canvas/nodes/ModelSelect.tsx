@@ -109,7 +109,7 @@ export function ModelSelect({ options, value, onChange }: ModelSelectProps) {
             {selected?.name ?? ''}
           </span>
           {selected && MODEL_SUBTITLES[selected.id] && (
-            <span className="block" style={{ color: 'var(--color-white-muted)', fontSize: 9, lineHeight: 1.25 }}>
+            <span className="block" style={{ color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}>
               {MODEL_SUBTITLES[selected.id]}
             </span>
           )}
@@ -173,7 +173,7 @@ export function ModelSelect({ options, value, onChange }: ModelSelectProps) {
               <span style={{ minWidth: 0 }}>
                 <span className="block">{opt.name}</span>
                 {MODEL_SUBTITLES[opt.id] && (
-                  <span className="block" style={{ color: 'var(--color-white-muted)', fontSize: 9, lineHeight: 1.25 }}>
+                  <span className="block" style={{ color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}>
                     {MODEL_SUBTITLES[opt.id]}
                   </span>
                 )}
