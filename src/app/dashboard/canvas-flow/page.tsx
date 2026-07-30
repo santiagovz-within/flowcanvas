@@ -523,7 +523,7 @@ export default function CanvasFlowPage() {
         )}
 
         {loading ? (
-          <FlowCardSkeletonGrid count={5} columns="base" />
+          <FlowCardSkeletonGrid count={BASE_FLOWS_VISIBLE} columns="base" />
         ) : baseFlows.length === 0 ? (
           <div
             className="flex items-center gap-3 px-4 py-5 rounded-xl"
