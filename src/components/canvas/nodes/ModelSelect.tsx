@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ByteDance, Fal, Flux, Google, Kling, NanoBanana, OpenAI, TopazLabs } from '@lobehub/icons';
-import { ChevronDown } from 'lucide-react';
+import { Box, ChevronDown } from 'lucide-react';
 
 interface Option {
   id: string;
@@ -109,7 +109,8 @@ export function ModelSelect({ options, value, onChange }: ModelSelectProps) {
             {selected?.name ?? ''}
           </span>
           {selected && MODEL_SUBTITLES[selected.id] && (
-            <span className="block" style={{ color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}>
+            <span className="flex items-center gap-1" style={{ color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}>
+              <Box size={9} aria-hidden />
               {MODEL_SUBTITLES[selected.id]}
             </span>
           )}
@@ -173,7 +174,8 @@ export function ModelSelect({ options, value, onChange }: ModelSelectProps) {
               <span style={{ minWidth: 0 }}>
                 <span className="block">{opt.name}</span>
                 {MODEL_SUBTITLES[opt.id] && (
-                  <span className="block" style={{ color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}>
+                  <span className="flex items-center gap-1" style={{ color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}>
+                    <Box size={9} aria-hidden />
                     {MODEL_SUBTITLES[opt.id]}
                   </span>
                 )}
