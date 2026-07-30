@@ -30,21 +30,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=domain`);
   }
 
-  // ── Ensure profile row exists ──────────────────────────────────────────────
-  // For Google OAuth the profile is not created by any existing trigger,
-  // so we upsert it here. New users get approved=false until an admin approves.
+  // ── Ensure profile row exists and has Google account details ───────────────
+  // A database trigger may create the row first. New users remain unapproved
+  // until an admin approves them.
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from('profiles')
-    .select('id, approved, display_name')
+    .select('id, approved, username, display_name')
     .eq('id', user.id)
     .maybeSingle();
 
+  const username = user.email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase();
   const googleDisplayName: string | null =
     user.user_metadata?.full_name ?? user.user_metadata?.name ?? null;
 
   if (!existing) {
-    const username = user.email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase();
     await admin.from('profiles').insert({
       id:           user.id,
       username,
@@ -53,12 +53,24 @@ export async function GET(request: NextRequest) {
       is_admin:     false,
       approved:     false,
     });
-  } else if (!existing.display_name && googleDisplayName) {
-    // Backfill display_name for existing users who don't have one yet
-    await admin
-      .from('profiles')
-      .update({ display_name: googleDisplayName })
-      .eq('id', user.id);
+  } else {
+    const updates: { username?: string; display_name?: string } = {};
+
+    // A database trigger may create the profile first with this placeholder.
+    // Replace only the default so user-chosen usernames remain untouched.
+    if (existing.username === 'User') {
+      updates.username = username;
+    }
+    if (!existing.display_name && googleDisplayName) {
+      updates.display_name = googleDisplayName;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await admin
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
+    }
   }
 
   // ── Route based on approval ────────────────────────────────────────────────
