@@ -201,7 +201,13 @@ export const MODELS: Record<string, ModelConfig> = {
   },
 };
 
-export const IMAGE_MODELS = Object.values(MODELS).filter(m => m.type === 'image');
+export const IMAGE_MODELS = [
+  MODELS['nano-banana-2'],
+  MODELS['seedream-5'],
+  MODELS['nano-banana-pro'],
+  MODELS['gpt-image-2'],
+  MODELS['flux-2-pro'],
+];
 export const VIDEO_MODELS = [
   MODELS['google-omni-flash'],
   MODELS['seedance-2'],

@@ -16,6 +16,17 @@ interface ModelSelectProps {
   onChange: (value: string) => void;
 }
 
+const MODEL_SUBTITLES: Record<string, string> = {
+  'nano-banana-2': 'BEST MODEL',
+  'seedream-5': 'BEST & MORE CREATIVE MODEL',
+  'nano-banana-pro': 'BEST OVERALL MODEL (MORE EXPENSIVE)',
+  'gpt-image-2': 'GOOD FOR TEXT & POSTER DESIGN',
+  'flux-2-pro': 'FOR MOODBOARDS & EXPERIMENTATION',
+  'google-omni-flash': 'GOOD & FAST MODEL',
+  'seedance-2': 'BEST MODEL',
+  'kling-3-pro': 'GOOD MODEL',
+};
+
 function ModelIcon({ modelId, size = 13 }: { modelId: string; size?: number }) {
   switch (modelId) {
     case 'nano-banana-2':
@@ -93,8 +104,15 @@ export function ModelSelect({ options, value, onChange }: ModelSelectProps) {
         >
           <ModelIcon modelId={selected?.id ?? ''} />
         </span>
-        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {selected?.name ?? ''}
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span className="block" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {selected?.name ?? ''}
+          </span>
+          {selected && MODEL_SUBTITLES[selected.id] && (
+            <span className="block" style={{ color: 'var(--color-white-muted)', fontSize: 9, lineHeight: 1.25 }}>
+              {MODEL_SUBTITLES[selected.id]}
+            </span>
+          )}
         </span>
         <ChevronDown
           size={20}
@@ -152,7 +170,14 @@ export function ModelSelect({ options, value, onChange }: ModelSelectProps) {
               >
                 <ModelIcon modelId={opt.id} />
               </span>
-              <span>{opt.name}</span>
+              <span style={{ minWidth: 0 }}>
+                <span className="block">{opt.name}</span>
+                {MODEL_SUBTITLES[opt.id] && (
+                  <span className="block" style={{ color: 'var(--color-white-muted)', fontSize: 9, lineHeight: 1.25 }}>
+                    {MODEL_SUBTITLES[opt.id]}
+                  </span>
+                )}
+              </span>
             </button>
           ))}
         </div>,
