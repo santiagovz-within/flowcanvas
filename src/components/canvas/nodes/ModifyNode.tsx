@@ -10,8 +10,10 @@ import { NodeWrapper } from './NodeWrapper';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import { ModelSelect } from './ModelSelect';
 import { NodeSelect } from './NodeSelect';
+import { SourceThumbnails } from './SourceThumbnails';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { ASPECT_RATIOS, RESOLUTIONS } from '@/lib/utils/constants';
+import { cssAspectRatio, nearestAspectRatio } from '@/lib/utils/aspectRatio';
 import type {
   ModifyNodeData, ImageGenNodeData, ImageInputNodeData, UpscaleNodeData, MediaInputNodeData,
   VideoGenNodeData, VideoInputNodeData, VideoUpscaleNodeData, UpscaleMediaNodeData,
@@ -57,28 +59,6 @@ const ANCHOR_GRID: AnchorKey[][] = [
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
   el.style.height = `${el.scrollHeight}px`;
-}
-
-// CSS `aspect-ratio` value for an "w:h" label, so source thumbnails match the
-// shape of the images they represent instead of being forced into squares.
-function cssAspectRatio(label: string): string {
-  const [w, h] = label.split(':').map(Number);
-  return w > 0 && h > 0 ? `${w} / ${h}` : '1 / 1';
-}
-
-function nearestAspectRatio(w: number, h: number): string {
-  const ratio = w / h;
-  const candidates: [string, number][] = [
-    ['1:1', 1], ['16:9', 16/9], ['9:16', 9/16],
-    ['4:3', 4/3], ['3:4', 3/4], ['21:9', 21/9],
-    ['3:2', 3/2], ['2:3', 2/3],
-  ];
-  let best = '1:1', bestDiff = Infinity;
-  for (const [label, val] of candidates) {
-    const diff = Math.abs(ratio - val);
-    if (diff < bestDiff) { bestDiff = diff; best = label; }
-  }
-  return best;
 }
 
 function anchorHV(a: AnchorKey): { h: 'left' | 'center' | 'right'; v: 'top' | 'center' | 'bottom' } {
@@ -341,53 +321,6 @@ function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLe
       >
         <div style={{ height: 20, width: 2, background: 'rgba(255,255,255,0.45)', borderRadius: 1 }} />
       </div>
-    </div>
-  );
-}
-
-// ── SourceThumbnails ───────────────────────────────────────────────────────────
-// 3-up grid so each option is large enough to tell apart, sized to the source
-// aspect ratio with a tight radius so the framing stays readable. Unselected
-// options are desaturated and dimmed so the active one reads at a glance.
-
-function SourceThumbnails({ images, selectedIndex, aspect, onSelect }: {
-  images: string[];
-  selectedIndex: number;
-  aspect: string;
-  onSelect: (index: number) => void;
-}) {
-  return (
-    <div
-      className="mb-3 nodrag"
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, padding: 3 }}
-    >
-      {images.map((url, i) => {
-        const isSelected = selectedIndex === i;
-        return (
-          <button
-            key={i}
-            onClick={() => onSelect(i)}
-            className="nodrag"
-            style={{
-              width: '100%', aspectRatio: aspect, borderRadius: 3, padding: 0, overflow: 'hidden',
-              display: 'block', background: 'var(--color-bg-surface)',
-              outline: isSelected ? '2px solid #a855f7' : '2px solid transparent',
-              outlineOffset: 1,
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt=""
-              style={{
-                width: '100%', height: '100%', objectFit: 'cover', display: 'block',
-                filter: isSelected ? 'none' : 'grayscale(1) brightness(0.55)',
-                transition: 'filter 0.15s',
-              }}
-            />
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -1185,6 +1118,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                   selectedIndex={safeIndex}
                   aspect={thumbnailAspect}
                   onSelect={setSelectedIndex}
+                  className="mb-3"
                 />
               )}
 
@@ -1236,6 +1170,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                   selectedIndex={safeIndex}
                   aspect={thumbnailAspect}
                   onSelect={setSelectedIndex}
+                  className="mb-3"
                 />
               )}
 

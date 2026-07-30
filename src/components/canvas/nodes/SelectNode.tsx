@@ -6,8 +6,10 @@ import { SendToFigmaButton } from './SendToFigmaButton';
 import { useEffect } from 'react';
 import { NodeWrapper } from './NodeWrapper';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
+import { SourceThumbnails, THUMBNAIL_GRID_STYLE, THUMBNAIL_RADIUS } from './SourceThumbnails';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { downloadFromUrl } from '@/lib/utils/download';
+import { cssAspectRatio, nearestAspectRatio } from '@/lib/utils/aspectRatio';
 import type {
   SelectNodeData,
   ImageGenNodeData,
@@ -26,25 +28,33 @@ export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNod
 
   let availableImages: string[] = [];
   let videoUrl: string | undefined;
+  let sourceAspect = '1:1';
 
   if (sourceNode?.type === 'imageGenNode') {
-    availableImages = (sourceNode.data as ImageGenNodeData).generatedImages ?? [];
+    const nd = sourceNode.data as ImageGenNodeData;
+    availableImages = nd.generatedImages ?? [];
+    sourceAspect = nd.aspectRatio ?? '1:1';
   } else if (sourceNode?.type === 'imageInputNode') {
-    const url = (sourceNode.data as ImageInputNodeData).imageUrl;
-    if (url) availableImages = [url];
+    const nd = sourceNode.data as ImageInputNodeData;
+    if (nd.imageUrl) availableImages = [nd.imageUrl];
+    if (nd.naturalWidth && nd.naturalHeight) sourceAspect = nearestAspectRatio(nd.naturalWidth, nd.naturalHeight);
   } else if (sourceNode?.type === 'upscaleNode') {
     const url = (sourceNode.data as UpscaleNodeData).outputImageUrl;
     if (url) availableImages = [url];
   } else if (sourceNode?.type === 'modifyNode') {
-    const url = (sourceNode.data as ModifyNodeData).outputImageUrl;
-    if (url) availableImages = [url];
+    const nd = sourceNode.data as ModifyNodeData;
+    if (nd.outputImageUrl) availableImages = [nd.outputImageUrl];
+    sourceAspect = nd.aspectRatio ?? '1:1';
   } else if (sourceNode?.type === 'videoGenNode') {
-    videoUrl = (sourceNode.data as VideoGenNodeData).videoUrl;
+    const nd = sourceNode.data as VideoGenNodeData;
+    videoUrl = nd.videoUrl;
+    sourceAspect = nd.aspectRatio ?? '16:9';
   }
 
   const selectedIndex = Math.min(data.selectedIndex ?? 0, Math.max(availableImages.length - 1, 0));
   const currentUrl = availableImages[selectedIndex] ?? videoUrl;
   const mediaType: 'image' | 'video' = videoUrl ? 'video' : 'image';
+  const thumbnailAspect = cssAspectRatio(sourceAspect);
 
   useEffect(() => {
     if (currentUrl !== data.selectedImageUrl) {
@@ -129,48 +139,33 @@ export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNod
 
       {currentUrl ? (
         /* Block 1: Thumbnail picker */
-        <div className="nodrag" style={{ padding: '3px', overflowX: 'auto' }}>
-          <div className="flex gap-1.5">
-            {availableImages.length > 0 ? (
-              availableImages.map((url, i) => (
-                <button
-                  key={i}
-                  onClick={() => selectImage(i)}
-                  className="shrink-0 nodrag"
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 8,
-                    padding: 0,
-                    overflow: 'hidden',
-                    outline: selectedIndex === i ? '2px solid #a855f7' : '2px solid transparent',
-                    outlineOffset: 1,
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                </button>
-              ))
-            ) : (
-              /* Video — show a placeholder tile */
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 8,
-                  background: 'var(--color-bg-surface)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  outline: '2px solid #34d399',
-                  outlineOffset: 1,
-                }}
-              >
-                <Film size={16} style={{ color: '#34d399', opacity: 0.7 }} />
-              </div>
-            )}
+        availableImages.length > 0 ? (
+          <SourceThumbnails
+            images={availableImages}
+            selectedIndex={selectedIndex}
+            aspect={thumbnailAspect}
+            onSelect={selectImage}
+          />
+        ) : (
+          /* Video — show a placeholder tile in the same grid */
+          <div className="nodrag" style={THUMBNAIL_GRID_STYLE}>
+            <div
+              style={{
+                width: '100%',
+                aspectRatio: thumbnailAspect,
+                borderRadius: THUMBNAIL_RADIUS,
+                background: 'var(--color-bg-surface)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                outline: '2px solid #34d399',
+                outlineOffset: 1,
+              }}
+            >
+              <Film size={16} style={{ color: '#34d399', opacity: 0.7 }} />
+            </div>
           </div>
-        </div>
+        )
       ) : (
         <div
           className="flex items-center justify-center"
