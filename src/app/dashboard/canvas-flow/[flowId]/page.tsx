@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ReactFlowProvider } from '@xyflow/react';
 import { FlowCanvas } from '@/components/canvas/FlowCanvas';
 import { TopBar } from '@/components/layout/TopBar';
@@ -19,6 +19,8 @@ export default function FlowEditorPage() {
   const params = useParams<{ flowId: string }>();
   const { flowId } = params;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusNodeId = searchParams.get('focusNode');
   const {
     setCurrentFlow, nodes, edges,
     isDirty, isSaving, setDirty, setSaving, setLastSaved, currentFlow,
@@ -368,7 +370,7 @@ export default function FlowEditorPage() {
           </div>
         )}
 
-        <FlowCanvas isTestUser={isTestUser} readOnly={!isOwner} />
+        <FlowCanvas isTestUser={isTestUser} readOnly={!isOwner} focusNodeId={focusNodeId} />
       </div>
     </ReactFlowProvider>
   );

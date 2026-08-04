@@ -3,7 +3,6 @@
 import { Position, type NodeProps } from '@xyflow/react';
 import { Film, Play, AlertTriangle, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { downloadFromUrl } from '@/lib/utils/download';
-import { playSuccessSound } from '@/lib/utils/sound';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NodeWrapper } from './NodeWrapper';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
@@ -13,6 +12,8 @@ import { ModelSelect } from './ModelSelect';
 import { NodeSelect } from './NodeSelect';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasVideo } from '@/components/canvas/CanvasMedia';
+import { generationJobId, useGenerationStore } from '@/lib/stores/generationStore';
+import { startTrackedVideoGeneration } from '@/lib/generationTracker';
 
 const FRAME_ROW_HEIGHT = 36;
 const FRAME_ROW_GAP = 25;
@@ -35,7 +36,9 @@ function autoResize(el: HTMLTextAreaElement) {
 }
 
 export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGenNodeData }) {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const currentFlow = useFlowStore((state) => state.currentFlow);
+  const activeJobId = currentFlow ? generationJobId(currentFlow.id, id) : '';
+  const isGenerating = useGenerationStore((state) => !!state.jobs[activeJobId]);
   const videoHistory = data.videoHistory ?? [];
   const [histIdx, setHistIdx] = useState(() => Math.max(0, videoHistory.length - 1));
   const prevHistLen = useRef(videoHistory.length);
@@ -115,7 +118,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     if (!promptSectionRef.current) return;
     const el = promptSectionRef.current;
     setPromptHandleTop(el.offsetTop + el.offsetHeight / 2);
-  });
+  }, [data.promptConnected, localPrompt]);
 
   useLayoutEffect(() => {
     if (startFrameRowRef.current) {
@@ -124,7 +127,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     if (endFrameRowRef.current) {
       setEndFrameHandleTop(endFrameRowRef.current.offsetTop + FRAME_ROW_HEIGHT / 2);
     }
-  });
+  }, [isOmni, data.startFrameUrl, data.endFrameUrl]);
 
   function updateData(updates: Partial<VideoGenNodeData>) {
     document.dispatchEvent(new CustomEvent('node:update', {
@@ -165,123 +168,35 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     return (modelConfig as { endpoint: string }).endpoint;
   }
 
-  async function handleGenerate() {
-    if (isGenerating) return;
+  function handleGenerate() {
+    if (isGenerating || !currentFlow) return;
     if (isOmni && !hasImage) {
       updateData({ status: 'error', errorMessage: 'Google Omni Flash requires a start frame.' });
       return;
     }
-    setIsGenerating(true);
-    updateData({ status: 'processing', errorMessage: undefined, pendingRequestId: undefined, pendingEndpoint: undefined });
 
     const endpoint = getFalEndpoint();
     useFlowStore.getState().consumeGcsOnlyEligibility();
-
-    try {
-      const res = await fetch('/api/fal/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: data.model,
-          prompt: data.prompt ?? '',
-          aspectRatio: data.aspectRatio,
-          duration: data.duration,
-          startFrameUrl: data.startFrameUrl,
-          endFrameUrl: data.endFrameUrl,
-          generateAudio: data.generateAudio ?? true,
-          seedanceResolution: data.seedanceResolution ?? '720p',
-          sourceType: 'canvas',
-          sourceId: useFlowStore.getState().currentFlow?.id,
-          nodeId: id,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string; details?: string };
-        updateData({ status: 'error', errorMessage: err.details ?? err.error ?? `Server error ${res.status}` });
-        setIsGenerating(false);
-        return;
-      }
-
-      const result = await res.json() as { mediaUrls?: string[]; requestId?: string; error?: string; details?: string };
-
-      if (result.mediaUrls?.[0]) {
-        const newHistory = [...(data.videoHistory ?? []), result.mediaUrls[0]];
-        updateData({ videoUrl: result.mediaUrls[0], videoHistory: newHistory, status: 'completed' });
-        playSuccessSound();
-        document.dispatchEvent(new CustomEvent('node:video-propagate', {
-          detail: { sourceNodeId: id, videoUrl: result.mediaUrls[0] },
-        }));
-      } else if (result.requestId) {
-        updateData({ pendingRequestId: result.requestId, pendingEndpoint: endpoint });
-        pollForResult(result.requestId, endpoint);
-      } else {
-        updateData({ status: 'error', errorMessage: result.details ?? result.error ?? 'Generation failed — no request ID returned.' });
-        setIsGenerating(false);
-      }
-    } catch (err) {
-      updateData({ status: 'error', errorMessage: err instanceof Error ? err.message : 'Network error — check your connection and try again.' });
-      setIsGenerating(false);
-    }
-  }
-
-  function pollForResult(requestId: string, endpoint: string) {
-    let attempts = 0;
-    const MAX_ATTEMPTS = 200; // ~16 min at 5s intervals
-    const interval = setInterval(async () => {
-      attempts++;
-      if (attempts > MAX_ATTEMPTS) {
-        clearInterval(interval);
-        updateData({
-          status: 'error',
-          errorMessage: `Timed out after ~${Math.round(MAX_ATTEMPTS * 5 / 60)} minutes. The video may still be generating on FAL's servers — click "Check status on FAL" below to resume.`,
-          pendingRequestId: requestId,
-          pendingEndpoint: endpoint,
-        });
-        setIsGenerating(false);
-        return;
-      }
-      try {
-        const res = await fetch(`/api/fal/status/${requestId}?endpoint=${encodeURIComponent(endpoint)}`);
-        const result = await res.json() as { status: string; mediaUrls?: string[]; error?: string };
-        if (result.status === 'completed' && result.mediaUrls?.[0]) {
-          clearInterval(interval);
-          const currentNodes = useFlowStore.getState().nodes;
-          const currentData = currentNodes.find(n => n.id === id)?.data as VideoGenNodeData | undefined;
-          const newHistory = [...(currentData?.videoHistory ?? []), result.mediaUrls[0]];
-          updateData({
-            videoUrl: result.mediaUrls[0],
-            videoHistory: newHistory,
-            status: 'completed',
-            pendingRequestId: undefined,
-            pendingEndpoint: undefined,
-            errorMessage: undefined,
-          });
-          playSuccessSound();
-          document.dispatchEvent(new CustomEvent('node:video-propagate', {
-            detail: { sourceNodeId: id, videoUrl: result.mediaUrls[0] },
-          }));
-          setIsGenerating(false);
-        } else if (result.status === 'failed') {
-          clearInterval(interval);
-          updateData({
-            status: 'error',
-            errorMessage: result.error ?? 'FAL reported that the generation failed. This may be due to an invalid input or a server issue.',
-            pendingRequestId: requestId,
-            pendingEndpoint: endpoint,
-          });
-          setIsGenerating(false);
-        }
-        // 'pending' or transient 'error' — keep polling
-      } catch { /* keep polling on network hiccups */ }
-    }, 5000);
-  }
-
-  function resumePolling() {
-    if (!data.pendingRequestId || !data.pendingEndpoint) return;
-    setIsGenerating(true);
-    updateData({ status: 'processing', errorMessage: undefined });
-    pollForResult(data.pendingRequestId, data.pendingEndpoint);
+    void startTrackedVideoGeneration({
+      flowId: currentFlow.id,
+      flowTitle: currentFlow.title,
+      nodeId: id,
+      data,
+      endpoint,
+      payload: {
+        model: data.model,
+        prompt: data.prompt ?? '',
+        aspectRatio: data.aspectRatio,
+        duration: data.duration,
+        startFrameUrl: data.startFrameUrl,
+        endFrameUrl: data.endFrameUrl,
+        generateAudio: data.generateAudio ?? true,
+        seedanceResolution: data.seedanceResolution ?? '720p',
+        sourceType: 'canvas',
+        sourceId: currentFlow.id,
+        nodeId: id,
+      },
+    });
   }
 
   const displayVideoUrl = videoHistory.length > 0 ? (videoHistory[histIdx] ?? data.videoUrl) : data.videoUrl;
@@ -313,18 +228,6 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         <Play size={12} />
         {isGenerating ? 'Generating…' : 'Generate'}
       </button>
-
-      {/* Recovery button — shown when polling timed out but the job may have finished on FAL */}
-      {data.status === 'error' && data.pendingRequestId && !isGenerating && (
-        <button
-          onClick={resumePolling}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium mt-1.5 nodrag"
-          style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--color-error)', borderRadius: 11, border: '1px solid var(--color-error)' }}
-        >
-          <AlertTriangle size={12} />
-          Check status on FAL
-        </button>
-      )}
 
       {displayVideoUrl && (
         <button

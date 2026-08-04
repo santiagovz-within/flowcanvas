@@ -15,9 +15,11 @@ import {
   Users,
   BarChart2,
   Bug,
+  LoaderCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { createClient } from '@/lib/supabase/client';
+import { useGenerationStore } from '@/lib/stores/generationStore';
 
 const NAV_ITEMS = [
   { label: 'Canvas Flow',  icon: GitBranch, href: '/dashboard/canvas-flow'  },
@@ -34,6 +36,9 @@ export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const generationJobs = useGenerationStore((state) => state.jobs);
+  const activeGenerations = Object.values(generationJobs)
+    .sort((a, b) => a.startedAt - b.startedAt);
 
   useEffect(() => {
     const supabase = createClient();
@@ -49,10 +54,6 @@ export function Sidebar() {
     }
     checkAdmin();
   }, []);
-
-  function handleJamBox() {
-    window.open('https://jambox-one.vercel.app/', '_blank', 'noopener,noreferrer');
-  }
 
   const renderNavItem = (label: string, Icon: React.ElementType, href: string) => {
     const active = pathname.startsWith(href);
@@ -179,6 +180,61 @@ export function Sidebar() {
           </>
         )}
       </nav>
+
+      {/* One compact card per generating node. Multi-image batches stay grouped. */}
+      {activeGenerations.length > 0 && (
+        <div className={cn('max-h-48 overflow-y-auto px-2 pb-2 space-y-1.5', collapsed && 'px-1.5')}>
+          {activeGenerations.map((generation) => (
+            <Link
+              key={generation.id}
+              href={{
+                pathname: `/dashboard/canvas-flow/${generation.flowId}`,
+                query: { focusNode: generation.nodeId },
+              }}
+              title={`Generating an asset in ${generation.flowTitle}`}
+              aria-label={`Generating an asset in ${generation.flowTitle}. Open generating node.`}
+              className={cn(
+                'group flex rounded-lg transition-colors hover:bg-white/10',
+                collapsed
+                  ? 'h-10 items-center justify-center'
+                  : 'items-center gap-2.5 px-2.5 py-2',
+              )}
+              style={{
+                background: 'rgba(57, 153, 248, 0.09)',
+                border: '1px solid rgba(57, 153, 248, 0.28)',
+              }}
+            >
+              <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+                <span
+                  className="absolute inset-0 rounded-full animate-pulse"
+                  style={{ background: 'rgba(57, 153, 248, 0.2)' }}
+                />
+                <LoaderCircle
+                  size={14}
+                  className="relative animate-spin"
+                  style={{ color: 'var(--color-accent)' }}
+                />
+              </span>
+              {!collapsed && (
+                <span className="min-w-0 text-left">
+                  <span
+                    className="block truncate text-[11px] font-semibold"
+                    style={{ color: 'var(--color-white)' }}
+                  >
+                    Generating asset
+                  </span>
+                  <span
+                    className="block truncate text-[10px]"
+                    style={{ color: 'var(--color-white-muted)' }}
+                  >
+                    {generation.flowTitle}
+                  </span>
+                </span>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Bottom section */}
       <div className="px-2 pb-4 space-y-1" style={{ borderTop: 'var(--border-default)', paddingTop: '12px' }}>

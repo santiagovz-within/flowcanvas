@@ -158,13 +158,14 @@ function ConnectionToast({ toast }: { toast: ConnectionToastState | null }) {
 interface FlowCanvasProps {
   isTestUser?: boolean;
   readOnly?: boolean;
+  focusNodeId?: string | null;
 }
 
-export function FlowCanvas({ isTestUser = false, readOnly = false }: FlowCanvasProps) {
+export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId = null }: FlowCanvasProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, updateNodeData, setNodes, setEdges } = useFlowStore();
   const theme = useThemeStore((s) => s.theme);
   const allowedTypes = isTestUser ? (['mediaInputNode', 'videoToGifNode'] as import('@/types').NodeType[]) : undefined;
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const [contextMenu, setContextMenu]   = useState<ContextMenu | null>(null);
   const [connectionToast, setConnectionToast] = useState<ConnectionToastState | null>(null);
   const [isDragOver, setIsDragOver]     = useState(false);
@@ -198,6 +199,23 @@ export function FlowCanvas({ isTestUser = false, readOnly = false }: FlowCanvasP
     cameraGestureActive.current = false;
     settleZoom(zoom);
   }, [settleZoom]);
+  const lastFocusedNodeRef              = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!focusNodeId || lastFocusedNodeRef.current === focusNodeId) return;
+    if (!nodes.some((node) => node.id === focusNodeId)) return;
+    lastFocusedNodeRef.current = focusNodeId;
+    const frame = window.requestAnimationFrame(() => {
+      void fitView({
+        nodes: [{ id: focusNodeId }],
+        padding: 0.8,
+        minZoom: 0.75,
+        maxZoom: 1.1,
+        duration: 500,
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [fitView, focusNodeId, nodes]);
 
   const showConnectionToast = useCallback((toast: ConnectionToastState) => {
     if (connectionToastTimer.current) clearTimeout(connectionToastTimer.current);

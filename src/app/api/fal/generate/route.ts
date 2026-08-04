@@ -15,6 +15,7 @@ interface GenerateRequestBody extends GenerateImageRequest {
   nodeId?: string;
   quality?: string;
   duration?: number;
+  slotIndex?: number;
 }
 
 const SEEDREAM_MIN_PIXELS = 1024 * 1024;
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
           node_id: nodeId,
           model,
           prompt,
-          parameters: { aspectRatio, resolution },
+          parameters: { aspectRatio, resolution, endpoint },
           reference_image_urls: referenceImageUrls,
           media_type: 'video',
           media_url: '',
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
             node_id: nodeId,
             model,
             prompt,
-            parameters: { aspectRatio, resolution },
+            parameters: { aspectRatio, resolution, endpoint, slotIndex: body.slotIndex },
             reference_image_urls: referenceImageUrls,
             media_type: 'image',
             media_url: '',
