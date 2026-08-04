@@ -47,6 +47,9 @@ interface RecoveredGeneration {
 const inFlightRequests = new Set<string>();
 const inFlightSaves = new Set<string>();
 let isRecovering = false;
+const MAX_CONSECUTIVE_POLL_ERRORS = 10;
+const ORPHANED_SUBMISSION_TIMEOUT_MS = 10 * 60 * 1000;
+const INCOMPLETE_RECOVERY_GRACE_MS = 60 * 1000;
 
 function activeNodeData(flowId: string, nodeId: string): NodeData | undefined {
   const flowState = useFlowStore.getState();
@@ -242,6 +245,12 @@ async function saveFinalJob(job: BackgroundGenerationJob) {
           .map(([key]) => key),
       }),
     });
+    if ([400, 403, 404].includes(response.status)) {
+      // The node was removed, the Flow is gone, or the saved job is no longer
+      // valid. Retrying can never succeed and would leave a phantom card.
+      useGenerationStore.getState().removeJob(job.id);
+      return;
+    }
     if (!response.ok) throw new Error(`Could not persist generation result (${response.status}).`);
 
     // The Flow may have loaded while the persistence request was in flight.
@@ -278,13 +287,83 @@ function requestStatusUrl(request: BackgroundGenerationRequest): string {
   return `/api/fal/status/${request.requestId}?endpoint=${encodeURIComponent(request.endpoint)}&mediaType=${request.mediaType}`;
 }
 
+function recordPollError(jobId: string, requestId: string, message: string) {
+  const job = useGenerationStore.getState().jobs[jobId];
+  const request = job?.requests.find((candidate) => candidate.requestId === requestId);
+  if (!request || request.status !== 'pending') return;
+  const pollErrorCount = (request.pollErrorCount ?? 0) + 1;
+  if (pollErrorCount < MAX_CONSECUTIVE_POLL_ERRORS) {
+    useGenerationStore.getState().patchRequest(jobId, requestId, { pollErrorCount });
+    return;
+  }
+
+  useGenerationStore.getState().patchRequest(jobId, requestId, {
+    status: 'failed',
+    pollErrorCount,
+    errorMessage: `Could not confirm this generation with FAL after repeated attempts. ${message}`,
+  });
+  markSlotFailed(jobId, request.slotIndex);
+}
+
+function failOrphanedJobs() {
+  const now = Date.now();
+  for (const job of Object.values(useGenerationStore.getState().jobs)) {
+    if (
+      !job.submissionsComplete
+      && job.requests.length === 0
+      && now - job.startedAt >= ORPHANED_SUBMISSION_TIMEOUT_MS
+    ) {
+      useGenerationStore.getState().patchJob(job.id, {
+        submissionsComplete: true,
+        failedSlots: Array.from({ length: job.slotCount }, (_, index) => index),
+        requests: [{
+          requestId: 'orphaned-submission',
+          endpoint: '',
+          mediaType: job.kind === 'image-generation' ? 'image' : 'video',
+          slotIndex: 0,
+          status: 'failed',
+          errorMessage: 'The generation request could not be recovered.',
+        }],
+      });
+      continue;
+    }
+
+    const hasPendingRequest = job.requests.some((request) => request.status === 'pending');
+    const resolvedCount = job.slots.filter(Boolean).length + job.failedSlots.length;
+    if (
+      job.submissionsComplete
+      && !hasPendingRequest
+      && resolvedCount < job.slotCount
+      && now - job.startedAt >= INCOMPLETE_RECOVERY_GRACE_MS
+    ) {
+      const missingSlots = Array.from({ length: job.slotCount }, (_, index) => index)
+        .filter((index) => !job.slots[index] && !job.failedSlots.includes(index));
+      useGenerationStore.getState().patchJob(job.id, {
+        failedSlots: [...job.failedSlots, ...missingSlots],
+        requests: [...job.requests, {
+          requestId: 'incomplete-recovery',
+          endpoint: '',
+          mediaType: job.kind === 'image-generation' ? 'image' : 'video',
+          slotIndex: missingSlots[0] ?? 0,
+          status: 'failed',
+          errorMessage: 'Part of this generation could not be recovered.',
+        }],
+      });
+    }
+  }
+}
+
 async function pollRequest(jobId: string, request: BackgroundGenerationRequest) {
   const requestKey = `${jobId}:${request.requestId}`;
   if (inFlightRequests.has(requestKey)) return;
   inFlightRequests.add(requestKey);
   try {
     const response = await fetch(requestStatusUrl(request));
-    if (!response.ok) return;
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      recordPollError(jobId, request.requestId, result.error ?? `Status request failed (${response.status}).`);
+      return;
+    }
     const result = await readJsonResponse<{
       status: string;
       mediaUrls?: string[];
@@ -303,10 +382,19 @@ async function pollRequest(jobId: string, request: BackgroundGenerationRequest) 
         errorMessage: result.error ?? result.detail ?? 'FAL reported that the generation failed.',
       });
       markSlotFailed(jobId, request.slotIndex);
+    } else if (result.status === 'error') {
+      recordPollError(
+        jobId,
+        request.requestId,
+        result.error ?? result.detail ?? 'FAL status is unavailable.',
+      );
+    } else {
+      useGenerationStore.getState().patchRequest(jobId, request.requestId, {
+        pollErrorCount: 0,
+      });
     }
   } catch {
-    // Network and status-service errors are transient. The dashboard-level
-    // poller will retry while the job remains active.
+    recordPollError(jobId, request.requestId, 'The status service could not be reached.');
   } finally {
     inFlightRequests.delete(requestKey);
   }
@@ -319,6 +407,7 @@ export async function progressBackgroundGenerations() {
       .filter((request) => request.status === 'pending')
       .map((request) => pollRequest(job.id, request))),
   );
+  failOrphanedJobs();
   await finalizeReadyJobs();
 }
 

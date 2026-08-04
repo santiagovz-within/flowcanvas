@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils/cn';
 import { createClient } from '@/lib/supabase/client';
 import { useGenerationStore } from '@/lib/stores/generationStore';
+import { PORT_COLORS } from '@/components/canvas/nodes/TypedHandle';
 
 const NAV_ITEMS = [
   { label: 'Canvas Flow',  icon: GitBranch, href: '/dashboard/canvas-flow'  },
@@ -38,6 +39,7 @@ export function Sidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const generationJobs = useGenerationStore((state) => state.jobs);
   const activeGenerations = Object.values(generationJobs)
+    .filter((generation) => generation.phase !== 'saving')
     .sort((a, b) => a.startedAt - b.startedAt);
 
   useEffect(() => {
@@ -184,55 +186,58 @@ export function Sidebar() {
       {/* One compact card per generating node. Multi-image batches stay grouped. */}
       {activeGenerations.length > 0 && (
         <div className={cn('max-h-48 overflow-y-auto px-2 pb-2 space-y-1.5', collapsed && 'px-1.5')}>
-          {activeGenerations.map((generation) => (
-            <Link
-              key={generation.id}
-              href={{
-                pathname: `/dashboard/canvas-flow/${generation.flowId}`,
-                query: { focusNode: generation.nodeId },
-              }}
-              title={`Generating an asset in ${generation.flowTitle}`}
-              aria-label={`Generating an asset in ${generation.flowTitle}. Open generating node.`}
-              className={cn(
-                'group flex rounded-lg transition-colors hover:bg-white/10',
-                collapsed
-                  ? 'h-10 items-center justify-center'
-                  : 'items-center gap-2.5 px-2.5 py-2',
-              )}
-              style={{
-                background: 'rgba(57, 153, 248, 0.09)',
-                border: '1px solid rgba(57, 153, 248, 0.28)',
-              }}
-            >
-              <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
-                <span
-                  className="absolute inset-0 rounded-full animate-pulse"
-                  style={{ background: 'rgba(57, 153, 248, 0.2)' }}
-                />
-                <LoaderCircle
-                  size={14}
-                  className="relative animate-spin"
-                  style={{ color: 'var(--color-accent)' }}
-                />
-              </span>
-              {!collapsed && (
-                <span className="min-w-0 text-left">
+          {activeGenerations.map((generation) => {
+            const mediaType = generation.kind === 'image-generation' ? 'image' : 'video';
+            return (
+              <Link
+                key={generation.id}
+                href={{
+                  pathname: `/dashboard/canvas-flow/${generation.flowId}`,
+                  query: { focusNode: generation.nodeId },
+                }}
+                title={`Generating an asset in ${generation.flowTitle}`}
+                aria-label={`Generating an asset in ${generation.flowTitle}. Open generating node.`}
+                className={cn(
+                  'group flex rounded-lg transition-opacity hover:opacity-80',
+                  collapsed
+                    ? 'h-10 items-center justify-center'
+                    : 'items-center gap-2.5 px-2.5 py-2',
+                )}
+                style={{
+                  background: 'var(--color-bg-elevated)',
+                  border: 'var(--border-default)',
+                }}
+              >
+                <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
                   <span
-                    className="block truncate text-[11px] font-semibold"
-                    style={{ color: 'var(--color-white)' }}
-                  >
-                    Generating asset
-                  </span>
-                  <span
-                    className="block truncate text-[10px]"
-                    style={{ color: 'var(--color-white-muted)' }}
-                  >
-                    {generation.flowTitle}
-                  </span>
+                    className="absolute inset-0 rounded-full animate-pulse"
+                    style={{ background: `var(--port-tint-${mediaType})` }}
+                  />
+                  <LoaderCircle
+                    size={14}
+                    className="relative animate-spin"
+                    style={{ color: PORT_COLORS[mediaType] }}
+                  />
                 </span>
-              )}
-            </Link>
-          ))}
+                {!collapsed && (
+                  <span className="min-w-0 text-left">
+                    <span
+                      className="block truncate text-[11px] font-semibold"
+                      style={{ color: 'var(--color-white)' }}
+                    >
+                      Generating asset
+                    </span>
+                    <span
+                      className="block truncate text-[10px]"
+                      style={{ color: 'var(--color-white-muted)' }}
+                    >
+                      {generation.flowTitle}
+                    </span>
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
 

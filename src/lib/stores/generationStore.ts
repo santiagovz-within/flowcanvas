@@ -16,6 +16,7 @@ export interface BackgroundGenerationRequest {
   status: 'pending' | 'completed' | 'failed';
   mediaUrl?: string;
   errorMessage?: string;
+  pollErrorCount?: number;
 }
 
 export interface BackgroundGenerationJob {
@@ -117,7 +118,14 @@ export const useGenerationStore = create<GenerationStore>()(
     {
       name: 'canvas-flow-background-generations',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      migrate: (persistedState, version) => {
+        // Version 1 could retain terminal/saving jobs indefinitely. Clear
+        // those entries once; genuinely active FAL jobs are recovered from
+        // the server immediately after hydration.
+        if (version < 2) return { jobs: {} } as GenerationStore;
+        return persistedState as GenerationStore;
+      },
       skipHydration: true,
     },
   ),

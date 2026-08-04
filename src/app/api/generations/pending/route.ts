@@ -3,6 +3,8 @@ import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { FAL_MODELS } from '@/lib/api/models';
 import type { FlowData, NodeType } from '@/types';
 
+const RECOVERY_WINDOW_MS = 2 * 60 * 60 * 1000;
+
 function resolveEndpoint(
   model: string,
   parameters: Record<string, unknown> | null,
@@ -53,6 +55,7 @@ export async function GET() {
       .not('source_id', 'is', null)
       .not('node_id', 'is', null)
       .not('fal_request_id', 'is', null)
+      .gte('created_at', new Date(Date.now() - RECOVERY_WINDOW_MS).toISOString())
       .order('created_at', { ascending: true });
     if (pendingError) throw new Error(pendingError.message);
 

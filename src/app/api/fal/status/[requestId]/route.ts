@@ -27,7 +27,7 @@ export async function GET(
 
     const { data: existingGeneration, error: lookupError } = await supabase
       .from('generations')
-      .select('id, media_url, status')
+      .select('id, media_url, status, error_message')
       .eq('fal_request_id', requestId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -43,6 +43,13 @@ export async function GET(
       return NextResponse.json({
         status: 'completed',
         mediaUrls: [mediaUrl],
+        generationId: existingGeneration.id,
+      });
+    }
+    if (existingGeneration?.status === 'failed') {
+      return NextResponse.json({
+        status: 'failed',
+        error: existingGeneration.error_message ?? 'FAL reported the job failed.',
         generationId: existingGeneration.id,
       });
     }
@@ -140,7 +147,10 @@ export async function GET(
     if (s.status === 'FAILED') {
       await supabase
         .from('generations')
-        .update({ status: 'failed' })
+        .update({
+          status: 'failed',
+          error_message: s.error ?? 'FAL reported the job failed.',
+        })
         .eq('fal_request_id', requestId)
         .eq('user_id', user.id);
       return NextResponse.json({ status: 'failed', error: s.error ?? 'FAL reported the job failed.' });
