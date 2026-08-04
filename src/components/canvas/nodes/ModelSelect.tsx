@@ -24,6 +24,7 @@ const MODEL_SUBTITLES: Record<string, string> = {
   'flux-2-pro': 'FOR MOODBOARDS & EXPERIMENTATION',
   'google-omni-flash': 'GOOD & FAST MODEL',
   'seedance-2': 'BEST MODEL',
+  'seedance-2-mini': 'GOOD MODEL',
   'kling-3-pro': 'GOOD MODEL',
 };
 
@@ -43,6 +44,7 @@ function ModelIcon({ modelId, size = 13 }: { modelId: string; size?: number }) {
     case 'kling-3-pro':
       return <Kling.Color size={size} />;
     case 'seedance-2':
+    case 'seedance-2-mini':
       return <ByteDance.Color size={size} />;
     case 'seedvr2':
       return <Fal.Color size={size} />;

@@ -75,11 +75,16 @@ export async function POST(request: NextRequest) {
       const startFrameUrl      = (body as GenerateRequestBody & { startFrameUrl?: string }).startFrameUrl;
       const endFrameUrl        = (body as GenerateRequestBody & { endFrameUrl?: string }).endFrameUrl;
       const generateAudio      = (body as GenerateRequestBody & { generateAudio?: boolean }).generateAudio;
-      const seedanceResolution = (body as GenerateRequestBody & { seedanceResolution?: string }).seedanceResolution ?? '720p';
       const hasImage = !!startFrameUrl;
-      const isSeedance = model === 'seedance-2';
+      const isSeedanceMini = model === 'seedance-2-mini';
+      const isSeedance = model === 'seedance-2' || isSeedanceMini;
       const isOmni = model === 'google-omni-flash';
-      const duration = body.duration ?? 5;
+      const requestedSeedanceResolution = (body as GenerateRequestBody & { seedanceResolution?: string }).seedanceResolution ?? '720p';
+      const seedanceResolution = isSeedanceMini && !['480p', '720p'].includes(requestedSeedanceResolution)
+        ? '720p'
+        : requestedSeedanceResolution;
+      const requestedDuration = body.duration ?? 5;
+      const duration = isSeedanceMini && requestedDuration < 4 ? 5 : requestedDuration;
 
       if (isOmni && !startFrameUrl) {
         return NextResponse.json(

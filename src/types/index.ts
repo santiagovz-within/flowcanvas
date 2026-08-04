@@ -174,7 +174,7 @@ export interface VideoGenNodeData extends Record<string, unknown> {
   imageAspectRatio?: string;
   duration?: number;
   generateAudio?: boolean;
-  seedanceResolution?: '720p' | '1080p' | '4k';
+  seedanceResolution?: '480p' | '720p' | '1080p' | '4k';
   prompt?: string;
   promptConnected?: boolean;
   startFrameUrl?: string;

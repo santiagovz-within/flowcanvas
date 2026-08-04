@@ -56,6 +56,11 @@ export const FAL_MODELS = {
     imageToVideoEndpoint: 'bytedance/seedance-2.0/image-to-video',
     type: 'video' as const,
   },
+  'seedance-2-mini': {
+    endpoint: 'bytedance/seedance-2.0/mini/text-to-video',
+    imageToVideoEndpoint: 'bytedance/seedance-2.0/mini/image-to-video',
+    type: 'video' as const,
+  },
   'seedvr2': {
     endpoint: 'fal-ai/seedvr/upscale/image',
     scaleParam: 'upscale_factor',
@@ -175,6 +180,18 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 90,
   },
+  'seedance-2-mini': {
+    id: 'seedance-2-mini',
+    name: 'Seedance 2.0 Mini',
+    provider: 'fal',
+    type: 'video',
+    supportedAspectRatios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+    supportedResolutions: ['480p', '720p'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: false,
+    estimatedTimeSeconds: 60,
+  },
   'seedvr2': {
     id: 'seedvr2',
     name: 'SeedVR2',
@@ -211,6 +228,7 @@ export const IMAGE_MODELS = [
 export const VIDEO_MODELS = [
   MODELS['google-omni-flash'],
   MODELS['seedance-2'],
+  MODELS['seedance-2-mini'],
   MODELS['kling-3-pro'],
 ];
 export const CHAT_VIDEO_MODELS = VIDEO_MODELS.filter(m => m.id !== 'google-omni-flash');

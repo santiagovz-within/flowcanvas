@@ -22,9 +22,12 @@ const KLING_ASPECT_RATIOS    = ['16:9', '9:16', '1:1'];
 const OMNI_ASPECT_RATIOS     = ['16:9', '9:16'];
 const SEEDANCE_ASPECT_RATIOS = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
 const SEEDANCE_RESOLUTIONS   = ['720p', '1080p', '4k'];
+const SEEDANCE_MINI_RESOLUTIONS = ['720p', '480p'];
 
 const DURATION_OPTIONS = ['3s', '5s', '8s', '10s'];
+const SEEDANCE_MINI_DURATION_OPTIONS = ['4s', '5s', '8s', '10s'];
 const DURATION_MAP: Record<string, number> = { '3s': 3, '5s': 5, '8s': 8, '10s': 10 };
+const SEEDANCE_MINI_DURATION_MAP: Record<string, number> = { '4s': 4, '5s': 5, '8s': 8, '10s': 10 };
 
 function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
@@ -67,7 +70,9 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
 
   const isKling     = data.model === 'kling-3-pro';
   const isOmni      = data.model === 'google-omni-flash';
-  const isSeedance  = data.model === 'seedance-2';
+  const isSeedanceFull = data.model === 'seedance-2';
+  const isSeedanceMini = data.model === 'seedance-2-mini';
+  const isSeedance  = isSeedanceFull || isSeedanceMini;
   const hasImage    = !!data.startFrameUrl;
 
   const aspectRatios = isSeedance
@@ -75,6 +80,21 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     : isOmni
       ? OMNI_ASPECT_RATIOS
       : KLING_ASPECT_RATIOS;
+  const seedanceResolutionOptions = isSeedanceMini
+    ? SEEDANCE_MINI_RESOLUTIONS
+    : SEEDANCE_RESOLUTIONS;
+  const durationOptions = isSeedanceMini
+    ? SEEDANCE_MINI_DURATION_OPTIONS
+    : DURATION_OPTIONS;
+  const durationMap = isSeedanceMini
+    ? SEEDANCE_MINI_DURATION_MAP
+    : DURATION_MAP;
+  const selectedDuration = isSeedanceMini && (data.duration ?? 5) < 4
+    ? 5
+    : data.duration ?? 5;
+  const selectedSeedanceResolution = isSeedanceMini && !SEEDANCE_MINI_RESOLUTIONS.includes(data.seedanceResolution ?? '720p')
+    ? '720p'
+    : data.seedanceResolution ?? '720p';
 
   // Read start-frame source node directly from store (reactive, zero-latency)
   const storeEdges = useFlowStore(state => state.edges);
@@ -138,10 +158,17 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   function handleModelChange(model: string) {
     const modelConfig = VIDEO_MODELS.find(option => option.id === model);
     const supportedAspectRatios = modelConfig?.supportedAspectRatios ?? [];
+    const nextIsSeedanceMini = model === 'seedance-2-mini';
     updateData({
       model,
       ...(!supportedAspectRatios.includes(data.aspectRatio) && supportedAspectRatios[0]
         ? { aspectRatio: supportedAspectRatios[0] }
+        : {}),
+      ...(nextIsSeedanceMini && !SEEDANCE_MINI_RESOLUTIONS.includes(data.seedanceResolution ?? '720p')
+        ? { seedanceResolution: '720p' as const }
+        : {}),
+      ...(nextIsSeedanceMini && (data.duration ?? 5) < 4
+        ? { duration: 5 }
         : {}),
     });
   }
@@ -187,11 +214,11 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         model: data.model,
         prompt: data.prompt ?? '',
         aspectRatio: data.aspectRatio,
-        duration: data.duration,
+        duration: selectedDuration,
         startFrameUrl: data.startFrameUrl,
         endFrameUrl: data.endFrameUrl,
         generateAudio: data.generateAudio ?? true,
-        seedanceResolution: data.seedanceResolution ?? '720p',
+        seedanceResolution: selectedSeedanceResolution,
         sourceType: 'canvas',
         sourceId: currentFlow.id,
         nodeId: id,
@@ -319,44 +346,43 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         <ModelSelect options={VIDEO_MODELS} value={data.model} onChange={handleModelChange} />
       </div>
 
-      {isSeedance && (
-        <>
-          <div
-            className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg mb-2 text-xs nodrag"
-            style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', color: '#eab308' }}
-          >
-            <AlertTriangle size={11} className="shrink-0 mt-0.5" />
-            This is a very expensive model to use, please use wisely.
-          </div>
+      {isSeedanceFull && (
+        <div
+          className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg mb-2 text-xs nodrag"
+          style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', color: '#eab308' }}
+        >
+          <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+          This is a very expensive model to use, please use wisely.
+        </div>
+      )}
 
-          {/* Generate Audio toggle */}
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs" style={{ color: 'var(--color-white-muted)' }}>Generate Audio</span>
-            <button
-              className="nodrag relative inline-flex items-center rounded-full transition-colors"
+      {isSeedance && (
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs" style={{ color: 'var(--color-white-muted)' }}>Generate Audio</span>
+          <button
+            className="nodrag relative inline-flex items-center rounded-full transition-colors"
+            style={{
+              width: 32,
+              height: 18,
+              background: (data.generateAudio ?? true) ? 'var(--color-accent)' : 'var(--color-bg-surface)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              flexShrink: 0,
+            }}
+            onClick={() => updateData({ generateAudio: !(data.generateAudio ?? true) })}
+          >
+            <span
+              className="absolute rounded-full transition-transform"
               style={{
-                width: 32,
-                height: 18,
-                background: (data.generateAudio ?? true) ? 'var(--color-accent)' : 'var(--color-bg-surface)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                flexShrink: 0,
+                width: 12,
+                height: 12,
+                background: 'var(--color-white)',
+                left: 2,
+                transform: (data.generateAudio ?? true) ? 'translateX(14px)' : 'translateX(0)',
+                transition: 'transform 0.15s ease',
               }}
-              onClick={() => updateData({ generateAudio: !(data.generateAudio ?? true) })}
-            >
-              <span
-                className="absolute rounded-full transition-transform"
-                style={{
-                  width: 12,
-                  height: 12,
-                  background: 'var(--color-white)',
-                  left: 2,
-                  transform: (data.generateAudio ?? true) ? 'translateX(14px)' : 'translateX(0)',
-                  transition: 'transform 0.15s ease',
-                }}
-              />
-            </button>
-          </div>
-        </>
+            />
+          </button>
+        </div>
       )}
 
       <div className={`grid gap-2 mb-3 ${isSeedance ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -371,18 +397,18 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         <div>
           <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Duration</label>
           <NodeSelect
-            options={DURATION_OPTIONS}
-            value={`${data.duration ?? 5}s`}
-            onChange={(v) => updateData({ duration: DURATION_MAP[v] ?? 5 })}
+            options={durationOptions}
+            value={`${selectedDuration}s`}
+            onChange={(v) => updateData({ duration: durationMap[v] ?? 5 })}
           />
         </div>
         {isSeedance && (
           <div>
             <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Resolution</label>
             <NodeSelect
-              options={SEEDANCE_RESOLUTIONS}
-              value={data.seedanceResolution ?? '720p'}
-              onChange={(v) => updateData({ seedanceResolution: v as '720p' | '1080p' | '4k' })}
+              options={seedanceResolutionOptions}
+              value={selectedSeedanceResolution}
+              onChange={(v) => updateData({ seedanceResolution: v as '480p' | '720p' | '1080p' | '4k' })}
             />
           </div>
         )}
