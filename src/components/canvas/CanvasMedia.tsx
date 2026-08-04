@@ -18,7 +18,6 @@ import {
   type ResolvedMediaAsset,
 } from '@/lib/utils/mediaUtils';
 
-const PLACEHOLDER_CSS_PX = 48;
 const DPR_CAP = 2;
 const OPTIMIZER_QUALITY = 75;
 const MAX_CONCURRENT_UPGRADES = 6;
@@ -212,9 +211,7 @@ function LodImage({
   }, [cameraMoving, commitCandidate]);
 
   const effectiveCssPixels = settledZoom === null ? 0 : layoutWidth * settledZoom;
-  const shouldResolve = !cameraMoving && settledZoom !== null && (
-    focused || (visible && effectiveCssPixels >= PLACEHOLDER_CSS_PX)
-  );
+  const shouldResolve = !cameraMoving && settledZoom !== null && (focused || visible);
 
   useEffect(() => {
     if (!shouldResolve) return;
@@ -232,7 +229,6 @@ function LodImage({
   );
   const desiredRank = useMemo<TierRank>(() => {
     if (cameraMoving || !asset || settledZoom === null || (!visible && !focused)) return 0;
-    if (effectiveCssPixels < PLACEHOLDER_CSS_PX && loadedRank === 0 && !focused) return 0;
     if (posterOnly && !asset.poster) return 0;
     // External/non-GCS images have no deterministic derivative family, so
     // retain their existing direct-load behavior.
@@ -242,7 +238,7 @@ function LodImage({
     // 2048px, so requesting the video original as a fifth visual tier is both
     // wasteful and contrary to the no-background-video rule.
     return posterOnly && desired === 5 ? 4 : desired;
-  }, [asset, cameraMoving, effectiveCssPixels, focused, loadedRank, posterOnly, requiredPixels, settledZoom, visible]);
+  }, [asset, cameraMoving, focused, posterOnly, requiredPixels, settledZoom, visible]);
 
   useEffect(() => {
     if (!asset || desiredRank === 0 || desiredRank <= loadedRankRef.current) return;
