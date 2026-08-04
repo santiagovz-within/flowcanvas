@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { isGcsRef, gcsPathFromRef, deleteFromGCS } from '@/lib/gcs';
+import { deleteMediaAndDerivatives } from '@/lib/mediaDerivatives';
 
 export async function DELETE(
   _request: NextRequest,
@@ -14,7 +15,7 @@ export async function DELETE(
 
   const { data: gen } = await supabase
     .from('generations')
-    .select('id, media_url, user_id')
+    .select('id, media_url, media_type, user_id')
     .eq('id', id)
     .eq('user_id', user.id)
     .single();
@@ -23,7 +24,12 @@ export async function DELETE(
 
   if (gen.media_url) {
     if (isGcsRef(gen.media_url)) {
-      await deleteFromGCS(gcsPathFromRef(gen.media_url)).catch(() => {});
+      const objectPath = gcsPathFromRef(gen.media_url);
+      if (gen.media_type === 'image' || gen.media_type === 'video') {
+        await deleteMediaAndDerivatives(objectPath, gen.media_type).catch(() => {});
+      } else {
+        await deleteFromGCS(objectPath).catch(() => {});
+      }
     } else {
       // Legacy Supabase URL: /storage/v1/object/public/<bucket>/<path...>
       try {

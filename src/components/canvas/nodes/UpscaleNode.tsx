@@ -12,6 +12,7 @@ import type { UpscaleNodeData, ImageInputNodeData, ImageGenNodeData, SelectNodeD
 import { UPSCALE_MODELS, FAL_MODELS } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { CanvasImage } from '@/components/canvas/CanvasMedia';
 
 type Dims = { w: number; h: number };
 
@@ -47,8 +48,7 @@ function ComparisonSlider({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl
         onMouseDown={(e) => { dragging.current = true; move.current(e.clientX); e.preventDefault(); }}
       >
         {/* After image — sets the container height */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <CanvasImage
           src={afterUrl}
           alt="After"
           className="w-full block"
@@ -60,12 +60,12 @@ function ComparisonSlider({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl
         />
 
         {/* Before image — absolutely overlaid, clipped via clipPath (no size distortion) */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <CanvasImage
           src={beforeUrl}
           alt="Before"
           className="absolute inset-0 w-full h-full block"
-          style={{ objectFit: 'cover', clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+          fill
+          style={{ position: 'absolute', inset: 0, objectFit: 'cover', clipPath: `inset(0 ${100 - pct}% 0 0)` }}
           onLoad={(e) => {
             const img = e.currentTarget;
             setBeforeDims({ w: img.naturalWidth, h: img.naturalHeight });
@@ -257,8 +257,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps & { data: UpscaleN
         </div>
       ) : inputImageUrl ? (
         <div style={{ margin: '0 -18px 12px -18px', overflow: 'hidden' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={inputImageUrl} alt="Input" className="w-full block" style={{ height: 'auto' }} />
+          <CanvasImage src={inputImageUrl} alt="Input" className="w-full block" style={{ height: 'auto' }} />
         </div>
       ) : null}
 

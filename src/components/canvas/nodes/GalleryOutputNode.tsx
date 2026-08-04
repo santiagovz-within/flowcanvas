@@ -6,7 +6,7 @@ import { Grid, Download, Film, Image } from 'lucide-react';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { NodeWrapper } from './NodeWrapper';
 import { downloadFromUrl } from '@/lib/utils/download';
-import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
+import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { getNodeMediaUrls, getSourceMediaType } from '../mediaOutputs';
 import type { GalleryOutputNodeData, NodeData } from '@/types';
 
@@ -119,16 +119,18 @@ export function GalleryOutputNode({ selected, id }: NodeProps & { data: GalleryO
                 title="Click to download"
               >
                 {item.type === 'video' ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--color-bg-surface)' }}>
-                      <Film size={20} style={{ color: 'var(--color-success)', opacity: 0.6 }} />
-                    </div>
-                  </>
+                  <CanvasVideo
+                    src={item.url}
+                    focused={false}
+                    className="w-full h-full"
+                    style={{ objectFit: 'cover' }}
+                    fill
+                  />
                 ) : (
-                  <ProgressiveImage
+                  <CanvasImage
                     src={item.url}
                     alt={`Gallery ${i + 1}`}
+                    focused={false}
                     className="w-full h-full object-cover"
                     draggable={false}
                     fill

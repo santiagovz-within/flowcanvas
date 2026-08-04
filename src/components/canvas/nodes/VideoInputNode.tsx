@@ -8,6 +8,7 @@ import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { VideoInputNodeData } from '@/types';
 import type { FFmpeg } from '@ffmpeg/ffmpeg';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { CanvasVideo } from '@/components/canvas/CanvasMedia';
 
 const COMPRESS_THRESHOLD_BYTES = 50 * 1024 * 1024; // 50 MB
 const ACCEPTED_VIDEO_TYPES = 'video/mp4,video/webm,video/quicktime,video/mpeg';
@@ -106,7 +107,7 @@ export function VideoInputNode({ data, selected, id }: NodeProps & { data: Video
         body: JSON.stringify({ contentType }),
       });
       if (!signRes.ok) throw new Error('Failed to get upload URL');
-      const { uploadUrl, readUrl } = await signRes.json();
+      const { uploadUrl, readUrl, ref } = await signRes.json();
 
       const putRes = await fetch(uploadUrl, {
         method: 'PUT',
@@ -114,6 +115,15 @@ export function VideoInputNode({ data, selected, id }: NodeProps & { data: Video
         headers: { 'Content-Type': contentType },
       });
       if (!putRes.ok) throw new Error(`Upload failed: ${putRes.status}`);
+
+      const finalizeRes = await fetch('/api/media/derivatives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref, contentType }),
+      });
+      if (!finalizeRes.ok) {
+        console.warn('[VideoInputNode] Upload succeeded without a generated poster');
+      }
 
       dispatchUpdate({ videoUrl: readUrl });
       document.dispatchEvent(new CustomEvent('node:video-propagate', {
@@ -199,7 +209,7 @@ export function VideoInputNode({ data, selected, id }: NodeProps & { data: Video
       {/* Video preview */}
       {!isProcessing && !error && data.videoUrl && (
         <div className="relative" style={{ margin: '-18px' }}>
-          <video
+          <CanvasVideo
             src={data.videoUrl}
             controls
             className="w-full block nodrag"

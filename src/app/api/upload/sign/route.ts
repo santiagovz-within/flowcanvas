@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getSignedUploadUrl, getSignedReadUrl } from '@/lib/gcs';
+import {
+  getSignedUploadUrl,
+  getSignedReadUrl,
+  MEDIA_CACHE_CONTROL,
+} from '@/lib/gcs';
 
 const ALLOWED_TYPES: Record<string, string> = {
   'image/jpeg':      'jpg',
@@ -35,5 +39,10 @@ export async function POST(request: NextRequest) {
     getSignedReadUrl(objectPath),
   ]);
 
-  return NextResponse.json({ uploadUrl, readUrl, ref });
+  return NextResponse.json({
+    uploadUrl,
+    readUrl,
+    ref,
+    cacheControl: MEDIA_CACHE_CONTROL,
+  });
 }

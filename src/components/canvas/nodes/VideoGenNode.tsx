@@ -12,6 +12,7 @@ import { VIDEO_MODELS, FAL_MODELS } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { NodeSelect } from './NodeSelect';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { CanvasVideo } from '@/components/canvas/CanvasMedia';
 
 const FRAME_ROW_HEIGHT = 36;
 const FRAME_ROW_GAP = 25;
@@ -549,7 +550,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
 
       {displayVideoUrl && (
         <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-          <video
+          <CanvasVideo
             src={displayVideoUrl}
             controls
             className="w-full block nodrag"

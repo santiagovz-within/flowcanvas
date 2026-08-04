@@ -1,6 +1,8 @@
 // Shared media helpers — safe to import in both server and client modules.
 
 const resolvedRefCache = new Map<string, string>();
+const resolvedAssetCache = new Map<string, Promise<ResolvedMediaAsset>>();
+const APP_GCS_BUCKET = 'within-glide';
 
 const SIGNED_URL_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
@@ -61,12 +63,12 @@ export function isSignedGcsUrl(url: string | null | undefined): url is string {
 
   try {
     const parsed = new URL(url);
-    const isGcsHost = (
-      parsed.protocol === 'https:'
-      && (
+    const isGcsHost = parsed.protocol === 'https:' && (
+      (
         parsed.hostname === 'storage.googleapis.com'
-        || parsed.hostname.endsWith('.storage.googleapis.com')
+        && decodeURIComponent(parsed.pathname.split('/')[1] ?? '') === APP_GCS_BUCKET
       )
+      || parsed.hostname === `${APP_GCS_BUCKET}.storage.googleapis.com`
     );
     if (!isGcsHost) return false;
 
@@ -99,6 +101,28 @@ export function extractGcsPathFromSignedUrl(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Converts a canonical ref or historical signed GCS URL to a stable ref. */
+export function canonicalizeGcsUrl(value: string): string {
+  if (isGcsRef(value)) return value;
+  if (!isSignedGcsUrl(value)) return value;
+  const path = extractGcsPathFromSignedUrl(value);
+  return path ? `gcs:${path}` : value;
+}
+
+/** Recursively canonicalizes media strings before node data is persisted. */
+export function canonicalizeGcsValue<T>(value: T): T {
+  if (typeof value === 'string') return canonicalizeGcsUrl(value) as T;
+  if (Array.isArray(value)) {
+    return value.map(item => canonicalizeGcsValue(item)) as T;
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, canonicalizeGcsValue(item)]),
+    ) as T;
+  }
+  return value;
 }
 
 /**
@@ -145,4 +169,75 @@ export async function resolveMediaUrl(url: string): Promise<string> {
   if (!isGcsRef(url) && !isSignedGcsUrl(url)) return url;
   const map = await resolveGcsRefs([url]);
   return map.get(url) ?? url;
+}
+
+export type MediaAssetKind = 'image' | 'video';
+
+export interface ResolvedMediaAsset {
+  original: string;
+  thumbnail?: string;
+  poster?: string;
+}
+
+interface PendingAsset {
+  key: string;
+  source: string;
+  kind: MediaAssetKind;
+  resolve: (asset: ResolvedMediaAsset) => void;
+}
+
+let pendingAssets: PendingAsset[] = [];
+let assetFlushQueued = false;
+
+async function flushPendingAssets() {
+  assetFlushQueued = false;
+  const batch = pendingAssets;
+  pendingAssets = [];
+  if (batch.length === 0) return;
+
+  try {
+    const response = await fetch('/api/media/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        assets: batch.map(({ key, source, kind }) => ({ key, source, kind })),
+      }),
+    });
+    if (!response.ok) throw new Error(`Media signing failed (${response.status})`);
+    const payload = await response.json() as {
+      assets: Record<string, ResolvedMediaAsset>;
+    };
+    for (const item of batch) {
+      item.resolve(payload.assets[item.key] ?? { original: item.source });
+    }
+  } catch {
+    for (const item of batch) item.resolve({ original: item.source });
+  }
+}
+
+/**
+ * Resolves an original plus deterministic stored preview URLs. Calls made by
+ * sibling nodes in the same render are coalesced into one signing request.
+ */
+export function resolveMediaAsset(
+  source: string,
+  kind: MediaAssetKind,
+): Promise<ResolvedMediaAsset> {
+  if (!isGcsRef(source) && !isSignedGcsUrl(source)) {
+    return Promise.resolve({ original: source });
+  }
+
+  const key = `${kind}:${source}`;
+  const cached = resolvedAssetCache.get(key);
+  if (cached) return cached;
+
+  const promise = new Promise<ResolvedMediaAsset>((resolve) => {
+    pendingAssets.push({ key, source, kind, resolve });
+    if (!assetFlushQueued) {
+      assetFlushQueued = true;
+      queueMicrotask(flushPendingAssets);
+    }
+  });
+  resolvedAssetCache.set(key, promise);
+  return promise;
 }

@@ -8,6 +8,7 @@ import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import { NodeSelect } from './NodeSelect';
 import type { ImageToPromptNodeData } from '@/types';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { CanvasImage } from '@/components/canvas/CanvasMedia';
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
@@ -186,9 +187,8 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
             overflow: 'hidden',
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={data.inputImageUrl}
+          <CanvasImage
+            src={data.inputImageUrl!}
             alt="Input"
             className="w-full block"
             draggable={false}

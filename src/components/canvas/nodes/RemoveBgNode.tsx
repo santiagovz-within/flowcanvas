@@ -10,6 +10,7 @@ import { NodeWrapper } from './NodeWrapper';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { RemoveBgNodeData, ImageInputNodeData, ImageGenNodeData, UpscaleNodeData, SelectNodeData, ModifyNodeData, MediaInputNodeData } from '@/types';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { CanvasImage } from '@/components/canvas/CanvasMedia';
 
 const CHECKERBOARD: React.CSSProperties = {
   backgroundImage:
@@ -133,8 +134,7 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
       {data.outputImageUrl ? (
         // Output on checkerboard so transparency is visible
         <div style={{ margin: '-18px', overflow: 'hidden', ...CHECKERBOARD }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <CanvasImage
             src={data.outputImageUrl}
             alt="Background removed"
             className="w-full block"
@@ -144,8 +144,7 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
         </div>
       ) : inputImageUrl ? (
         <div style={{ margin: '-18px', overflow: 'hidden' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <CanvasImage
             src={inputImageUrl}
             alt="Input"
             className="w-full block"

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { GoogleGenAI } from '@google/genai';
 import { GOOGLE_IMAGE_MODELS } from '@/lib/api/models';
-import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getSignedReadUrl } from '@/lib/gcs';
+import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 
 interface GenerateBody {
   model: string;
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
 
         const genId = crypto.randomUUID();
         const objectPath = `${user.id}/${genId}.${ext}`;
-        const gcsRef = await uploadToGCS(binary, objectPath, mimeType);
+        const gcsRef = await uploadMediaToGCS(binary, objectPath, mimeType);
         const signedUrl = await getSignedReadUrl(objectPath);
 
         await supabase.from('generations').insert({

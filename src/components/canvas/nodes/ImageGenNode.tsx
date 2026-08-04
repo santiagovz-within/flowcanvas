@@ -6,7 +6,7 @@ import { SendToFigmaButton } from './SendToFigmaButton';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { downloadAllFromUrls, downloadFromUrl } from '@/lib/utils/download';
 import { playSuccessSound } from '@/lib/utils/sound';
-import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
+import { CanvasImage } from '@/components/canvas/CanvasMedia';
 import { NodeWrapper } from './NodeWrapper';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { ImageGenNodeData } from '@/types';
@@ -735,7 +735,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
             >
               {url ? (
                 <>
-                  <ProgressiveImage
+                  <CanvasImage
                     src={url}
                     alt={`Generated ${i + 1}`}
                     className="w-full h-full object-cover nodrag"

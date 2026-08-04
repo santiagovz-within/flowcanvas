@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
-import { uploadToGCS, getSignedReadUrl, isGcsRef, signGcsRef } from '@/lib/gcs';
+import { getSignedReadUrl, isGcsRef, signGcsRef } from '@/lib/gcs';
+import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -73,7 +74,7 @@ export async function GET(
         const contentType = imageRes.headers.get('content-type') ?? 'image/jpeg';
         const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg';
         const objectPath = `${user.id}/${existingGeneration.id}.${ext}`;
-        const gcsRef = await uploadToGCS(imageBuffer, objectPath, contentType);
+        const gcsRef = await uploadMediaToGCS(imageBuffer, objectPath, contentType);
         const signedUrl = await getSignedReadUrl(objectPath);
 
         const { error: updateError } = await supabase
@@ -108,7 +109,7 @@ export async function GET(
       const videoBuffer = await videoRes.arrayBuffer();
       const genId = existingGeneration?.id ?? crypto.randomUUID();
       const objectPath = `${user.id}/${genId}.mp4`;
-      const gcsRef = await uploadToGCS(videoBuffer, objectPath, 'video/mp4');
+      const gcsRef = await uploadMediaToGCS(videoBuffer, objectPath, 'video/mp4');
       const signedUrl = await getSignedReadUrl(objectPath);
 
       await supabase

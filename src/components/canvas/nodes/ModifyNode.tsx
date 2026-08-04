@@ -5,7 +5,7 @@ import { Sliders, Play, Download, AlertTriangle } from 'lucide-react';
 import { SendToFigmaButton } from './SendToFigmaButton';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { playSuccessSound } from '@/lib/utils/sound';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NodeWrapper } from './NodeWrapper';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import { ModelSelect } from './ModelSelect';
@@ -19,6 +19,8 @@ import type {
   VideoGenNodeData, VideoInputNodeData, VideoUpscaleNodeData, UpscaleMediaNodeData,
 } from '@/types';
 import { getSourceMediaType } from '../mediaOutputs';
+import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
+import { CanvasNodeFocusContext } from '@/components/canvas/mediaFocus';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -167,6 +169,7 @@ interface ExpandCanvasProps {
 }
 
 function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLeft, onChange, onNaturalSize }: ExpandCanvasProps) {
+  const focused = useContext(CanvasNodeFocusContext);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
   const totalW = (naturalSize?.w ?? 1) + expandLeft + expandRight;
@@ -219,15 +222,19 @@ function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLe
   if (!naturalSize) {
     return (
       <>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt="" style={{ display: 'none' }} onLoad={(e) => {
-          const img = e.currentTarget;
-          const s = { w: img.naturalWidth, h: img.naturalHeight };
-          setNaturalSize(s);
-          onNaturalSize(s.w, s.h);
-        }} />
-        <div className="flex items-center justify-center rounded-lg mb-3" style={{ height: 80, background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', fontSize: 11 }}>
-          Loading…
+        {focused && (
+          // The outpaint operation needs original pixel dimensions. Defer this
+          // read until the node is focused instead of loading every source.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt="" style={{ display: 'none' }} onLoad={(e) => {
+            const img = e.currentTarget;
+            const s = { w: img.naturalWidth, h: img.naturalHeight };
+            setNaturalSize(s);
+            onNaturalSize(s.w, s.h);
+          }} />
+        )}
+        <div className="rounded-lg mb-3 overflow-hidden" style={{ height: 160, background: 'var(--color-bg-surface)' }}>
+          <CanvasImage src={imageUrl} alt="Source" fill style={{ objectFit: 'contain' }} />
         </div>
       </>
     );
@@ -245,10 +252,10 @@ function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLe
         <div style={{ position: 'absolute', inset: 0, background: STRIPE, borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)' }} />
       )}
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <CanvasImage
         src={imageUrl}
         alt="Source"
+        fill
         style={{
           position: 'absolute',
           left: imgX, top: imgY,
@@ -357,9 +364,10 @@ function AnchorPicker({ value, onChange }: { value: AnchorKey; onChange: (v: Anc
 // Measures actual video dimensions via onLoadedMetadata instead of trusting
 // source-node metadata, which is often missing or wrong for video inputs.
 
-function VideoOutpaintCanvas({ videoUrl, tgtAspect }: {
+function VideoOutpaintCanvas({ videoUrl, tgtAspect, onDuration }: {
   videoUrl?: string;
   tgtAspect: string;
+  onDuration: (duration: number) => void;
 }) {
   const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
 
@@ -400,23 +408,6 @@ function VideoOutpaintCanvas({ videoUrl, tgtAspect }: {
       className="nodrag mx-auto mb-3"
       style={{ position: 'relative', width: tgtDispW, height: tgtDispH, userSelect: 'none', flexShrink: 0 }}
     >
-      {/* Hidden video used only to read videoWidth / videoHeight on load */}
-      {videoUrl && (
-        // eslint-disable-next-line jsx-a11y/media-has-caption
-        <video
-          key={videoUrl}
-          src={videoUrl}
-          muted
-          playsInline
-          preload="metadata"
-          style={{ display: 'none' }}
-          onLoadedMetadata={(e) => {
-            const v = e.currentTarget;
-            if (v.videoWidth && v.videoHeight) setVideoSize({ w: v.videoWidth, h: v.videoHeight });
-          }}
-        />
-      )}
-
       {hasExpansion && (
         <div style={{ position: 'absolute', inset: 0, background: STRIPE, borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)' }} />
       )}
@@ -427,12 +418,17 @@ function VideoOutpaintCanvas({ videoUrl, tgtAspect }: {
         background: 'rgba(255,255,255,0.05)',
       }}>
         {videoUrl && (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video
+          <CanvasVideo
             src={videoUrl}
             muted
             playsInline
+            fill
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+            onLoadedMetadata={(e) => {
+              const v = e.currentTarget;
+              if (v.videoWidth && v.videoHeight) setVideoSize({ w: v.videoWidth, h: v.videoHeight });
+              if (Number.isFinite(v.duration)) onDuration(v.duration);
+            }}
           />
         )}
       </div>
@@ -1023,19 +1019,6 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
         connected={storeEdges.some(e => e.target === id && e.targetHandle === 'image')}
       />
 
-      {/* Hidden video element to capture duration for num_frames */}
-      {inputMediaType === 'video' && inputVideoUrl && (
-        // eslint-disable-next-line jsx-a11y/media-has-caption
-        <video
-          key={inputVideoUrl}
-          src={inputVideoUrl}
-          muted
-          playsInline
-          style={{ display: 'none' }}
-          onLoadedMetadata={(e) => setVideoDuration(e.currentTarget.duration)}
-        />
-      )}
-
       {/* ── No input ── */}
       {inputMediaType === null && (
         <div
@@ -1140,8 +1123,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
 
               {data.outputImageUrl && (
                 <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={data.outputImageUrl} alt="Modified" className="w-full block nodrag" style={{ height: 'auto' }} />
+                  <CanvasImage src={data.outputImageUrl} alt="Modified" className="w-full block nodrag" style={{ height: 'auto' }} />
                 </div>
               )}
             </>
@@ -1229,8 +1211,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
 
               {data.outputImageUrl && (
                 <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={data.outputImageUrl} alt="Expanded" className="w-full block nodrag" style={{ height: 'auto' }} />
+                  <CanvasImage src={data.outputImageUrl} alt="Expanded" className="w-full block nodrag" style={{ height: 'auto' }} />
                 </div>
               )}
             </>
@@ -1260,6 +1241,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           <VideoOutpaintCanvas
             videoUrl={inputVideoUrl}
             tgtAspect={outpaintAspect}
+            onDuration={setVideoDuration}
           />
 
           {/* Target aspect ratio */}
@@ -1333,8 +1315,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           {/* Output video */}
           {hasVideoOutput && (
             <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video src={data.outputVideoUrl!} controls className="w-full block nodrag" style={{ height: 'auto' }} />
+              <CanvasVideo src={data.outputVideoUrl!} controls className="w-full block nodrag" style={{ height: 'auto' }} />
             </div>
           )}
         </>

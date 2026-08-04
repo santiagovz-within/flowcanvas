@@ -9,6 +9,7 @@ import { useFlowStore } from '@/lib/stores/flowStore';
 import { createClient } from '@/lib/supabase/client';
 import { AUTOSAVE_DEBOUNCE_MS } from '@/lib/utils/constants';
 import { createFlowThumbnail, extractFlowThumbnailSource } from '@/lib/utils/flowThumbnail';
+import { canonicalizeGcsValue } from '@/lib/utils/mediaUtils';
 import {
   shouldActivateFlow,
   shouldDiscardAbandonedFlow,
@@ -146,7 +147,7 @@ export default function FlowEditorPage() {
               id: node.id,
               type: node.type,
               position: node.position,
-              data: node.data,
+              data: canonicalizeGcsValue(node.data),
               parentId: node.parentId,
               style: node.style,
             })),

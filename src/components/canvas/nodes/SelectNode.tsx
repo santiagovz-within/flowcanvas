@@ -18,6 +18,7 @@ import type {
   ModifyNodeData,
   VideoGenNodeData,
 } from '@/types';
+import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 
 export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNodeData }) {
   const storeEdges = useFlowStore(state => state.edges);
@@ -88,10 +89,9 @@ export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNod
         }}
       >
         {mediaType === 'video' ? (
-          <video src={currentUrl} controls className="w-full block" style={{ height: 'auto' }} />
+          <CanvasVideo src={currentUrl} controls className="w-full block" style={{ height: 'auto' }} />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={currentUrl} alt="Selected" className="w-full block" draggable={false} style={{ height: 'auto' }} />
+          <CanvasImage src={currentUrl} alt="Selected" className="w-full block" draggable={false} style={{ height: 'auto' }} />
         )}
       </div>
 

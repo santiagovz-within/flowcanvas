@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils/cn';
 import type { NodeStatus } from '@/types';
 import { RefreshCw, Check, AlertCircle, Copy } from 'lucide-react';
 import { useState } from 'react';
+import { CanvasNodeFocusContext } from '@/components/canvas/mediaFocus';
 
 interface NodeWrapperProps {
   title: string;
@@ -38,6 +39,7 @@ export function NodeWrapper({
 
   if (titlePosition === 'outside') {
     return (
+      <CanvasNodeFocusContext.Provider value={!!selected}>
       <div style={{ width: width ?? minWidth }}>
         {/* Title floats above the card */}
         <div className="flex items-center gap-2 mb-2 px-1">
@@ -56,11 +58,13 @@ export function NodeWrapper({
         {/* Footer sits below the card */}
         {footer && <div className="mt-2">{footer}</div>}
       </div>
+      </CanvasNodeFocusContext.Provider>
     );
   }
 
   // Default: title bar inside the card
   return (
+    <CanvasNodeFocusContext.Provider value={!!selected}>
     <div
       className={cn('overflow-hidden transition-all duration-150')}
       style={{ ...cardStyle, width: width ?? minWidth }}
@@ -84,6 +88,7 @@ export function NodeWrapper({
       {/* Content */}
       <div style={{ padding: 18 }}>{children}</div>
     </div>
+    </CanvasNodeFocusContext.Provider>
   );
 }
 

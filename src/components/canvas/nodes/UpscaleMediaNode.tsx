@@ -15,6 +15,7 @@ import { UPSCALE_MODELS, FAL_MODELS } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { getNodeMediaUrls, getSourceMediaType } from '../mediaOutputs';
+import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 
 type Dims = { w: number; h: number };
 
@@ -71,16 +72,15 @@ function ComparisonSlider({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl
         style={{ cursor: 'col-resize' }}
         onMouseDown={(e) => { dragging.current = true; move.current(e.clientX); e.preventDefault(); }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <CanvasImage
           src={afterUrl} alt="After" className="w-full block" style={{ height: 'auto' }}
           onLoad={(e) => { const img = e.currentTarget; setAfterDims({ w: img.naturalWidth, h: img.naturalHeight }); }}
         />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <CanvasImage
           src={beforeUrl} alt="Before"
           className="absolute inset-0 w-full h-full block"
-          style={{ objectFit: 'cover', clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+          fill
+          style={{ position: 'absolute', inset: 0, objectFit: 'cover', clipPath: `inset(0 ${100 - pct}% 0 0)` }}
           onLoad={(e) => { const img = e.currentTarget; setBeforeDims({ w: img.naturalWidth, h: img.naturalHeight }); }}
         />
         <div
@@ -131,8 +131,7 @@ function ImageThumb({ url, result }: { url: string | undefined; result: BulkItem
   return (
     <div className="relative flex-shrink-0 rounded overflow-hidden nodrag" style={{ width: 56, height: 56 }}>
       {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="w-full h-full" style={{ objectFit: 'cover' }} />
+        <CanvasImage src={url} alt="" focused={false} fill className="w-full h-full" style={{ objectFit: 'cover' }} />
       ) : (
         <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--color-bg-surface)' }}>
           <Zap size={14} style={{ opacity: 0.4 }} />
@@ -153,10 +152,11 @@ function VideoThumb({
       onClick={onClick}
     >
       {url ? (
-        <video
+        <CanvasVideo
           src={url}
+          focused={false}
           muted
-          preload="metadata"
+          fill
           className="w-full h-full"
           style={{ objectFit: 'cover', pointerEvents: 'none' }}
         />
@@ -182,8 +182,7 @@ function ImageResultCard({ result, onRetry }: { result: BulkItemResult; onRetry:
     <div className="relative rounded overflow-hidden" style={{ aspectRatio: '1', background: 'var(--color-bg-surface)' }}>
       {result.status === 'completed' && result.outputUrl ? (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={result.outputUrl} alt="" className="w-full h-full" style={{ objectFit: 'cover' }} />
+          <CanvasImage src={result.outputUrl} alt="" focused={false} fill className="w-full h-full" style={{ objectFit: 'cover' }} />
           <button
             onClick={() => downloadFromUrl(result.outputUrl!)}
             className="absolute bottom-1 right-1 nodrag"
@@ -224,10 +223,11 @@ function VideoResultCard({
       {result.status === 'completed' && result.outputUrl ? (
         <>
           <div className="w-full h-full cursor-pointer" onClick={onExpand}>
-            <video
+            <CanvasVideo
               src={result.outputUrl}
+              focused={false}
               muted
-              preload="metadata"
+              fill
               className="w-full h-full"
               style={{ objectFit: 'cover', pointerEvents: 'none' }}
             />
@@ -931,8 +931,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           </div>
         ) : inputImageUrl ? (
           <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={inputImageUrl} alt="Input" className="w-full block" style={{ height: 'auto' }} />
+            <CanvasImage src={inputImageUrl} alt="Input" className="w-full block" style={{ height: 'auto' }} />
           </div>
         ) : null
       )}
@@ -942,13 +941,13 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
         <div className="flex flex-col gap-3">
           {inputVideoUrl && (
             <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-              <video src={inputVideoUrl} controls className="w-full block nodrag" style={{ height: 'auto' }} />
+              <CanvasVideo src={inputVideoUrl} controls className="w-full block nodrag" style={{ height: 'auto' }} />
               <p className="px-3 pt-1 text-center" style={{ fontSize: 9, color: 'var(--color-white-muted)' }}>Input</p>
             </div>
           )}
           {hasVideoOutput && (
             <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-              <video src={data.outputVideoUrl!} controls className="w-full block nodrag" style={{ height: 'auto' }} />
+              <CanvasVideo src={data.outputVideoUrl!} controls className="w-full block nodrag" style={{ height: 'auto' }} />
               <p className="px-3 pt-1 text-center" style={{ fontSize: 9, color: 'var(--color-white-muted)' }}>Output ({upscaleFactor}x)</p>
             </div>
           )}
@@ -968,7 +967,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           >
             <X size={12} color="#fff" />
           </button>
-          <video src={expandedUrl} controls className="w-full block nodrag" style={{ height: 'auto' }} />
+          <CanvasVideo src={expandedUrl} focused controls className="w-full block nodrag" style={{ height: 'auto' }} />
         </div>
       )}
 

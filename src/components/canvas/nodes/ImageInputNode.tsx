@@ -13,7 +13,7 @@ import { processImageFile } from '@/lib/utils/imageProcessing';
 import type { ProcessStage } from '@/lib/utils/imageProcessing';
 import { uploadImageToStorage } from '@/lib/utils/uploadImage';
 import { resolveGcsRefs } from '@/lib/utils/mediaUtils';
-import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
+import { CanvasImage } from '@/components/canvas/CanvasMedia';
 import { useFlowStore } from '@/lib/stores/flowStore';
 
 // ── Stage types ──────────────────────────────────────────────────────────────
@@ -339,7 +339,7 @@ export function ImageInputNode({ data, selected, id }: NodeProps & { data: Image
             backgroundSize: '14px 14px',
           }}
         >
-          <ProgressiveImage
+          <CanvasImage
             src={data.imageUrl}
             alt="Input"
             className="w-full block nodrag"

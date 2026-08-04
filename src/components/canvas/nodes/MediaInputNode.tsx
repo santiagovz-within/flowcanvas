@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { processImageFile } from '@/lib/utils/imageProcessing';
 import { uploadImageToStorage } from '@/lib/utils/uploadImage';
 import { resolveGcsRefs } from '@/lib/utils/mediaUtils';
-import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
+import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import type { FFmpeg } from '@ffmpeg/ffmpeg';
 
@@ -290,13 +290,22 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
         body: JSON.stringify({ contentType }),
       });
       if (!signRes.ok) throw new Error('Failed to get upload URL');
-      const { uploadUrl, readUrl } = await signRes.json();
+      const { uploadUrl, readUrl, ref } = await signRes.json();
       const putRes = await fetch(uploadUrl, {
         method: 'PUT',
         body: uploadFile,
         headers: { 'Content-Type': contentType },
       });
       if (!putRes.ok) throw new Error(`Upload failed: ${putRes.status}`);
+
+      const finalizeRes = await fetch('/api/media/derivatives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref, contentType }),
+      });
+      if (!finalizeRes.ok) {
+        console.warn('[MediaInputNode] Upload succeeded without a generated poster');
+      }
 
       dispatchUpdate({ mediaType: 'video', videoUrl: readUrl });
       document.dispatchEvent(new CustomEvent('node:video-propagate', {
@@ -497,7 +506,7 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
             backgroundSize: '14px 14px',
           }}
         >
-          <ProgressiveImage
+          <CanvasImage
             src={data.imageUrl!}
             alt="Input"
             className="w-full block"
@@ -518,7 +527,7 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
       {/* Video preview */}
       {!isProcessing && !activeError && hasVideo && (
         <div className="relative" style={{ margin: '-18px' }}>
-          <video
+          <CanvasVideo
             src={data.videoUrl!}
             controls
             className="w-full block nodrag"

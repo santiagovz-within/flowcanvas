@@ -38,6 +38,15 @@ async function uploadFileToStorage(
     throw new Error(`Storage upload failed: ${putRes.status} ${putRes.statusText}`);
   }
 
+  const finalizeRes = await fetch('/api/media/derivatives', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref, contentType: file.type }),
+  });
+  if (!finalizeRes.ok) {
+    console.warn('Media upload succeeded without a generated preview');
+  }
+
   return { readUrl, ref };
 }
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
-import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getSignedReadUrl } from '@/lib/gcs';
+import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -37,7 +38,7 @@ export async function GET(
       const videoBuffer = await videoRes.arrayBuffer();
       const genId = crypto.randomUUID();
       const objectPath = `${user.id}/${genId}.mp4`;
-      const gcsRef = await uploadToGCS(videoBuffer, objectPath, 'video/mp4');
+      const gcsRef = await uploadMediaToGCS(videoBuffer, objectPath, 'video/mp4');
       const signedUrl = await getSignedReadUrl(objectPath);
 
       await supabase

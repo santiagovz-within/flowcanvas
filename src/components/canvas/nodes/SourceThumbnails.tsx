@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
+import { CanvasImage } from '@/components/canvas/CanvasMedia';
 
 // 3-up grid so each option is large enough to tell apart, sized to the source
 // aspect ratio with a tight radius so the framing stays readable. Unselected
@@ -41,11 +42,12 @@ export function SourceThumbnails({ images, selectedIndex, aspect, onSelect, clas
               outlineOffset: 1,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <CanvasImage
               src={url}
               alt=""
+              focused={false}
               draggable={false}
+              fill
               style={{
                 width: '100%', height: '100%', objectFit: 'cover', display: 'block',
                 filter: isSelected ? 'none' : 'grayscale(1) brightness(0.55)',

@@ -17,8 +17,9 @@ import {
   type FinalConnectionState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { useMediaLodStore } from '@/lib/stores/mediaLodStore';
 import { useThemeStore } from '@/lib/stores/themeStore';
 import { PromptNode } from './nodes/PromptNode';
 import { ImageInputNode } from './nodes/ImageInputNode';
@@ -175,6 +176,28 @@ export function FlowCanvas({ isTestUser = false, readOnly = false }: FlowCanvasP
   const nodesRef                        = useRef(nodes);
   const edgesRef                        = useRef(edges);
   const pendingConnectionRef            = useRef<PendingConnection | null>(null);
+  const zoomSettleTimer                 = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoomInitTimer                   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraGestureActive             = useRef(false);
+  const beginCameraMove                 = useMediaLodStore(state => state.beginCameraMove);
+  const settleCamera                    = useMediaLodStore(state => state.settleCamera);
+  const resetCamera                     = useMediaLodStore(state => state.resetCamera);
+
+  const settleZoom = useCallback((zoom: number) => {
+    if (zoomSettleTimer.current) clearTimeout(zoomSettleTimer.current);
+    zoomSettleTimer.current = setTimeout(() => settleCamera(zoom), 140);
+  }, [settleCamera]);
+
+  const handleMoveStart = useCallback(() => {
+    cameraGestureActive.current = true;
+    if (zoomSettleTimer.current) clearTimeout(zoomSettleTimer.current);
+    beginCameraMove();
+  }, [beginCameraMove]);
+
+  const handleMoveEnd = useCallback((zoom: number) => {
+    cameraGestureActive.current = false;
+    settleZoom(zoom);
+  }, [settleZoom]);
 
   const showConnectionToast = useCallback((toast: ConnectionToastState) => {
     if (connectionToastTimer.current) clearTimeout(connectionToastTimer.current);
@@ -184,7 +207,15 @@ export function FlowCanvas({ isTestUser = false, readOnly = false }: FlowCanvasP
 
   useEffect(() => () => {
     if (connectionToastTimer.current) clearTimeout(connectionToastTimer.current);
+    if (zoomSettleTimer.current) clearTimeout(zoomSettleTimer.current);
+    if (zoomInitTimer.current) clearTimeout(zoomInitTimer.current);
   }, []);
+
+  useLayoutEffect(() => {
+    // Prevent the default zoom of 1 from initiating oversized cold-start loads
+    // before React Flow completes fitView.
+    resetCamera();
+  }, [resetCamera]);
 
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
   useEffect(() => { edgesRef.current = edges; }, [edges]);
@@ -1153,6 +1184,20 @@ export function FlowCanvas({ isTestUser = false, readOnly = false }: FlowCanvasP
         defaultEdgeOptions={{ animated: false, type: 'default' }}
         fitView
         fitViewOptions={{ padding: 0.2 }}
+        onInit={(instance) => {
+          // fitView is applied during initialization; this fallback also
+          // covers canvases where no camera gesture emits onMoveEnd.
+          zoomInitTimer.current = setTimeout(() => {
+            if (
+              !cameraGestureActive.current
+              && useMediaLodStore.getState().settledZoom === null
+            ) {
+              settleZoom(instance.getViewport().zoom);
+            }
+          }, 200);
+        }}
+        onMoveStart={handleMoveStart}
+        onMoveEnd={(_, viewport) => handleMoveEnd(viewport.zoom)}
         minZoom={0.1}
         maxZoom={2}
         nodesDraggable={!readOnly}

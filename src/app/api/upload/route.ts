@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { MAX_UPLOAD_SIZE_BYTES } from '@/lib/utils/constants';
-import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getSignedReadUrl } from '@/lib/gcs';
+import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
     const objectPath = `refs/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
     const arrayBuffer = await file.arrayBuffer();
-    await uploadToGCS(arrayBuffer, objectPath, file.type);
+    await uploadMediaToGCS(arrayBuffer, objectPath, file.type);
     const url = await getSignedReadUrl(objectPath);
 
     return NextResponse.json({ url });

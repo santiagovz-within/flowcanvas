@@ -22,6 +22,7 @@ import { downloadFromUrl } from '@/lib/utils/download';
 import { playSuccessSound } from '@/lib/utils/sound';
 import type { FFmpeg } from '@ffmpeg/ffmpeg';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { CanvasImage } from '@/components/canvas/CanvasMedia';
 
 // ── Module-level FFmpeg singleton (lazy, shared across all instances) ─────────
 
@@ -145,7 +146,7 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
   // ── Probe video duration when videoUrl changes ────────────────────────────
 
   useEffect(() => {
-    if (!data.videoUrl) { setVideoDuration(null); return; }
+    if (!data.videoUrl || !selected) return;
     const vid = document.createElement('video');
     vid.preload = 'metadata';
     vid.src = data.videoUrl;
@@ -157,7 +158,7 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
     vid.onerror = () => setVideoDuration(null);
     return () => { vid.src = ''; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.videoUrl]);
+  }, [data.videoUrl, selected]);
 
   // ── On mount: restore GIF from GCS if available ───────────────────────────
 
@@ -326,6 +327,11 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
             method: 'PUT', body: blob, headers: { 'Content-Type': 'image/gif' },
           });
           if (put.ok) {
+            await fetch('/api/media/derivatives', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ref: d.gcsRef, contentType: 'image/gif' }),
+            }).catch(() => null);
             setGifGcsRef(d.gcsRef);
             updateData({ gifGcsRef: d.gcsRef });
           }
@@ -571,8 +577,7 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
       {gifUrl && !isConverting && (
         <>
           <div style={{ margin: '0 -18px 8px -18px', overflow: 'hidden' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <CanvasImage
               src={gifUrl}
               alt="GIF preview"
               className="w-full block nodrag"

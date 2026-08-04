@@ -7,6 +7,7 @@ import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { OutputNodeData, ImageInputNodeData, ImageGenNodeData, UpscaleNodeData, VideoGenNodeData, ModifyNodeData, SelectNodeData } from '@/types';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 
 export function OutputNode({ data, selected, id }: NodeProps & { data: OutputNodeData }) {
   const storeEdges = useFlowStore(state => state.edges);
@@ -71,15 +72,14 @@ export function OutputNode({ data, selected, id }: NodeProps & { data: OutputNod
       {mediaUrl ? (
         <div style={{ margin: '-18px', overflow: 'hidden' }}>
           {mediaType === 'video' ? (
-            <video
+            <CanvasVideo
               src={mediaUrl}
               controls
               className="w-full block"
               style={{ height: 'auto' }}
             />
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <CanvasImage
               src={mediaUrl}
               alt="Output"
               className="w-full block"

@@ -6,6 +6,13 @@ const BUCKET_NAME = process.env.GCS_BUCKET_NAME ?? 'within-glide';
 const READ_TTL_MS   = 7 * 24 * 60 * 60 * 1000; // 7 days
 const UPLOAD_TTL_MS = 15 * 60 * 1000;           // 15 minutes
 
+/**
+ * Objects and their signed responses remain private. The Vercel optimizer was
+ * verified to turn this exact upstream policy into a shared transformed cache
+ * entry, while direct original responses stay in private browser caches.
+ */
+export const MEDIA_CACHE_CONTROL = 'private, max-age=604800, immutable';
+
 let _storage: Storage | null = null;
 
 function getStorage(): Storage {
@@ -23,6 +30,10 @@ function getStorage(): Storage {
   return _storage;
 }
 
+export function getGcsBucket() {
+  return getStorage().bucket(BUCKET_NAME);
+}
+
 // ── Writes ────────────────────────────────────────────────────────────────────
 
 /**
@@ -33,11 +44,15 @@ export async function uploadToGCS(
   buffer: Buffer | ArrayBuffer,
   objectPath: string,
   contentType: string,
+  options: { cacheControl?: string } = {},
 ): Promise<string> {
   const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
-  const file = getStorage().bucket(BUCKET_NAME).file(objectPath);
+  const file = getGcsBucket().file(objectPath);
   await file.save(buf, {
-    metadata: { contentType },
+    metadata: {
+      contentType,
+      ...(options.cacheControl ? { cacheControl: options.cacheControl } : {}),
+    },
     resumable: false,
   });
   return `gcs:${objectPath}`;
@@ -50,14 +65,28 @@ export async function uploadToGCS(
  * `objectPath` must NOT include the `gcs:` prefix.
  */
 export async function getSignedReadUrl(objectPath: string): Promise<string> {
-  const [url] = await getStorage()
-    .bucket(BUCKET_NAME)
+  // Pin the signing timestamp to a shared seven-day epoch. This means every
+  // user receives the same URL for an object during that epoch, allowing the
+  // Vercel optimizer cache to be shared instead of fragmented by request time.
+  const accessibleAtMs = Math.floor(Date.now() / READ_TTL_MS) * READ_TTL_MS;
+  const [url] = await getGcsBucket()
     .file(objectPath)
     .getSignedUrl({
       action: 'read',
       version: 'v4',
-      expires: Date.now() + READ_TTL_MS,
+      accessibleAt: new Date(accessibleAtMs),
+      expires: new Date(accessibleAtMs + READ_TTL_MS - 1000),
     });
+  return url;
+}
+
+/** A rolling signed URL for short-lived server-to-server work. */
+export async function getFreshSignedReadUrl(objectPath: string): Promise<string> {
+  const [url] = await getGcsBucket().file(objectPath).getSignedUrl({
+    action: 'read',
+    version: 'v4',
+    expires: Date.now() + READ_TTL_MS,
+  });
   return url;
 }
 
@@ -86,15 +115,18 @@ export async function signGcsRef(ref: string): Promise<string> {
 export async function getSignedUploadUrl(
   objectPath: string,
   contentType: string,
+  cacheControl?: string,
 ): Promise<string> {
-  const [url] = await getStorage()
-    .bucket(BUCKET_NAME)
+  const [url] = await getGcsBucket()
     .file(objectPath)
     .getSignedUrl({
       action: 'write',
       version: 'v4',
       contentType,
       expires: Date.now() + UPLOAD_TTL_MS,
+      ...(cacheControl
+        ? { extensionHeaders: { 'cache-control': cacheControl } }
+        : {}),
     });
   return url;
 }
@@ -103,8 +135,7 @@ export async function getSignedUploadUrl(
 
 /** Deletes an object from GCS. Silently ignores 404s. */
 export async function deleteFromGCS(objectPath: string): Promise<void> {
-  await getStorage()
-    .bucket(BUCKET_NAME)
+  await getGcsBucket()
     .file(objectPath)
     .delete({ ignoreNotFound: true });
 }

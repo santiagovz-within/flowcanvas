@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { FAL_MODELS } from '@/lib/api/models';
-import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getSignedReadUrl } from '@/lib/gcs';
+import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import type { GenerateImageRequest } from '@/types';
 
@@ -253,7 +254,7 @@ export async function POST(request: NextRequest) {
 
       const genId = crypto.randomUUID();
       const objectPath = `${user.id}/${genId}.${ext}`;
-      const gcsRef = await uploadToGCS(imageBuffer, objectPath, contentType);
+      const gcsRef = await uploadMediaToGCS(imageBuffer, objectPath, contentType);
       const signedUrl = await getSignedReadUrl(objectPath);
 
       await supabase

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { GoogleGenAI } from '@google/genai';
-import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
+import { getSignedReadUrl } from '@/lib/gcs';
+import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     const genId = crypto.randomUUID();
     const objectPath = `${user.id}/${genId}.mp4`;
-    const gcsRef = await uploadToGCS(videoBuffer, objectPath, 'video/mp4');
+    const gcsRef = await uploadMediaToGCS(videoBuffer, objectPath, 'video/mp4');
     const signedUrl = await getSignedReadUrl(objectPath);
 
     const { data: gen } = await supabase

@@ -9,6 +9,7 @@ import { NodeWrapper } from './NodeWrapper';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { VideoUpscaleNodeData, VideoGenNodeData, VideoInputNodeData } from '@/types';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { CanvasVideo } from '@/components/canvas/CanvasMedia';
 
 const SCALE_OPTIONS = [2, 3, 4];
 
@@ -173,7 +174,7 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
 
       {inputVideoUrl && (
         <div style={{ margin: '0 -18px 12px -18px', overflow: 'hidden' }}>
-          <video
+          <CanvasVideo
             src={inputVideoUrl}
             controls
             className="w-full block nodrag"
@@ -185,7 +186,7 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
 
       {data.videoUrl && data.status === 'completed' && (
         <div style={{ margin: '0 -18px 12px -18px', overflow: 'hidden' }}>
-          <video
+          <CanvasVideo
             src={data.videoUrl}
             controls
             className="w-full block nodrag"
