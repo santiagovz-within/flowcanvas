@@ -41,8 +41,14 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   const username = user.email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase();
-  const googleDisplayName: string | null =
+  const metadataDisplayName =
     user.user_metadata?.full_name ?? user.user_metadata?.name ?? null;
+  const googleDisplayName =
+    typeof metadataDisplayName === 'string' &&
+    metadataDisplayName.trim() &&
+    metadataDisplayName.trim().toLowerCase() !== 'user'
+      ? metadataDisplayName.trim()
+      : null;
 
   if (!existing) {
     await admin.from('profiles').insert({
@@ -54,14 +60,18 @@ export async function GET(request: NextRequest) {
       approved:     false,
     });
   } else {
-    const updates: { username?: string; display_name?: string } = {};
+    const updates: { username?: string; display_name?: string | null } = {};
 
     // A database trigger may create the profile first with this placeholder.
     // Replace only the default so user-chosen usernames remain untouched.
     if (existing.username === 'User') {
       updates.username = username;
     }
-    if (!existing.display_name && googleDisplayName) {
+    if (existing.display_name === 'User') {
+      // Clear the placeholder when Google has no full name so the UI falls
+      // back to the corrected email-derived username.
+      updates.display_name = googleDisplayName;
+    } else if (!existing.display_name && googleDisplayName) {
       updates.display_name = googleDisplayName;
     }
 
