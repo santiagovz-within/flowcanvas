@@ -3,6 +3,7 @@ import type { NodeStatus } from '@/types';
 import { RefreshCw, Check, AlertCircle, Copy } from 'lucide-react';
 import { useState } from 'react';
 import { CanvasNodeFocusContext } from '@/components/canvas/mediaFocus';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 interface NodeWrapperProps {
   title: string;
@@ -18,45 +19,84 @@ interface NodeWrapperProps {
   titlePosition?: 'inside' | 'outside';
   /** Rendered below the card when titlePosition === 'outside'. */
   footer?: React.ReactNode;
+  appearance?: 'default' | 'imageGenerationGlass';
+  glassPerformanceMode?: boolean;
 }
 
 export function NodeWrapper({
   title, icon, status, errorMessage, selected, children,
   minWidth = 280, width, accentColor,
   titlePosition = 'inside', footer,
+  appearance = 'default', glassPerformanceMode = false,
 }: NodeWrapperProps) {
   const color = accentColor ?? 'var(--color-accent)';
   const glow  = accentColor ? `${accentColor}4d` : 'var(--color-accent-glow)';
+  const isImageGenerationGlass = appearance === 'imageGenerationGlass';
 
   const cardStyle: React.CSSProperties = {
-    borderRadius: 17,
-    background: 'var(--color-bg-elevated)',
-    border: selected ? `1px solid ${color}` : 'var(--border-default)',
-    boxShadow: selected
-      ? `0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px ${glow}`
-      : 'var(--shadow-node)',
+    ...(isImageGenerationGlass ? {
+      outline: selected ? `1px solid ${color}` : 'none',
+      outlineOffset: selected ? 1 : 0,
+    } : {
+      borderRadius: 17,
+      background: 'var(--color-bg-elevated)',
+      border: selected ? `1px solid ${color}` : 'var(--border-default)',
+      boxShadow: selected
+        ? `0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px ${glow}`
+        : 'var(--shadow-node)',
+    }),
   };
 
   if (titlePosition === 'outside') {
     return (
       <CanvasNodeFocusContext.Provider value={!!selected}>
-      <div style={{ width: width ?? minWidth }}>
+      <div
+        className={cn(
+          isImageGenerationGlass && glassStyles.nodeShell,
+          isImageGenerationGlass && glassPerformanceMode && glassStyles.performance,
+        )}
+        style={{ width: width ?? minWidth }}
+      >
         {/* Title floats above the card */}
-        <div className="flex items-center gap-2 mb-2 px-1">
-          <span style={{ color }}>{icon}</span>
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-white-muted)' }}>
+        <div className={cn(
+          isImageGenerationGlass ? glassStyles.titleRow : 'flex items-center gap-2 mb-2 px-1',
+        )}>
+          <span className={cn(isImageGenerationGlass && glassStyles.titleIcon)} style={{ color }}>{icon}</span>
+          <span
+            className={cn(
+              isImageGenerationGlass ? glassStyles.titleText : 'text-xs font-semibold uppercase tracking-wider',
+            )}
+            style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)' }}
+          >
             {title}
           </span>
           {status && status !== 'idle' && <StatusBadge status={status} errorMessage={errorMessage} />}
         </div>
 
         {/* Card (no inner title bar) */}
-        <div className={cn('overflow-hidden transition-all duration-150')} style={cardStyle}>
-          <div style={{ padding: 18 }}>{children}</div>
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-150',
+            isImageGenerationGlass && glassStyles.glassSurface,
+            isImageGenerationGlass && glassStyles.nodeSurface,
+            isImageGenerationGlass && glassStyles.nodeCard,
+          )}
+          style={cardStyle}
+        >
+          <div
+            className={cn(isImageGenerationGlass && glassStyles.nodeContent)}
+            style={isImageGenerationGlass ? undefined : { padding: 18 }}
+          >
+            {children}
+          </div>
         </div>
 
         {/* Footer sits below the card */}
-        {footer && <div className="mt-2">{footer}</div>}
+        {footer && (
+          <div className={cn(isImageGenerationGlass ? glassStyles.nodeFooter : 'mt-2')}>
+            {footer}
+          </div>
+        )}
       </div>
       </CanvasNodeFocusContext.Provider>
     );

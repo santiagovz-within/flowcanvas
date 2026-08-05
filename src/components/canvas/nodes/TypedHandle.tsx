@@ -9,6 +9,8 @@ import {
 } from '@xyflow/react';
 import { Image as ImageIcon, Film, Type, Minus } from 'lucide-react';
 import { useLayoutEffect, useState } from 'react';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 export type PortType = 'text' | 'image' | 'video' | 'neutral';
 
@@ -85,9 +87,18 @@ interface TypedHandleProps extends Omit<HandleProps, 'style'> {
   badge?: number;
   // when true the handle renders in its "lit" state (full colour + white icon) even without hover
   connected?: boolean;
+  appearance?: 'default' | 'imageGenerationGlass';
 }
 
-export function TypedHandle({ portType, offset, position, badge, connected, ...rest }: TypedHandleProps) {
+export function TypedHandle({
+  portType,
+  offset,
+  position,
+  badge,
+  connected,
+  appearance = 'default',
+  ...rest
+}: TypedHandleProps) {
   const [hovered, setHovered] = useState(false);
   const nodeId = useNodeId();
   const updateNodeInternals = useUpdateNodeInternals();
@@ -95,6 +106,7 @@ export function TypedHandle({ portType, offset, position, badge, connected, ...r
   const isLeft = position === Position.Left;
   const isRight = position === Position.Right;
   const isActive = hovered || connected;
+  const isImageGenerationGlass = appearance === 'imageGenerationGlass';
 
   // React Flow measures handle bounds separately from node dimensions. Several
   // nodes calculate their handle offsets after layout, so a handle can move
@@ -121,18 +133,38 @@ export function TypedHandle({ portType, offset, position, badge, connected, ...r
         width: 36,
         height: 36,
         borderRadius: '50%',
-        background: isActive ? color : `var(--port-tint-${portType})`,
+        background: isImageGenerationGlass
+          ? 'transparent'
+          : isActive ? color : `var(--port-tint-${portType})`,
         border: 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         color: isActive ? '#fff' : `var(--port-icon-inactive-${portType})`,
         pointerEvents: 'all',
-        transition: 'background 0.15s, color 0.15s',
+        transition: isImageGenerationGlass ? undefined : 'background 0.15s, color 0.15s',
         ...offsetStyle,
       }}
     >
-      <PortIcon type={portType} size={14} />
+      {isImageGenerationGlass ? (
+        <span
+          className={cn(
+            glassStyles.handleVisual,
+            isActive
+              ? glassStyles.handleActive
+              : [
+                  glassStyles.glassSurface,
+                  glassStyles.controlSurface,
+                  glassStyles.handleIdle,
+                ],
+          )}
+          style={{ color: isActive ? '#fff' : `var(--port-icon-inactive-${portType})` }}
+        >
+          <PortIcon type={portType} size={15} />
+        </span>
+      ) : (
+        <PortIcon type={portType} size={14} />
+      )}
       {badge !== undefined && (
         <span
           style={{

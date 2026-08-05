@@ -36,7 +36,7 @@
   --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.6);
 
   /* Typography */
-  --font-family: 'Manrope', sans-serif;
+  --font-family: var(--font-manrope), 'Manrope', sans-serif;
 
   /* Port handle tints (inactive state background) */
   --port-tint-image:   #3a1a6a;
@@ -133,7 +133,7 @@
   --color-error: var(--color-error);
   --color-warning: var(--color-warning);
   --color-processing: var(--color-processing);
-  --font-sans: 'Manrope', sans-serif;
+  --font-sans: var(--font-manrope), 'Manrope', sans-serif;
 }
 
 /* ============================================================

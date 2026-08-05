@@ -3,19 +3,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 interface NodeSelectProps {
   options: string[];
   value: string;
   onChange: (value: string) => void;
+  leadingIcon?: React.ReactNode;
+  appearance?: 'default' | 'imageGenerationGlass';
 }
 
-export function NodeSelect({ options, value, onChange }: NodeSelectProps) {
+export function NodeSelect({
+  options,
+  value,
+  onChange,
+  leadingIcon,
+  appearance = 'default',
+}: NodeSelectProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isImageGenerationGlass = appearance === 'imageGenerationGlass';
 
   function openDropdown(e: React.MouseEvent) {
     e.stopPropagation();
@@ -41,8 +52,13 @@ export function NodeSelect({ options, value, onChange }: NodeSelectProps) {
     <div className="nodrag" style={{ position: 'relative' }}>
       <button
         ref={triggerRef}
-        className="nodrag w-full h-full flex items-center gap-1.5 px-2 py-1.5 text-xs"
-        style={{
+        className={cn(
+          'nodrag',
+          isImageGenerationGlass
+            ? [glassStyles.glassSurface, glassStyles.dropdownSurface, glassStyles.selectTrigger]
+            : 'w-full h-full flex items-center gap-1.5 px-2 py-1.5 text-xs',
+        )}
+        style={isImageGenerationGlass ? undefined : {
           background: 'var(--color-bg-surface)',
           color: 'var(--color-white)',
           border: 'none',
@@ -54,11 +70,23 @@ export function NodeSelect({ options, value, onChange }: NodeSelectProps) {
         }}
         onClick={openDropdown}
       >
-        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</span>
+        <span
+          className={cn(isImageGenerationGlass && glassStyles.selectContent)}
+          style={isImageGenerationGlass ? undefined : { display: 'flex', flex: 1, minWidth: 0 }}
+        >
+          {leadingIcon}
+          <span
+            className={cn(isImageGenerationGlass && glassStyles.selectValue)}
+            style={isImageGenerationGlass ? undefined : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+          >
+            {value}
+          </span>
+        </span>
         <ChevronDown
-          size={20}
+          size={isImageGenerationGlass ? 14 : 20}
+          className={cn(isImageGenerationGlass && glassStyles.chevron)}
           style={{
-            opacity: 0.6,
+            opacity: isImageGenerationGlass ? 1 : 0.6,
             flexShrink: 0,
             transform: open ? 'rotate(180deg)' : 'none',
             transition: 'transform 0.15s',
@@ -69,15 +97,20 @@ export function NodeSelect({ options, value, onChange }: NodeSelectProps) {
       {open && typeof document !== 'undefined' && createPortal(
         <div
           ref={dropdownRef}
-          className="nodrag"
+          className={cn(
+            'nodrag',
+            isImageGenerationGlass && glassStyles.glassSurface,
+            isImageGenerationGlass && glassStyles.dropdownSurface,
+            isImageGenerationGlass && glassStyles.dropdownMenu,
+          )}
           style={{
             position: 'fixed',
             top: pos.top,
             left: pos.left,
             width: pos.width,
-            background: 'var(--color-bg-surface)',
+            background: isImageGenerationGlass ? undefined : 'var(--color-bg-surface)',
             borderRadius: 11,
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: isImageGenerationGlass ? 'none' : '1px solid rgba(255,255,255,0.1)',
             overflow: 'hidden',
             zIndex: 99999,
           }}
