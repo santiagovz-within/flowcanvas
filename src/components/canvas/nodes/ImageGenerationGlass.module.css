@@ -407,12 +407,15 @@ textarea.promptSurface {
   transition: background 150ms, color 150ms;
 }
 
-.handleIdle {
+.handleIdleImage {
   --glass-fill: rgba(58, 25, 106, 0.7);
 }
 
+.handleIdleText {
+  --glass-fill: rgba(29, 63, 106, 0.6);
+}
+
 .handleActive {
-  background: #a855f7;
   box-shadow: none;
   color: #fff;
 }

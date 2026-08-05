@@ -155,10 +155,15 @@ export function TypedHandle({
               : [
                   glassStyles.glassSurface,
                   glassStyles.controlSurface,
-                  glassStyles.handleIdle,
+                  portType === 'text'
+                    ? glassStyles.handleIdleText
+                    : glassStyles.handleIdleImage,
                 ],
           )}
-          style={{ color: isActive ? '#fff' : `var(--port-icon-inactive-${portType})` }}
+          style={{
+            background: isActive ? color : undefined,
+            color: isActive ? '#fff' : `var(--port-icon-inactive-${portType})`,
+          }}
         >
           <PortIcon type={portType} size={15} />
         </span>
