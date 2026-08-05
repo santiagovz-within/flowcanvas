@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
+import { describeFalError, isTerminalFalError } from '@/lib/falErrors';
+import { failGeneration } from '@/lib/generationFailures';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -25,13 +27,28 @@ export async function GET(
     });
 
     if (status.status === 'COMPLETED') {
-      const result = await fal.queue.result(FAL_ENDPOINT, { requestId });
+      // A failed run is also reported COMPLETED — fetching the result is what
+      // surfaces FAL's reason for the failure.
+      let result: Awaited<ReturnType<typeof fal.queue.result>>;
+      try {
+        result = await fal.queue.result(FAL_ENDPOINT, { requestId });
+      } catch (err) {
+        if (!isTerminalFalError(err)) throw err;
+        const message = describeFalError(err);
+        console.error(`[video-upscale/status] request ${requestId} failed: ${message}`);
+        return failGeneration(supabase, user.id, requestId, message);
+      }
       const falResult = result.data as { video?: { url: string }; output_video?: { url: string } };
       const videoUrl = falResult.video?.url ?? falResult.output_video?.url;
 
       if (!videoUrl) {
         console.error('[video-upscale/status] no video URL in result:', JSON.stringify(result.data));
-        return NextResponse.json({ status: 'failed' });
+        return failGeneration(
+          supabase,
+          user.id,
+          requestId,
+          'FAL returned no video URL in the result.',
+        );
       }
 
       const videoRes = await fetch(videoUrl);
@@ -57,20 +74,20 @@ export async function GET(
       });
     }
 
-    const inQueue = status as { status: string; queue_position?: number };
+    const inQueue = status as { status: string; queue_position?: number; error?: string };
 
-    if (inQueue.status === 'FAILED') {
-      await supabase
-        .from('generations')
-        .update({ status: 'failed' })
-        .eq('fal_request_id', requestId)
-        .eq('user_id', user.id);
-      return NextResponse.json({ status: 'failed' });
+    if (inQueue.status === 'FAILED' || inQueue.status === 'ERROR') {
+      return failGeneration(
+        supabase,
+        user.id,
+        requestId,
+        inQueue.error ?? 'FAL reported that the upscale failed.',
+      );
     }
 
     return NextResponse.json({ status: 'pending', queuePosition: inQueue.queue_position ?? null });
   } catch (err) {
     console.error('[video-upscale/status] error:', err);
-    return NextResponse.json({ error: 'Status check failed' }, { status: 500 });
+    return NextResponse.json({ error: describeFalError(err) }, { status: 500 });
   }
 }

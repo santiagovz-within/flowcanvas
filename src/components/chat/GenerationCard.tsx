@@ -79,14 +79,23 @@ export function GenerationCard({ generation, onClick }: GenerationCardProps) {
   if (generation.status === 'failed') {
     return (
       <div
-        className="relative rounded-xl overflow-hidden flex items-center justify-center"
+        className="relative rounded-xl overflow-hidden flex flex-col items-center justify-center gap-1 px-3 py-3 text-center"
         style={{
           aspectRatio,
           background: 'var(--color-bg-surface)',
           border: '1px solid var(--color-error)',
+          overflowY: 'auto',
         }}
       >
-        <p className="text-xs" style={{ color: 'var(--color-error)' }}>Failed</p>
+        <p className="text-xs font-semibold" style={{ color: 'var(--color-error)' }}>Failed</p>
+        {generation.error_message && (
+          <p
+            className="leading-snug"
+            style={{ color: 'var(--color-white-muted)', fontSize: 10, wordBreak: 'break-word' }}
+          >
+            {generation.error_message}
+          </p>
+        )}
       </div>
     );
   }

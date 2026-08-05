@@ -4,6 +4,7 @@ import { fal } from '@fal-ai/client';
 import { getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
+import { describeFalError } from '@/lib/falErrors';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -56,6 +57,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ mediaUrls: [signedUrl], status: 'completed' });
   } catch (err) {
     console.error('Remove background error:', err);
-    return NextResponse.json({ error: 'Remove background failed', details: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Remove background failed', details: describeFalError(err) },
+      { status: 500 },
+    );
   }
 }

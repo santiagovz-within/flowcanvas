@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { getFalStorageHeaders } from '@/lib/falStorage';
+import { describeFalError } from '@/lib/falErrors';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ requestId: request_id, status: 'pending' });
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
+    const detail = describeFalError(err);
     console.error('[video-outpaint] submit error:', detail, err);
     return NextResponse.json({ error: 'Failed to submit outpaint job', details: detail }, { status: 500 });
   }

@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { downloadAllFromUrls, downloadFromUrl } from '@/lib/utils/download';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
 import { NodeWrapper } from './NodeWrapper';
+import { GenerationFailureOverlay, RegenerateGate } from './GenerationFailure';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { ImageGenNodeData } from '@/types';
 import {
@@ -198,6 +199,16 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     }
   }
 
+  /** Clears the failure so the Generate button unlocks for the edited inputs. */
+  function acknowledgeFailure() {
+    updateData({
+      status: 'idle',
+      errorMessage: undefined,
+      generationErrors: undefined,
+      generationSlots: undefined,
+    });
+  }
+
   const sliderPct = ((data.numImages - 1) / 3) * 100;
   const hasPendingRequests = !!data.pendingRequests?.length;
   const generationSlots = data.generationSlots ?? [];
@@ -208,6 +219,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     ? generationSlots
     : displayImages;
   const downloadableImages = previewSlots.filter((url): url is string => !!url);
+  const hasFailure = data.status === 'error';
   const displayVersion = isShowingActiveGeneration ? genHistory.length + 1 : histIdx + 1;
   const previewAspectRatio = data.aspectRatio.replace(':', ' / ');
 
@@ -215,13 +227,15 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     <div className="flex flex-col gap-2">
       <button
         onClick={handleGenerate}
-        disabled={isGenerating || (data.status === 'processing' && hasPendingRequests)}
+        disabled={isGenerating || hasFailure || (data.status === 'processing' && hasPendingRequests)}
+        title={hasFailure ? 'Change the prompt or inputs, then confirm below to regenerate' : undefined}
         className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
         style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
       >
         <Play size={12} />
         {isGenerating ? 'Generating…' : 'Generate'}
       </button>
+      {hasFailure && <RegenerateGate onChangesApplied={acknowledgeFailure} />}
       {downloadableImages.length > 0 && (
         <div key={downloadableImages[0]} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
           <button
@@ -501,6 +515,23 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
         </div>
       )}
 
+      {/* A failure before any slot existed still has to show its reason. */}
+      {hasFailure && !previewSlots.some((url) => !url) && (
+        <div
+          className="relative"
+          style={{
+            aspectRatio: previewAspectRatio,
+            borderRadius: 8,
+            border: '1px solid var(--color-error)',
+            overflow: 'hidden',
+            background: 'var(--color-bg-surface)',
+            marginBottom: previewSlots.length > 0 ? 8 : 0,
+          }}
+        >
+          <GenerationFailureOverlay message={data.errorMessage} />
+        </div>
+      )}
+
       {/* ── Generated previews ───────────────────────────────── */}
       {previewSlots.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -545,23 +576,24 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
                       : <Download size={13} />}
                   </button>
                 </>
-              ) : (
+              ) : hasActiveSlotRequests ? (
                 <div className="relative flex h-full w-full items-center justify-center">
                   <div
-                    className={`absolute inset-0${hasActiveSlotRequests ? ' animate-pulse' : ''}`}
-                    style={{
-                      background: hasActiveSlotRequests
-                        ? 'rgba(255,255,255,0.09)'
-                        : 'rgba(248,113,113,0.12)',
-                    }}
+                    className="absolute inset-0 animate-pulse"
+                    style={{ background: 'rgba(255,255,255,0.09)' }}
                   />
                   <span
                     className="relative text-xs font-medium"
                     style={{ color: 'var(--color-white-muted)' }}
                   >
-                    {hasActiveSlotRequests ? 'Generating' : 'Failed'}
+                    Generating
                   </span>
                 </div>
+              ) : (
+                <GenerationFailureOverlay
+                  message={data.generationErrors?.[i]?.message ?? data.errorMessage}
+                  requestId={data.generationErrors?.[i]?.requestId}
+                />
               )}
             </div>
           ))}

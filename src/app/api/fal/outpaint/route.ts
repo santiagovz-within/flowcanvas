@@ -4,6 +4,7 @@ import { fal } from '@fal-ai/client';
 import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
+import { describeFalError } from '@/lib/falErrors';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ mediaUrls: [signedUrl], status: 'completed' });
   } catch (err) {
-    const details = err instanceof Error ? err.message : String(err);
+    const details = describeFalError(err);
     console.error('[fal/outpaint] error:', details);
     return NextResponse.json({ error: 'Outpaint failed', details }, { status: 500 });
   }

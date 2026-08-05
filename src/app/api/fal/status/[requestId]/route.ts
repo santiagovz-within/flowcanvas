@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { getSignedReadUrl, isGcsRef, signGcsRef } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
+import { describeFalError, isTerminalFalError } from '@/lib/falErrors';
+import { failGeneration } from '@/lib/generationFailures';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -51,6 +53,7 @@ export async function GET(
         status: 'failed',
         error: existingGeneration.error_message ?? 'FAL reported the job failed.',
         generationId: existingGeneration.id,
+        requestId,
       });
     }
 
@@ -60,17 +63,31 @@ export async function GET(
     });
 
     if (status.status === 'COMPLETED') {
-      const result = await fal.queue.result(endpoint, { requestId });
+      // FAL marks a failed run COMPLETED and only reveals why when the result is
+      // fetched: it answers 422/500 with the reason in `detail`.
+      let result: Awaited<ReturnType<typeof fal.queue.result>>;
+      try {
+        result = await fal.queue.result(endpoint, { requestId });
+      } catch (err) {
+        if (!isTerminalFalError(err)) throw err;
+        const message = describeFalError(err);
+        console.error(`[fal/status] ${endpoint} request ${requestId} failed: ${message}`);
+        return failGeneration(supabase, user.id, requestId, message);
+      }
 
       if (mediaType === 'image') {
         const falResult = result.data as { images?: Array<{ url: string }> };
         const imageUrl = falResult.images?.[0]?.url;
 
         if (!imageUrl) {
-          return NextResponse.json({ status: 'failed', error: 'FAL returned no image URL in the result.' });
+          return failGeneration(supabase, user.id, requestId, 'FAL returned no image URL in the result.');
         }
         if (!existingGeneration) {
-          return NextResponse.json({ status: 'failed', error: 'Queued generation record was not found.' });
+          return NextResponse.json({
+            status: 'failed',
+            error: 'Queued generation record was not found.',
+            requestId,
+          });
         }
 
         const imageRes = await fetch(imageUrl);
@@ -109,7 +126,7 @@ export async function GET(
       const videoUrl = falResult.video?.url;
 
       if (!videoUrl) {
-        return NextResponse.json({ status: 'failed', error: 'FAL returned no video URL in the result.' });
+        return failGeneration(supabase, user.id, requestId, 'FAL returned no video URL in the result.');
       }
 
       const videoRes = await fetch(videoUrl);
@@ -142,24 +159,18 @@ export async function GET(
       });
     }
 
-    const s = status as { status: string; queue_position?: number; error?: string };
+    const s = status as { status: string; queue_position?: number; error?: string; detail?: string };
 
-    if (s.status === 'FAILED') {
-      await supabase
-        .from('generations')
-        .update({
-          status: 'failed',
-          error_message: s.error ?? 'FAL reported the job failed.',
-        })
-        .eq('fal_request_id', requestId)
-        .eq('user_id', user.id);
-      return NextResponse.json({ status: 'failed', error: s.error ?? 'FAL reported the job failed.' });
+    // The queue contract only documents IN_QUEUE/IN_PROGRESS/COMPLETED, but treat
+    // any explicit failure status as terminal in case FAL adds one.
+    if (s.status === 'FAILED' || s.status === 'ERROR') {
+      const message = s.error ?? s.detail ?? 'FAL reported the job failed.';
+      return failGeneration(supabase, user.id, requestId, message);
     }
 
     return NextResponse.json({ status: 'pending', queuePosition: s.queue_position ?? null });
   } catch (err) {
     console.error('Status check error:', err);
-    const detail = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ status: 'error', error: detail }, { status: 500 });
+    return NextResponse.json({ status: 'error', error: describeFalError(err) }, { status: 500 });
   }
 }

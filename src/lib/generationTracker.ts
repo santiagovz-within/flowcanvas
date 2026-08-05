@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  GenerationFailure,
   ImageGenNodeData,
   NodeData,
   NodeType,
@@ -146,6 +147,7 @@ export function syncJobToCurrentFlow(job: BackgroundGenerationJob | undefined) {
     applyNodeData(job.flowId, job.nodeId, {
       status: 'processing',
       errorMessage: undefined,
+      generationErrors: undefined,
       generatedImages: job.slots.filter((url): url is string => !!url),
       generationSlots: job.slots,
       pendingRequests: pendingNodeRequests(job),
@@ -156,16 +158,49 @@ export function syncJobToCurrentFlow(job: BackgroundGenerationJob | undefined) {
   applyNodeData(job.flowId, job.nodeId, {
     status: 'processing',
     errorMessage: undefined,
+    errorRequestId: undefined,
     pendingRequestId: job.requests.find((request) => request.status === 'pending')?.requestId,
     pendingEndpoint: job.requests.find((request) => request.status === 'pending')?.endpoint,
   });
 }
 
+// Requests we invented locally (submission errors, unrecoverable jobs) have no
+// counterpart in FAL, so their IDs must not be shown as traceable request IDs.
+function falRequestId(request: BackgroundGenerationRequest): string | undefined {
+  const { requestId } = request;
+  if (!requestId || requestId.startsWith('submission-')) return undefined;
+  if (requestId === 'orphaned-submission' || requestId === 'incomplete-recovery') return undefined;
+  return requestId;
+}
+
+/** The reason each slot failed, so every failed thumbnail can show its own message. */
+function failuresBySlot(job: BackgroundGenerationJob): Array<GenerationFailure | null> {
+  const length = job.requests.reduce(
+    (max, request) => Math.max(max, request.slotIndex + 1),
+    job.slotCount,
+  );
+  const failures = Array.from({ length }, () => null as GenerationFailure | null);
+  for (const request of job.requests) {
+    if (request.status !== 'failed' || !request.errorMessage) continue;
+    if (request.slotIndex < 0 || failures[request.slotIndex]) continue;
+    failures[request.slotIndex] = {
+      message: request.errorMessage,
+      requestId: falRequestId(request),
+    };
+  }
+  return failures;
+}
+
 function errorMessageForJob(job: BackgroundGenerationJob): string {
-  return job.requests.find((request) => request.errorMessage)?.errorMessage
-    ?? (job.kind === 'image-generation'
-      ? 'One or more images could not be generated.'
-      : 'FAL reported that the generation failed.');
+  const messages = [...new Set(
+    job.requests
+      .map((request) => request.errorMessage)
+      .filter((message): message is string => !!message),
+  )];
+  if (messages.length > 0) return messages.join(' · ');
+  return job.kind === 'image-generation'
+    ? 'One or more images could not be generated.'
+    : 'FAL reported that the generation failed.';
 }
 
 function buildFinalData(job: BackgroundGenerationJob): Partial<NodeData> | null {
@@ -183,6 +218,7 @@ function buildFinalData(job: BackgroundGenerationJob): Partial<NodeData> | null 
       ? {
           generatedImages: completedMedia,
           generationSlots: job.slots,
+          generationErrors: failuresBySlot(job),
           status: 'error',
           errorMessage: errorMessageForJob(job),
           pendingRequests: undefined,
@@ -190,6 +226,7 @@ function buildFinalData(job: BackgroundGenerationJob): Partial<NodeData> | null 
       : {
           generatedImages: completedMedia,
           generationSlots: undefined,
+          generationErrors: undefined,
           generationHistory: [...history, completedMedia],
           status: 'completed',
           errorMessage: undefined,
@@ -201,6 +238,7 @@ function buildFinalData(job: BackgroundGenerationJob): Partial<NodeData> | null 
     return {
       status: 'error',
       errorMessage: errorMessageForJob(job),
+      errorRequestId: failuresBySlot(job).find((failure) => failure?.requestId)?.requestId,
       pendingRequestId: undefined,
       pendingEndpoint: undefined,
     };
@@ -214,6 +252,7 @@ function buildFinalData(job: BackgroundGenerationJob): Partial<NodeData> | null 
       videoHistory: [...history, completedMedia[0]],
       status: 'completed',
       errorMessage: undefined,
+      errorRequestId: undefined,
       pendingRequestId: undefined,
       pendingEndpoint: undefined,
     };
@@ -222,6 +261,7 @@ function buildFinalData(job: BackgroundGenerationJob): Partial<NodeData> | null 
     videoUrl: completedMedia[0],
     status: 'completed',
     errorMessage: undefined,
+    errorRequestId: undefined,
     pendingRequestId: undefined,
     pendingEndpoint: undefined,
   };

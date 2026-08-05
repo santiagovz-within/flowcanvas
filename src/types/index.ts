@@ -150,6 +150,12 @@ export interface ImageInputNodeData extends Record<string, unknown> {
   uploadError?: string;
 }
 
+/** Why FAL rejected one generation, shown inside the thumbnail that failed. */
+export interface GenerationFailure {
+  message: string;
+  requestId?: string;
+}
+
 export interface ImageGenNodeData extends Record<string, unknown> {
   model: string;
   aspectRatio: string;
@@ -162,6 +168,8 @@ export interface ImageGenNodeData extends Record<string, unknown> {
   generatedImages?: string[];
   generationSlots?: Array<string | null>;
   generationHistory?: string[][];
+  /** Parallel to `generationSlots`: the failure for each slot that has one. */
+  generationErrors?: Array<GenerationFailure | null>;
   status: NodeStatus;
   errorMessage?: string;
   pendingRequests?: Array<{ requestId: string; endpoint: string; slotIndex?: number }>;
@@ -183,6 +191,8 @@ export interface VideoGenNodeData extends Record<string, unknown> {
   videoHistory?: string[];
   status: NodeStatus;
   errorMessage?: string;
+  /** FAL request that produced `errorMessage`, so the failure can be traced in FAL. */
+  errorRequestId?: string;
   pendingRequestId?: string;
   pendingEndpoint?: string;
   label?: string;

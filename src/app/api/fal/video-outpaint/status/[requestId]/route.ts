@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
+import { describeFalError, isTerminalFalError } from '@/lib/falErrors';
+import { failGeneration } from '@/lib/generationFailures';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -22,13 +24,28 @@ export async function GET(
     const status = await fal.queue.status(FAL_ENDPOINT, { requestId, logs: false });
 
     if (status.status === 'COMPLETED') {
-      const result = await fal.queue.result(FAL_ENDPOINT, { requestId });
+      // A failed run is also reported COMPLETED — fetching the result is what
+      // surfaces FAL's reason for the failure.
+      let result: Awaited<ReturnType<typeof fal.queue.result>>;
+      try {
+        result = await fal.queue.result(FAL_ENDPOINT, { requestId });
+      } catch (err) {
+        if (!isTerminalFalError(err)) throw err;
+        const message = describeFalError(err);
+        console.error(`[video-outpaint/status] request ${requestId} failed: ${message}`);
+        return failGeneration(supabase, user.id, requestId, message);
+      }
       const falResult = result.data as { video?: { url: string }; output_video?: { url: string } };
       const videoUrl = falResult.video?.url ?? falResult.output_video?.url;
 
       if (!videoUrl) {
         console.error('[video-outpaint/status] no video URL in result:', JSON.stringify(result.data));
-        return NextResponse.json({ status: 'failed' });
+        return failGeneration(
+          supabase,
+          user.id,
+          requestId,
+          'FAL returned no video URL in the result.',
+        );
       }
 
       const videoRes = await fetch(videoUrl);
@@ -47,23 +64,22 @@ export async function GET(
       return NextResponse.json({ status: 'completed', mediaUrls: [signedUrl] });
     }
 
-    if ((status as { status: string }).status === 'FAILED') {
-      await supabase
-        .from('generations')
-        .update({ status: 'failed' })
-        .eq('fal_request_id', requestId)
-        .eq('user_id', user.id);
-      return NextResponse.json({ status: 'failed' });
+    const queued = status as { status: string; queue_position?: number; error?: string };
+
+    if (queued.status === 'FAILED' || queued.status === 'ERROR') {
+      return failGeneration(
+        supabase,
+        user.id,
+        requestId,
+        queued.error ?? 'FAL reported that the outpaint failed.',
+      );
     }
 
-    return NextResponse.json({
-      status: 'pending',
-      queuePosition: (status as { queue_position?: number }).queue_position ?? null,
-    });
+    return NextResponse.json({ status: 'pending', queuePosition: queued.queue_position ?? null });
   } catch (err) {
     console.error('[video-outpaint/status] error:', err);
     // Return status: 'error' (not HTTP 500) so the client poll loop can count
     // consecutive failures and stop rather than polling indefinitely.
-    return NextResponse.json({ status: 'error', detail: String(err) });
+    return NextResponse.json({ status: 'error', detail: describeFalError(err) });
   }
 }

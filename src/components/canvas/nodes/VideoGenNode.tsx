@@ -5,6 +5,7 @@ import { Film, Play, AlertTriangle, Download, ChevronLeft, ChevronRight } from '
 import { downloadFromUrl } from '@/lib/utils/download';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NodeWrapper } from './NodeWrapper';
+import { GenerationFailureOverlay, RegenerateGate } from './GenerationFailure';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { VideoGenNodeData, ImageInputNodeData, ImageGenNodeData } from '@/types';
 import { VIDEO_MODELS, FAL_MODELS } from '@/lib/api/models';
@@ -226,7 +227,13 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     });
   }
 
+  /** Clears the failure so the Generate button unlocks for the edited inputs. */
+  function acknowledgeFailure() {
+    updateData({ status: 'idle', errorMessage: undefined, errorRequestId: undefined });
+  }
+
   const displayVideoUrl = videoHistory.length > 0 ? (videoHistory[histIdx] ?? data.videoUrl) : data.videoUrl;
+  const hasFailure = data.status === 'error';
 
   const videoAspect = (() => {
     const parts = data.aspectRatio.split(':');
@@ -247,14 +254,26 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     <>
       <button
         onClick={handleGenerate}
-        disabled={isGenerating || (isOmni && !hasImage)}
-        title={isOmni && !hasImage ? 'Connect a start frame to generate with Google Omni Flash' : undefined}
+        disabled={isGenerating || hasFailure || (isOmni && !hasImage)}
+        title={
+          hasFailure
+            ? 'Change the prompt or inputs, then confirm below to regenerate'
+            : isOmni && !hasImage
+              ? 'Connect a start frame to generate with Google Omni Flash'
+              : undefined
+        }
         className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
         style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
       >
         <Play size={12} />
         {isGenerating ? 'Generating…' : 'Generate'}
       </button>
+
+      {hasFailure && (
+        <div className="mt-1.5">
+          <RegenerateGate onChangesApplied={acknowledgeFailure} />
+        </div>
+      )}
 
       {displayVideoUrl && (
         <button
@@ -474,6 +493,25 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
           >
             <ChevronRight size={13} />
           </button>
+        </div>
+      )}
+
+      {hasFailure && (
+        <div
+          className="relative"
+          style={{
+            aspectRatio: videoAspect,
+            borderRadius: 8,
+            border: '1px solid var(--color-error)',
+            overflow: 'hidden',
+            background: 'var(--color-bg-surface)',
+            marginBottom: displayVideoUrl ? 8 : 0,
+          }}
+        >
+          <GenerationFailureOverlay
+            message={data.errorMessage}
+            requestId={data.errorRequestId}
+          />
         </div>
       )}
 

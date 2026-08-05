@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { getFalStorageHeaders } from '@/lib/falStorage';
+import { describeFalError } from '@/lib/falErrors';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ requestId: request_id, status: 'pending' });
   } catch (err) {
     console.error('[video-upscale] submit error:', err);
-    return NextResponse.json({ error: 'Failed to submit upscale job', details: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to submit upscale job', details: describeFalError(err) },
+      { status: 500 },
+    );
   }
 }

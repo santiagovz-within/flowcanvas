@@ -5,6 +5,7 @@ import { FAL_MODELS } from '@/lib/api/models';
 import { getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
+import { describeFalError } from '@/lib/falErrors';
 import type { GenerateImageRequest } from '@/types';
 
 fal.config({ credentials: process.env.FAL_KEY });
@@ -300,11 +301,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ generationId: lastGen?.id, mediaUrls: results, status: 'completed' });
   } catch (err) {
-    const details = err instanceof Error
-      ? err.message
-      : typeof err === 'object' && err !== null
-        ? JSON.stringify(err)
-        : String(err);
+    const details = describeFalError(err);
     console.error('Generation error:', details);
     return NextResponse.json({ error: 'Generation failed', details }, { status: 500 });
   }
