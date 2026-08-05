@@ -1226,7 +1226,7 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
         selectionKeyCode="Shift"
         style={{ background: 'var(--color-bg-darkest)' }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={28} size={1.5} color={theme === 'light' ? '#29292A' : 'rgba(255,255,255,0.18)'} />
+        <Background variant={BackgroundVariant.Dots} gap={28} size={1.5} color={theme === 'light' ? '#29292A' : 'rgba(255,255,255,0.32)'} />
         <Controls showInteractive={false} />
         <MiniMap
           nodeColor="var(--color-bg-surface)"

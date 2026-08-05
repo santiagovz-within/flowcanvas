@@ -70,7 +70,7 @@
   --tag-image-text: #b36af7;
 
   /* Canvas background dot grid */
-  --bg-dot-color: rgba(255, 255, 255, 0.18);
+  --bg-dot-color: rgba(255, 255, 255, 0.32);
 }
 
 /* Light theme overrides */
