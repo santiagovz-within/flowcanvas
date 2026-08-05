@@ -764,6 +764,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
       errorMessage={data.errorMessage}
       selected={selected}
       minWidth={560}
+      preserveWidth
       accentColor={accentColor}
       titlePosition="outside"
       footer={footer}

@@ -317,6 +317,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       titlePosition="outside"
       footer={footer}
       appearance="imageGenerationGlass"
+      glassContentDensity="compact"
       glassPerformanceMode={usePerformanceGlass}
     >
       {/* ── Handles ─────────────────────────────────────────── */}

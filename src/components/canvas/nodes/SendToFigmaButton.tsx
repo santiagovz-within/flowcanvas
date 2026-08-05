@@ -89,7 +89,7 @@ export function SendToFigmaButton({
   imageUrl,
   style,
   buttonStyle,
-  appearance = 'default',
+  appearance = 'imageGenerationGlass',
 }: SendToFigmaButtonProps) {
   const [status, setStatus] = useState<FigmaStatus>('idle');
   const [error,  setError]  = useState<string | null>(null);

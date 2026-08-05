@@ -40,7 +40,7 @@ export function NodeSelect({
   onChange,
   leadingIcon,
   optionIcon,
-  appearance = 'default',
+  appearance = 'imageGenerationGlass',
 }: NodeSelectProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);

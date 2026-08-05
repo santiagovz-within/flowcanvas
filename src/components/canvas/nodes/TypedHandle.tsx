@@ -87,6 +87,7 @@ interface TypedHandleProps extends Omit<HandleProps, 'style'> {
   badge?: number;
   // when true the handle renders in its "lit" state (full colour + white icon) even without hover
   connected?: boolean;
+  icon?: React.ReactNode;
   appearance?: 'default' | 'imageGenerationGlass';
 }
 
@@ -96,7 +97,8 @@ export function TypedHandle({
   position,
   badge,
   connected,
-  appearance = 'default',
+  icon,
+  appearance = 'imageGenerationGlass',
   ...rest
 }: TypedHandleProps) {
   const [hovered, setHovered] = useState(false);
@@ -156,6 +158,10 @@ export function TypedHandle({
                   glassStyles.glassSurface,
                   portType === 'text'
                     ? glassStyles.handleIdleText
+                    : portType === 'video'
+                      ? glassStyles.handleIdleVideo
+                      : portType === 'neutral'
+                        ? glassStyles.handleIdleNeutral
                     : glassStyles.handleIdleImage,
                 ],
           )}
@@ -165,11 +171,11 @@ export function TypedHandle({
           }}
         >
           <span className={cn(glassStyles.glassContent, glassStyles.handleContent)}>
-            <PortIcon type={portType} size={15} />
+            {icon ?? <PortIcon type={portType} size={15} />}
           </span>
         </span>
       ) : (
-        <PortIcon type={portType} size={14} />
+        icon ?? <PortIcon type={portType} size={14} />
       )}
       {badge !== undefined && (
         <span

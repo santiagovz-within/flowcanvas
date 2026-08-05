@@ -20,6 +20,9 @@ interface NodeWrapperProps {
   /** Rendered below the card when titlePosition === 'outside'. */
   footer?: React.ReactNode;
   appearance?: 'default' | 'imageGenerationGlass';
+  glassContentDensity?: 'standard' | 'compact';
+  /** Keeps a node-specific width instead of using the shared 300px base width. */
+  preserveWidth?: boolean;
   glassPerformanceMode?: boolean;
 }
 
@@ -27,11 +30,15 @@ export function NodeWrapper({
   title, icon, status, errorMessage, selected, children,
   minWidth = 280, width, accentColor,
   titlePosition = 'inside', footer,
-  appearance = 'default', glassPerformanceMode = false,
+  appearance = 'imageGenerationGlass',
+  glassContentDensity = 'standard',
+  preserveWidth = false,
+  glassPerformanceMode = false,
 }: NodeWrapperProps) {
   const color = accentColor ?? 'var(--color-accent)';
   const glow  = accentColor ? `${accentColor}4d` : 'var(--color-accent-glow)';
   const isImageGenerationGlass = appearance === 'imageGenerationGlass';
+  const nodeWidth = width ?? (isImageGenerationGlass && !preserveWidth ? 300 : minWidth);
 
   const cardStyle: React.CSSProperties = {
     ...(isImageGenerationGlass ? {
@@ -59,7 +66,7 @@ export function NodeWrapper({
           isImageGenerationGlass && glassStyles.nodeShell,
           isImageGenerationGlass && glassPerformanceMode && glassStyles.performance,
         )}
-        style={{ width: width ?? minWidth }}
+        style={{ width: nodeWidth }}
       >
         {/* Title floats above the card */}
         <div className={cn(
@@ -91,6 +98,9 @@ export function NodeWrapper({
             className={cn(
               isImageGenerationGlass && glassStyles.glassContent,
               isImageGenerationGlass && glassStyles.nodeContent,
+              isImageGenerationGlass
+                && glassContentDensity === 'compact'
+                && glassStyles.nodeContentCompact,
             )}
             style={isImageGenerationGlass ? undefined : { padding: 18 }}
           >
@@ -114,7 +124,7 @@ export function NodeWrapper({
     <CanvasNodeFocusContext.Provider value={!!selected}>
     <div
       className={cn('overflow-hidden transition-all duration-150')}
-      style={{ ...cardStyle, width: width ?? minWidth }}
+      style={{ ...cardStyle, width: nodeWidth }}
     >
       {/* Title bar */}
       <div
