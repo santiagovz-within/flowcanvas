@@ -37,6 +37,10 @@ export function NodeWrapper({
     ...(isImageGenerationGlass ? {
       outline: selected ? `1px solid ${color}` : 'none',
       outlineOffset: selected ? 1 : 0,
+      // The glass primitive establishes this card as a positioning context.
+      // Keep overflow open so React Flow handles can retain their existing
+      // outward offsets and full hit targets instead of being clipped.
+      overflow: 'visible',
     } : {
       borderRadius: 17,
       background: 'var(--color-bg-elevated)',
