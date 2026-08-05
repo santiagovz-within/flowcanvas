@@ -258,7 +258,6 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
         title={hasFailure ? 'Change the prompt or inputs, then confirm below to regenerate' : undefined}
         className={cn(
           glassStyles.glassSurface,
-          glassStyles.controlSurface,
           glassStyles.button,
           glassStyles.generateButton,
           'transition-opacity disabled:opacity-40 nodrag',
@@ -277,7 +276,6 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
             disabled={isDownloading}
             className={cn(
               glassStyles.glassSurface,
-              glassStyles.controlSurface,
               glassStyles.button,
               glassStyles.downloadButton,
               'nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50',
@@ -340,7 +338,6 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           id={`ref_${i}`}
           portType="image"
           offset={`${rowsStartTop + REF_ROW_HEIGHT / 2 + i * (REF_ROW_HEIGHT + ROW_GAP)}px`}
-          badge={i + 1}
           connected={connectedReferenceHandles.has(`ref_${i}`) || !!(data.inputImageUrls?.[i])}
           appearance="imageGenerationGlass"
         />
@@ -351,7 +348,6 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
         ref={promptSectionRef}
         className={cn(
           glassStyles.glassSurface,
-          glassStyles.controlSurface,
           glassStyles.promptSection,
           glassStyles.promptSurface,
         )}
@@ -396,8 +392,8 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
         <span
           className={cn(
             glassStyles.glassSurface,
-            glassStyles.controlSurface,
             glassStyles.modePill,
+            isEditMode ? glassStyles.modePillImage : glassStyles.modePillText,
           )}
         >
           <span className={glassStyles.glassContent}>
@@ -413,6 +409,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           value={data.aspectRatio}
           onChange={(v) => updateData({ aspectRatio: v })}
           leadingIcon={<AspectRatioGlyph ratio={data.aspectRatio} />}
+          optionIcon={(ratio) => <AspectRatioGlyph ratio={ratio} />}
           appearance="imageGenerationGlass"
         />
         <NodeSelect
@@ -420,6 +417,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           value={data.resolution}
           onChange={(v) => updateData({ resolution: v })}
           leadingIcon={<Image src="/node-icons/icon-resolution.svg" alt="" width={10} height={10} aria-hidden />}
+          optionIcon={() => <Image src="/node-icons/icon-resolution.svg" alt="" width={10} height={10} aria-hidden />}
           appearance="imageGenerationGlass"
         />
       </div>
@@ -504,7 +502,6 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
                   key={i}
                   className={cn(
                     glassStyles.glassSurface,
-                    glassStyles.controlSurface,
                     glassStyles.connector,
                     isConnected ? glassStyles.connectorActive : glassStyles.connectorInactive,
                   )}

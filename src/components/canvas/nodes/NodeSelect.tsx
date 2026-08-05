@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useStoreApi } from '@xyflow/react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
@@ -11,7 +12,26 @@ interface NodeSelectProps {
   value: string;
   onChange: (value: string) => void;
   leadingIcon?: React.ReactNode;
+  optionIcon?: (option: string) => React.ReactNode;
   appearance?: 'default' | 'imageGenerationGlass';
+}
+
+interface DropdownPosition {
+  top: number;
+  left: number;
+  width: number;
+  scale: number;
+}
+
+function measureDropdown(trigger: HTMLButtonElement): DropdownPosition {
+  const rect = trigger.getBoundingClientRect();
+  const scale = trigger.offsetWidth > 0 ? rect.width / trigger.offsetWidth : 1;
+  return {
+    top: rect.bottom + 3 * scale,
+    left: rect.left,
+    width: trigger.offsetWidth,
+    scale,
+  };
 }
 
 export function NodeSelect({
@@ -19,22 +39,42 @@ export function NodeSelect({
   value,
   onChange,
   leadingIcon,
+  optionIcon,
   appearance = 'default',
 }: NodeSelectProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const [pos, setPos] = useState<DropdownPosition>({ top: 0, left: 0, width: 0, scale: 1 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const reactFlowStore = useStoreApi();
   const isImageGenerationGlass = appearance === 'imageGenerationGlass';
 
   function openDropdown(e: React.MouseEvent) {
     e.stopPropagation();
     if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 3, left: rect.left, width: rect.width });
+    setPos(measureDropdown(triggerRef.current));
     setOpen((o) => !o);
   }
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    let frameId: number | undefined;
+    const syncPosition = () => {
+      if (triggerRef.current) setPos(measureDropdown(triggerRef.current));
+    };
+    const scheduleSync = () => {
+      if (frameId !== undefined) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(syncPosition);
+    };
+    const unsubscribe = reactFlowStore.subscribe(scheduleSync);
+    window.addEventListener('resize', scheduleSync);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('resize', scheduleSync);
+      if (frameId !== undefined) cancelAnimationFrame(frameId);
+    };
+  }, [open, reactFlowStore]);
 
   useEffect(() => {
     if (!open) return;
@@ -78,7 +118,10 @@ export function NodeSelect({
   const dropdownOptions = options.map((opt) => (
     <button
       key={opt}
-      className="nodrag w-full flex items-center px-2 py-1.5 text-xs"
+      className={cn(
+        'nodrag w-full flex items-center gap-1.5 px-2 py-1.5 text-xs',
+        isImageGenerationGlass && glassStyles.dropdownOption,
+      )}
       style={{
         color: opt === value ? 'var(--color-white)' : 'var(--color-white-muted)',
         background:
@@ -98,6 +141,7 @@ export function NodeSelect({
       onMouseDown={(e) => e.stopPropagation()}
       onClick={() => { onChange(opt); setOpen(false); }}
     >
+      {optionIcon?.(opt)}
       {opt}
     </button>
   ));
@@ -109,7 +153,7 @@ export function NodeSelect({
         className={cn(
           'nodrag',
           isImageGenerationGlass
-            ? [glassStyles.glassSurface, glassStyles.dropdownSurface, glassStyles.selectTrigger]
+            ? [glassStyles.glassSurface, glassStyles.selectTrigger]
             : 'w-full h-full flex items-center gap-1.5 px-2 py-1.5 text-xs',
         )}
         style={isImageGenerationGlass ? undefined : {
@@ -137,7 +181,6 @@ export function NodeSelect({
           className={cn(
             'nodrag',
             isImageGenerationGlass && glassStyles.glassSurface,
-            isImageGenerationGlass && glassStyles.dropdownSurface,
             isImageGenerationGlass && glassStyles.dropdownMenu,
           )}
           style={{
@@ -145,6 +188,8 @@ export function NodeSelect({
             top: pos.top,
             left: pos.left,
             width: pos.width,
+            transform: `scale(${pos.scale})`,
+            transformOrigin: 'top left',
             background: isImageGenerationGlass ? undefined : 'var(--color-bg-surface)',
             borderRadius: 11,
             border: isImageGenerationGlass ? 'none' : '1px solid rgba(255,255,255,0.1)',

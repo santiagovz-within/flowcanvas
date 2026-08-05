@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useStoreApi } from '@xyflow/react';
 import { ByteDance, Fal, Flux, Gemini, Google, Kling, NanoBanana, OpenAI, TopazLabs } from '@lobehub/icons';
 import { Box, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -17,6 +18,24 @@ interface ModelSelectProps {
   value: string;
   onChange: (value: string) => void;
   appearance?: 'default' | 'imageGenerationGlass';
+}
+
+interface DropdownPosition {
+  top: number;
+  left: number;
+  width: number;
+  scale: number;
+}
+
+function measureDropdown(trigger: HTMLButtonElement): DropdownPosition {
+  const rect = trigger.getBoundingClientRect();
+  const scale = trigger.offsetWidth > 0 ? rect.width / trigger.offsetWidth : 1;
+  return {
+    top: rect.bottom + 3 * scale,
+    left: rect.left,
+    width: trigger.offsetWidth,
+    scale,
+  };
 }
 
 const MODEL_SUBTITLES: Record<string, string> = {
@@ -71,19 +90,38 @@ function ModelIcon({
 export function ModelSelect({ options, value, onChange, appearance = 'default' }: ModelSelectProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const [pos, setPos] = useState<DropdownPosition>({ top: 0, left: 0, width: 0, scale: 1 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const reactFlowStore = useStoreApi();
   const selected = options.find((o) => o.id === value) ?? options[0];
   const isImageGenerationGlass = appearance === 'imageGenerationGlass';
 
   function openDropdown(e: React.MouseEvent) {
     e.stopPropagation();
     if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 3, left: rect.left, width: rect.width });
+    setPos(measureDropdown(triggerRef.current));
     setOpen((o) => !o);
   }
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    let frameId: number | undefined;
+    const syncPosition = () => {
+      if (triggerRef.current) setPos(measureDropdown(triggerRef.current));
+    };
+    const scheduleSync = () => {
+      if (frameId !== undefined) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(syncPosition);
+    };
+    const unsubscribe = reactFlowStore.subscribe(scheduleSync);
+    window.addEventListener('resize', scheduleSync);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('resize', scheduleSync);
+      if (frameId !== undefined) cancelAnimationFrame(frameId);
+    };
+  }, [open, reactFlowStore]);
 
   useEffect(() => {
     if (!open) return;
@@ -142,7 +180,10 @@ export function ModelSelect({ options, value, onChange, appearance = 'default' }
   const dropdownOptions = options.map((opt) => (
     <button
       key={opt.id}
-      className="nodrag w-full flex items-center gap-1.5 px-2 py-1.5 text-xs"
+      className={cn(
+        'nodrag w-full flex items-center gap-1.5 px-2 py-1.5 text-xs',
+        isImageGenerationGlass && glassStyles.dropdownOption,
+      )}
       style={{
         color: opt.id === value ? 'var(--color-white)' : 'var(--color-white-muted)',
         background:
@@ -190,7 +231,7 @@ export function ModelSelect({ options, value, onChange, appearance = 'default' }
         className={cn(
           'nodrag',
           isImageGenerationGlass
-            ? [glassStyles.glassSurface, glassStyles.dropdownSurface, glassStyles.modelTrigger]
+            ? [glassStyles.glassSurface, glassStyles.modelTrigger]
             : 'w-full flex items-center gap-1.5 px-2 py-1.5 text-xs',
         )}
         style={isImageGenerationGlass ? undefined : {
@@ -218,7 +259,6 @@ export function ModelSelect({ options, value, onChange, appearance = 'default' }
           className={cn(
             'nodrag',
             isImageGenerationGlass && glassStyles.glassSurface,
-            isImageGenerationGlass && glassStyles.dropdownSurface,
             isImageGenerationGlass && glassStyles.dropdownMenu,
           )}
           style={{
@@ -226,6 +266,8 @@ export function ModelSelect({ options, value, onChange, appearance = 'default' }
             top: pos.top,
             left: pos.left,
             width: pos.width,
+            transform: `scale(${pos.scale})`,
+            transformOrigin: 'top left',
             background: isImageGenerationGlass ? undefined : 'var(--color-bg-surface)',
             borderRadius: 11,
             border: isImageGenerationGlass ? 'none' : '1px solid rgba(255,255,255,0.1)',

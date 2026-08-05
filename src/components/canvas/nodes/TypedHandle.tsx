@@ -154,7 +154,6 @@ export function TypedHandle({
               ? glassStyles.handleActive
               : [
                   glassStyles.glassSurface,
-                  glassStyles.controlSurface,
                   portType === 'text'
                     ? glassStyles.handleIdleText
                     : glassStyles.handleIdleImage,
