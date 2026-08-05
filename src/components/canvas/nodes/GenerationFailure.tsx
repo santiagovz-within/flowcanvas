@@ -16,7 +16,7 @@ export function GenerationFailureOverlay({
   return (
     <div
       className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 py-3 text-center nodrag nowheel"
-      style={{ background: 'rgba(248,113,113,0.12)', overflowY: 'auto' }}
+      style={{ background: 'var(--color-bg-surface)', overflowY: 'auto' }}
     >
       <div className="flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}>
         <AlertCircle size={11} className="shrink-0" />
