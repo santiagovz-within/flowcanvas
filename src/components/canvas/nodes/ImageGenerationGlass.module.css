@@ -60,13 +60,14 @@ textarea.glassSurface {
 }
 
 .nodeSurface {
-  --glass-blur: 96px;
   --glass-intensity: 1;
   --glass-fill: linear-gradient(
     135deg,
-    rgba(26, 26, 27, 0.7) 0%,
-    rgba(33, 33, 33, 0.7) 100%
+    #1a1a1b 0%,
+    #212121 100%
   );
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .controlSurface {
@@ -461,11 +462,15 @@ textarea.promptSurface {
 }
 
 .handleIdleImage {
-  --glass-fill: rgba(58, 25, 106, 0.7);
+  --glass-fill:
+    linear-gradient(rgba(58, 25, 106, 0.7), rgba(58, 25, 106, 0.7)),
+    #0f0f10;
 }
 
 .handleIdleText {
-  --glass-fill: rgba(29, 63, 106, 0.6);
+  --glass-fill:
+    linear-gradient(rgba(29, 63, 106, 0.6), rgba(29, 63, 106, 0.6)),
+    #0f0f10;
 }
 
 .handleActive {
