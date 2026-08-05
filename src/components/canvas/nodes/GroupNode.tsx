@@ -5,8 +5,6 @@ import { NodeResizer } from '@xyflow/react';
 import { useState } from 'react';
 import { Layers, Edit2, Check } from 'lucide-react';
 import type { GroupNodeData } from '@/types';
-import { cn } from '@/lib/utils/cn';
-import glassStyles from './ImageGenerationGlass.module.css';
 
 const GROUP_COLORS = [
   { label: 'Blue',   bg: 'rgba(59,158,255,0.06)',   border: 'rgba(59,158,255,0.35)',   header: 'rgba(59,158,255,0.12)'  },
@@ -53,7 +51,7 @@ export function GroupNode({ data, selected, id }: NodeProps & { data: GroupNodeD
       />
 
       <div
-        className={cn('w-full h-full rounded-xl overflow-hidden', glassStyles.glassSurface)}
+        className="w-full h-full rounded-xl overflow-hidden"
         style={{
           background: theme.bg,
           border: `1.5px solid ${selected ? theme.border : theme.border.replace('0.35', '0.2')}`,
@@ -63,7 +61,7 @@ export function GroupNode({ data, selected, id }: NodeProps & { data: GroupNodeD
       >
         {/* Header bar */}
         <div
-          className={cn('flex items-center gap-2 px-3 py-2 select-none', glassStyles.glassContent)}
+          className="flex items-center gap-2 px-3 py-2 select-none"
           style={{ background: theme.header }}
         >
           <Layers size={12} style={{ color: theme.border.replace('0.35', '0.8'), flexShrink: 0 }} />

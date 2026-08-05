@@ -1,10 +1,10 @@
 'use client';
 
 import { Position, type Node, type NodeProps } from '@xyflow/react';
-import { Grid, Download, Film, Image as ImageIcon } from 'lucide-react';
+import { Handle } from '@xyflow/react';
+import { Grid, Download, Film, Image } from 'lucide-react';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { NodeWrapper } from './NodeWrapper';
-import { TypedHandle } from './TypedHandle';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { getNodeMediaUrls, getSourceMediaType } from '../mediaOutputs';
@@ -67,13 +67,26 @@ export function GalleryOutputNode({ selected, id }: NodeProps & { data: GalleryO
       ) : undefined}
     >
       {/* Wide hit-area target handle — accepts any connection type */}
-      <TypedHandle
+      <Handle
         type="target"
         position={Position.Left}
         id="input"
-        portType="neutral"
-        icon={<Grid size={15} />}
-      />
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: '50%',
+          background: '#1f1505',
+          border: '1.5px solid #f59e0b',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#f59e0b',
+          left: -44,
+          transform: 'translateY(-50%)',
+        }}
+      >
+        <Grid size={14} style={{ pointerEvents: 'none', color: '#f59e0b', position: 'absolute' }} />
+      </Handle>
 
       {mediaItems.length === 0 ? (
         <div
@@ -130,7 +143,7 @@ export function GalleryOutputNode({ selected, id }: NodeProps & { data: GalleryO
                 >
                   {item.type === 'video'
                     ? <Film size={14} style={{ color: '#fff' }} />
-                    : <ImageIcon size={14} style={{ color: '#fff' }} />
+                    : <Image size={14} style={{ color: '#fff' }} />
                   }
                 </div>
               </div>
