@@ -278,16 +278,25 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
               glassStyles.glassSurface,
               glassStyles.button,
               glassStyles.downloadButton,
+              glassStyles.footerAction,
               'nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50',
             )}
             aria-label={downloadableImages.length > 1 ? `Download all ${downloadableImages.length} images` : 'Download image'}
           >
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
               {isDownloading && <RefreshCw size={12} className="animate-spin" />}
-              {isDownloading ? 'Downloading…' : 'Download'}
+              {isDownloading
+                ? 'Downloading…'
+                : downloadableImages.length > 1
+                  ? `Download all (${downloadableImages.length})`
+                  : 'Download'}
             </span>
           </button>
-          <SendToFigmaButton imageUrl={downloadableImages[0]} style={{ width: '100%', minWidth: 0 }} />
+          <SendToFigmaButton
+            imageUrl={downloadableImages[0]}
+            style={{ flex: '1 1 0', minWidth: 0 }}
+            buttonStyle={{ height: 32, padding: '9px 10px' }}
+          />
         </div>
       )}
     </div>

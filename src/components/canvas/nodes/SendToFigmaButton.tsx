@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Check, Copy } from 'lucide-react';
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -78,11 +79,17 @@ function FigmaIcon({ size = 12 }: { size?: number }) {
 interface SendToFigmaButtonProps {
   imageUrl: string | undefined;
   style?: React.CSSProperties;
+  buttonStyle?: React.CSSProperties;
 }
 
-export function SendToFigmaButton({ imageUrl, style }: SendToFigmaButtonProps) {
+export function SendToFigmaButton({ imageUrl, style, buttonStyle }: SendToFigmaButtonProps) {
   const [status, setStatus] = useState<FigmaStatus>('idle');
   const [error,  setError]  = useState<string | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupCopied, setSetupCopied] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
 
   if (!imageUrl) return null;
 
@@ -98,6 +105,7 @@ export function SendToFigmaButton({ imageUrl, style }: SendToFigmaButtonProps) {
       const { configured } = await tokenRes.json();
       if (!configured) {
         setStatus('no_token');
+        setSetupOpen(true);
         return;
       }
 
@@ -143,82 +151,267 @@ export function SendToFigmaButton({ imageUrl, style }: SendToFigmaButtonProps) {
     }
   }
 
+  async function handleGenerateKey() {
+    if (setupLoading) return;
+    setSetupLoading(true);
+    setSetupError(null);
+    setSetupCopied(false);
+    try {
+      const response = await fetch('/api/figma/token', { method: 'POST' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? 'Could not generate the Figma key');
+      }
+      const body = await response.json() as { token: string };
+      setSetupToken(body.token);
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : 'Could not generate the Figma key');
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
+  async function handleCopyKey() {
+    if (!setupToken) return;
+    try {
+      await navigator.clipboard.writeText(setupToken);
+      setSetupCopied(true);
+    } catch {
+      setSetupError('Could not copy the key. Select it manually and copy it before continuing.');
+    }
+  }
+
+  function handleSetupDone() {
+    if (!setupToken) return;
+    setSetupOpen(false);
+    setStatus('idle');
+    void handleSend();
+  }
+
   return (
-    <div style={style}>
-      <button
-        onClick={handleSend}
-        disabled={status === 'sending'}
-        className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50"
-        style={{
-          borderRadius: 11,
-          background: status === 'sent'
-            ? 'rgba(34,197,94,0.15)'
-            : 'rgba(255,255,255,0.06)',
-          color: status === 'sent'
-            ? 'var(--color-success)'
-            : status === 'error' || status === 'no_token'
-            ? '#f87171'
-            : 'var(--color-white-muted)',
-          border: status === 'sent'
-            ? '1px solid rgba(34,197,94,0.3)'
-            : status === 'error' || status === 'no_token'
-            ? '1px solid rgba(239,68,68,0.3)'
-            : '1px solid transparent',
-          cursor: 'pointer',
-        }}
-      >
-        {status === 'sending' ? (
-          <>
-            <div
-              className="animate-spin"
-              style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--color-white-muted)', flexShrink: 0 }}
-            />
-            Sending…
-          </>
-        ) : status === 'sent' ? (
-          <>
-            <Check size={12} style={{ color: 'var(--color-success)' }} />
-            Sent to Figma
-          </>
-        ) : (
-          <>
-            <FigmaIcon size={12} />
-            Send to Figma
-          </>
+    <>
+      <div style={style}>
+        <button
+          onClick={handleSend}
+          disabled={status === 'sending'}
+          className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50"
+          style={{
+            borderRadius: 11,
+            background: status === 'sent'
+              ? 'rgba(34,197,94,0.15)'
+              : 'rgba(255,255,255,0.06)',
+            color: status === 'sent'
+              ? 'var(--color-success)'
+              : status === 'error' || status === 'no_token'
+              ? '#f87171'
+              : 'var(--color-white-muted)',
+            border: status === 'sent'
+              ? '1px solid rgba(34,197,94,0.3)'
+              : status === 'error' || status === 'no_token'
+              ? '1px solid rgba(239,68,68,0.3)'
+              : '1px solid transparent',
+            cursor: 'pointer',
+            ...buttonStyle,
+          }}
+        >
+          {status === 'sending' ? (
+            <>
+              <div
+                className="animate-spin"
+                style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--color-white-muted)', flexShrink: 0 }}
+              />
+              Sending…
+            </>
+          ) : status === 'sent' ? (
+            <>
+              <Check size={12} style={{ color: 'var(--color-success)' }} />
+              Sent to Figma
+            </>
+          ) : (
+            <>
+              <FigmaIcon size={12} />
+              Send to Figma
+            </>
+          )}
+        </button>
+
+        {status === 'error' && error && (
+          <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: '#f87171' }}>
+            {error}
+          </p>
         )}
-      </button>
+      </div>
 
-      {status === 'no_token' && (
-        <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: '#f87171' }}>
-          Go to{' '}
-          <button
-            className="underline"
-            style={{ color: '#f87171', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10 }}
-            onClick={() => window.open('/dashboard/settings', '_blank')}
+      {setupOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="nodrag nowheel"
+          onMouseDown={(event) => event.stopPropagation()}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+            background: 'rgba(0,0,0,0.72)',
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="figma-setup-title"
+            style={{
+              width: 'min(440px, 100%)',
+              padding: 20,
+              borderRadius: 16,
+              background: '#1f1f20',
+              border: '1px solid rgba(255,255,255,0.14)',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+              color: 'var(--color-white)',
+              fontFamily: 'var(--font-manrope), Manrope, sans-serif',
+            }}
           >
-            Settings → Figma Integration
-          </button>{' '}
-          to generate your link token.
-        </p>
-      )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ display: 'flex', color: 'var(--color-white-muted)' }}>
+                <FigmaIcon size={16} />
+              </span>
+              <h2 id="figma-setup-title" style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
+                Configure WITHIN Glide for Figma
+              </h2>
+            </div>
 
-      {status === 'error' && error && (
-        <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: '#f87171' }}>
-          {error}
-        </p>
-      )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 12, lineHeight: 1.5, color: 'var(--color-white-muted)' }}>
+              <p style={{ margin: 0 }}>
+                1. In Figma go to <strong style={{ color: 'var(--color-white)' }}>Plugins &gt; Manage Plugins</strong> and install <strong style={{ color: 'var(--color-white)' }}>WITHIN Glide</strong>.
+              </p>
 
-      {status === 'sent' && (
-        <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: 'var(--color-white-muted)' }}>
-          Make sure the Figma plugin is open in your target file — the image will drop into whatever file is open.
-        </p>
-      )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ margin: 0 }}>
+                  2. Generate your private connection key.
+                </p>
+                {!setupToken ? (
+                  <button
+                    type="button"
+                    onClick={handleGenerateKey}
+                    disabled={setupLoading}
+                    className="nodrag transition-opacity disabled:opacity-50"
+                    style={{
+                      width: 'fit-content',
+                      padding: '8px 12px',
+                      border: 'none',
+                      borderRadius: 9,
+                      background: 'var(--color-accent)',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: setupLoading ? 'wait' : 'pointer',
+                    }}
+                  >
+                    {setupLoading ? 'Generating…' : 'Generate key'}
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'stretch', gap: 6 }}>
+                    <code
+                      style={{
+                        minWidth: 0,
+                        flex: 1,
+                        padding: '8px 10px',
+                        overflow: 'hidden',
+                        borderRadius: 9,
+                        background: '#111112',
+                        color: '#fff',
+                        fontSize: 11,
+                        lineHeight: '16px',
+                        textOverflow: 'ellipsis',
+                        userSelect: 'all',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {setupToken}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={handleCopyKey}
+                      className="nodrag"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '8px 10px',
+                        borderRadius: 9,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: setupCopied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.07)',
+                        color: setupCopied ? 'var(--color-success)' : 'var(--color-white)',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {setupCopied ? <Check size={12} /> : <Copy size={12} />}
+                      {setupCopied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+              </div>
 
-      {status === 'idle' && (
-        <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: 'var(--color-white-muted)', opacity: 0.6 }}>
-          Make sure the Figma plugin is open in your target file.
-        </p>
+              <p style={{ margin: 0 }}>
+                3. Copy and paste the key inside Figma in the <strong style={{ color: 'var(--color-white)' }}>WITHIN Glide</strong> plugin.
+              </p>
+              <p style={{ margin: 0 }}>
+                Keep the plugin open in your target Figma file whenever you send an image.
+              </p>
+
+              {setupError && (
+                <p role="alert" style={{ margin: 0, color: '#f87171' }}>{setupError}</p>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+              {!setupToken && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetupOpen(false);
+                    setStatus('idle');
+                    setSetupError(null);
+                  }}
+                  className="nodrag"
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 9,
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'transparent',
+                    color: 'var(--color-white-muted)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSetupDone}
+                disabled={!setupToken}
+                className="nodrag transition-opacity disabled:opacity-40"
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: 9,
+                  background: '#fff',
+                  color: '#111',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: setupToken ? 'pointer' : 'not-allowed',
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
