@@ -264,8 +264,10 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           'transition-opacity disabled:opacity-40 nodrag',
         )}
       >
-        <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
-        {isGenerating ? 'Generating…' : 'Generate'}
+        <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+          <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
+          {isGenerating ? 'Generating…' : 'Generate'}
+        </span>
       </button>
       {hasFailure && <RegenerateGate onChangesApplied={acknowledgeFailure} />}
       {downloadableImages.length > 0 && (
@@ -282,8 +284,10 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
             )}
             aria-label={downloadableImages.length > 1 ? `Download all ${downloadableImages.length} images` : 'Download image'}
           >
-            {isDownloading && <RefreshCw size={12} className="animate-spin" />}
-            {isDownloading ? 'Downloading…' : 'Download'}
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              {isDownloading && <RefreshCw size={12} className="animate-spin" />}
+              {isDownloading ? 'Downloading…' : 'Download'}
+            </span>
           </button>
           <SendToFigmaButton imageUrl={downloadableImages[0]} style={{ width: '100%', minWidth: 0 }} />
         </div>
@@ -343,13 +347,19 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       ))}
 
       {/* ── Inline prompt ────────────────────────────────────── */}
-      <div ref={promptSectionRef} className={glassStyles.promptSection}>
+      <div
+        ref={promptSectionRef}
+        className={cn(
+          glassStyles.glassSurface,
+          glassStyles.controlSurface,
+          glassStyles.promptSection,
+          glassStyles.promptSurface,
+        )}
+      >
         {data.promptConnected ? (
           <div
             className={cn(
-              glassStyles.glassSurface,
-              glassStyles.controlSurface,
-              glassStyles.promptSurface,
+              glassStyles.glassContent,
               glassStyles.connectedPrompt,
             )}
           >
@@ -359,9 +369,8 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           <textarea
             ref={promptTextareaRef}
             className={cn(
-              glassStyles.glassSurface,
-              glassStyles.controlSurface,
-              glassStyles.promptSurface,
+              glassStyles.glassContent,
+              glassStyles.promptContent,
               'outline-none nodrag',
             )}
             rows={2}
@@ -391,7 +400,9 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
             glassStyles.modePill,
           )}
         >
-          {isEditMode ? 'Image-to-image' : 'Text-to-image'}
+          <span className={glassStyles.glassContent}>
+            ● {isEditMode ? 'Image-to-image' : 'Text-to-image'}
+          </span>
         </span>
       )}
 
@@ -498,7 +509,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
                     isConnected ? glassStyles.connectorActive : glassStyles.connectorInactive,
                   )}
                 >
-                  Image {i + 1}
+                  <span className={glassStyles.glassContent}>Image {i + 1}</span>
                 </div>
               );
             })}

@@ -165,7 +165,9 @@ export function TypedHandle({
             color: isActive ? '#fff' : `var(--port-icon-inactive-${portType})`,
           }}
         >
-          <PortIcon type={portType} size={15} />
+          <span className={cn(glassStyles.glassContent, glassStyles.handleContent)}>
+            <PortIcon type={portType} size={15} />
+          </span>
         </span>
       ) : (
         <PortIcon type={portType} size={14} />

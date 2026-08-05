@@ -88,7 +88,10 @@ export function NodeWrapper({
           style={cardStyle}
         >
           <div
-            className={cn(isImageGenerationGlass && glassStyles.nodeContent)}
+            className={cn(
+              isImageGenerationGlass && glassStyles.glassContent,
+              isImageGenerationGlass && glassStyles.nodeContent,
+            )}
             style={isImageGenerationGlass ? undefined : { padding: 18 }}
           >
             {children}

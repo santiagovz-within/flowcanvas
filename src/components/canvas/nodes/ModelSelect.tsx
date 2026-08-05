@@ -97,6 +97,92 @@ export function ModelSelect({ options, value, onChange, appearance = 'default' }
     return () => document.removeEventListener('mousedown', onOutsideDown, true);
   }, [open]);
 
+  const triggerContent = (
+    <>
+      <span
+        className={cn(isImageGenerationGlass ? glassStyles.modelIcon : 'flex items-center justify-center')}
+        style={isImageGenerationGlass ? undefined : { width: 13, height: 13, flexShrink: 0, lineHeight: 0 }}
+      >
+        <ModelIcon
+          modelId={selected?.id ?? ''}
+          size={isImageGenerationGlass ? 15 : 13}
+          appearance={appearance}
+        />
+      </span>
+      <span className={cn(isImageGenerationGlass && glassStyles.modelText)} style={isImageGenerationGlass ? undefined : { flex: 1, minWidth: 0 }}>
+        <span
+          className={cn('block', isImageGenerationGlass && glassStyles.modelName)}
+          style={isImageGenerationGlass ? undefined : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+        >
+          {selected?.name ?? ''}
+        </span>
+        {selected && MODEL_SUBTITLES[selected.id] && (
+          <span
+            className={cn(!isImageGenerationGlass && 'flex items-center gap-1', isImageGenerationGlass && glassStyles.modelDescription)}
+            style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}
+          >
+            {!isImageGenerationGlass && <Box size={9} aria-hidden />}
+            {MODEL_SUBTITLES[selected.id]}
+          </span>
+        )}
+      </span>
+      <ChevronDown
+        size={isImageGenerationGlass ? 14 : 20}
+        className={cn(isImageGenerationGlass && glassStyles.chevron)}
+        style={{
+          opacity: isImageGenerationGlass ? 1 : 0.6,
+          flexShrink: 0,
+          transform: open ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.15s',
+        }}
+      />
+    </>
+  );
+
+  const dropdownOptions = options.map((opt) => (
+    <button
+      key={opt.id}
+      className="nodrag w-full flex items-center gap-1.5 px-2 py-1.5 text-xs"
+      style={{
+        color: opt.id === value ? 'var(--color-white)' : 'var(--color-white-muted)',
+        background:
+          hovered === opt.id
+            ? 'rgba(255,255,255,0.07)'
+            : opt.id === value
+            ? 'rgba(255,255,255,0.04)'
+            : 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        textAlign: 'left',
+        outline: 'none',
+        lineHeight: 1.4,
+      }}
+      onMouseEnter={() => setHovered(opt.id)}
+      onMouseLeave={() => setHovered(null)}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={() => { onChange(opt.id); setOpen(false); }}
+    >
+      <span
+        className="flex items-center justify-center"
+        style={{ width: isImageGenerationGlass ? 15 : 13, height: isImageGenerationGlass ? 15 : 13, flexShrink: 0, lineHeight: 0 }}
+      >
+        <ModelIcon modelId={opt.id} size={isImageGenerationGlass ? 15 : 13} appearance={appearance} />
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span className={cn('block', isImageGenerationGlass && glassStyles.modelName)}>{opt.name}</span>
+        {MODEL_SUBTITLES[opt.id] && (
+          <span
+            className={cn(!isImageGenerationGlass && 'flex items-center gap-1', isImageGenerationGlass && glassStyles.modelDescription)}
+            style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}
+          >
+            {!isImageGenerationGlass && <Box size={9} aria-hidden />}
+            {MODEL_SUBTITLES[opt.id]}
+          </span>
+        )}
+      </span>
+    </button>
+  ));
+
   return (
     <div className="nodrag" style={{ position: 'relative', width: isImageGenerationGlass ? '100%' : undefined }}>
       <button
@@ -119,43 +205,11 @@ export function ModelSelect({ options, value, onChange, appearance = 'default' }
         }}
         onClick={openDropdown}
       >
-        <span
-          className={cn(isImageGenerationGlass ? glassStyles.modelIcon : 'flex items-center justify-center')}
-          style={isImageGenerationGlass ? undefined : { width: 13, height: 13, flexShrink: 0, lineHeight: 0 }}
-        >
-          <ModelIcon
-            modelId={selected?.id ?? ''}
-            size={isImageGenerationGlass ? 15 : 13}
-            appearance={appearance}
-          />
-        </span>
-        <span className={cn(isImageGenerationGlass && glassStyles.modelText)} style={isImageGenerationGlass ? undefined : { flex: 1, minWidth: 0 }}>
-          <span
-            className={cn('block', isImageGenerationGlass && glassStyles.modelName)}
-            style={isImageGenerationGlass ? undefined : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-          >
-            {selected?.name ?? ''}
+        {isImageGenerationGlass ? (
+          <span className={cn(glassStyles.glassContent, glassStyles.modelTriggerContent)}>
+            {triggerContent}
           </span>
-          {selected && MODEL_SUBTITLES[selected.id] && (
-            <span
-              className={cn(!isImageGenerationGlass && 'flex items-center gap-1', isImageGenerationGlass && glassStyles.modelDescription)}
-              style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}
-            >
-              {!isImageGenerationGlass && <Box size={9} aria-hidden />}
-              {MODEL_SUBTITLES[selected.id]}
-            </span>
-          )}
-        </span>
-        <ChevronDown
-          size={isImageGenerationGlass ? 14 : 20}
-          className={cn(isImageGenerationGlass && glassStyles.chevron)}
-          style={{
-            opacity: isImageGenerationGlass ? 1 : 0.6,
-            flexShrink: 0,
-            transform: open ? 'rotate(180deg)' : 'none',
-            transition: 'transform 0.15s',
-          }}
-        />
+        ) : triggerContent}
       </button>
 
       {open && typeof document !== 'undefined' && createPortal(
@@ -179,49 +233,9 @@ export function ModelSelect({ options, value, onChange, appearance = 'default' }
             zIndex: 99999,
           }}
         >
-          {options.map((opt) => (
-            <button
-              key={opt.id}
-              className="nodrag w-full flex items-center gap-1.5 px-2 py-1.5 text-xs"
-              style={{
-                color: opt.id === value ? 'var(--color-white)' : 'var(--color-white-muted)',
-                background:
-                  hovered === opt.id
-                    ? 'rgba(255,255,255,0.07)'
-                    : opt.id === value
-                    ? 'rgba(255,255,255,0.04)'
-                    : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-                outline: 'none',
-                lineHeight: 1.4,
-              }}
-              onMouseEnter={() => setHovered(opt.id)}
-              onMouseLeave={() => setHovered(null)}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => { onChange(opt.id); setOpen(false); }}
-            >
-              <span
-                className="flex items-center justify-center"
-                style={{ width: isImageGenerationGlass ? 15 : 13, height: isImageGenerationGlass ? 15 : 13, flexShrink: 0, lineHeight: 0 }}
-              >
-                <ModelIcon modelId={opt.id} size={isImageGenerationGlass ? 15 : 13} appearance={appearance} />
-              </span>
-              <span style={{ minWidth: 0 }}>
-                <span className={cn('block', isImageGenerationGlass && glassStyles.modelName)}>{opt.name}</span>
-                {MODEL_SUBTITLES[opt.id] && (
-                  <span
-                    className={cn(!isImageGenerationGlass && 'flex items-center gap-1', isImageGenerationGlass && glassStyles.modelDescription)}
-                    style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)', fontSize: 9, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.25, opacity: 0.7 }}
-                  >
-                    {!isImageGenerationGlass && <Box size={9} aria-hidden />}
-                    {MODEL_SUBTITLES[opt.id]}
-                  </span>
-                )}
-              </span>
-            </button>
-          ))}
+          {isImageGenerationGlass ? (
+            <div className={glassStyles.glassContent}>{dropdownOptions}</div>
+          ) : dropdownOptions}
         </div>,
         document.body
       )}
