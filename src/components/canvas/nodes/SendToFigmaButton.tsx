@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Copy } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -80,9 +82,15 @@ interface SendToFigmaButtonProps {
   imageUrl: string | undefined;
   style?: React.CSSProperties;
   buttonStyle?: React.CSSProperties;
+  appearance?: 'default' | 'imageGenerationGlass';
 }
 
-export function SendToFigmaButton({ imageUrl, style, buttonStyle }: SendToFigmaButtonProps) {
+export function SendToFigmaButton({
+  imageUrl,
+  style,
+  buttonStyle,
+  appearance = 'default',
+}: SendToFigmaButtonProps) {
   const [status, setStatus] = useState<FigmaStatus>('idle');
   const [error,  setError]  = useState<string | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -90,6 +98,7 @@ export function SendToFigmaButton({ imageUrl, style, buttonStyle }: SendToFigmaB
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupCopied, setSetupCopied] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
+  const isImageGenerationGlass = appearance === 'imageGenerationGlass';
 
   if (!imageUrl) return null;
 
@@ -194,27 +203,60 @@ export function SendToFigmaButton({ imageUrl, style, buttonStyle }: SendToFigmaB
         <button
           onClick={handleSend}
           disabled={status === 'sending'}
-          className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50"
+          className={cn(
+            'w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50',
+            isImageGenerationGlass && glassStyles.glassSurface,
+            isImageGenerationGlass && glassStyles.footerControl,
+          )}
           style={{
             borderRadius: 11,
             background: status === 'sent'
               ? 'rgba(34,197,94,0.15)'
-              : 'rgba(255,255,255,0.06)',
+              : isImageGenerationGlass
+                ? undefined
+                : 'rgba(255,255,255,0.06)',
             color: status === 'sent'
               ? 'var(--color-success)'
               : status === 'error' || status === 'no_token'
               ? '#f87171'
-              : 'var(--color-white-muted)',
+              : isImageGenerationGlass
+                ? undefined
+                : 'var(--color-white-muted)',
             border: status === 'sent'
               ? '1px solid rgba(34,197,94,0.3)'
               : status === 'error' || status === 'no_token'
               ? '1px solid rgba(239,68,68,0.3)'
-              : '1px solid transparent',
+              : isImageGenerationGlass
+                ? 'none'
+                : '1px solid transparent',
             cursor: 'pointer',
+            fontWeight: isImageGenerationGlass ? 700 : undefined,
             ...buttonStyle,
           }}
         >
-          {status === 'sending' ? (
+          {isImageGenerationGlass ? (
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              {status === 'sending' ? (
+                <>
+                  <div
+                    className="animate-spin"
+                    style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--color-white-muted)', flexShrink: 0 }}
+                  />
+                  Sending…
+                </>
+              ) : status === 'sent' ? (
+                <>
+                  <Check size={12} style={{ color: 'var(--color-success)' }} />
+                  Sent to Figma
+                </>
+              ) : (
+                <>
+                  <FigmaIcon size={12} />
+                  Send to Figma
+                </>
+              )}
+            </span>
+          ) : status === 'sending' ? (
             <>
               <div
                 className="animate-spin"

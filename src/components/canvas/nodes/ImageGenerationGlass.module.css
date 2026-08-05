@@ -98,20 +98,20 @@
 }
 
 .nodeFooter {
-  margin-top: 5px;
+  margin-top: calc(var(--spacing) * 2);
 }
 
 .footerStack {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: calc(var(--spacing) * 2);
   width: 100%;
 }
 
 .footerSecondary {
   display: flex;
   align-items: stretch;
-  gap: 5px;
+  gap: calc(var(--spacing) * 2);
   width: 100%;
 }
 
@@ -124,7 +124,7 @@
 .button {
   display: flex;
   width: 100%;
-  height: 32px;
+  height: 40px;
   align-items: center;
   justify-content: center;
   padding: 9px 10px;
@@ -144,12 +144,21 @@
 }
 
 .downloadButton {
-  --glass-fill: rgba(41, 41, 42, 0.5);
+  --glass-fill: #2b2b2c;
 
   border: none;
-  color: #8d8d8d;
+  color: #fff;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 700;
+}
+
+.footerControl {
+  --glass-fill: #2b2b2c;
+
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .promptSection,
