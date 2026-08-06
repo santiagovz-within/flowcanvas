@@ -86,7 +86,9 @@ export async function POST(request: NextRequest) {
         ? '720p'
         : requestedSeedanceResolution;
       const requestedDuration = body.duration ?? 5;
-      const duration = isSeedanceMini && requestedDuration < 4 ? 5 : requestedDuration;
+      const duration = isSeedance
+        ? Math.min(15, requestedDuration < 4 ? 5 : requestedDuration)
+        : requestedDuration;
 
       if (isOmni && !startFrameUrl) {
         return NextResponse.json(

@@ -34,8 +34,9 @@ const LOCKED_RESOLUTIONS: Partial<Record<string, VideoResolution>> = {
 };
 
 const DURATION_OPTIONS = ['3s', '5s', '8s', '10s'];
+const SEEDANCE_DURATION_OPTIONS = ['4s', '5s', '8s', '10s', '15s'];
 const SEEDANCE_MINI_DURATION_OPTIONS = ['4s', '5s', '8s', '10s'];
-const DURATION_MAP: Record<string, number> = { '3s': 3, '5s': 5, '8s': 8, '10s': 10 };
+const DURATION_MAP: Record<string, number> = { '3s': 3, '4s': 4, '5s': 5, '8s': 8, '10s': 10, '15s': 15 };
 const SEEDANCE_MINI_DURATION_MAP: Record<string, number> = { '4s': 4, '5s': 5, '8s': 8, '10s': 10 };
 
 function gcd(a: number, b: number): number {
@@ -95,13 +96,15 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     : lockedResolution
       ? [lockedResolution]
       : ['720p'];
-  const durationOptions = isSeedanceMini
-    ? SEEDANCE_MINI_DURATION_OPTIONS
-    : DURATION_OPTIONS;
+  const durationOptions = isSeedanceFull
+    ? SEEDANCE_DURATION_OPTIONS
+    : isSeedanceMini
+      ? SEEDANCE_MINI_DURATION_OPTIONS
+      : DURATION_OPTIONS;
   const durationMap = isSeedanceMini
     ? SEEDANCE_MINI_DURATION_MAP
     : DURATION_MAP;
-  const selectedDuration = isSeedanceMini && (data.duration ?? 5) < 4
+  const selectedDuration = isSeedance && (data.duration ?? 5) < 4
     ? 5
     : data.duration ?? 5;
   const selectedResolution = lockedResolution ?? data.seedanceResolution ?? '720p';
@@ -166,7 +169,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   function handleModelChange(model: string) {
     const modelConfig = VIDEO_MODELS.find(option => option.id === model);
     const supportedAspectRatios = modelConfig?.supportedAspectRatios ?? [];
-    const nextIsSeedanceMini = model === 'seedance-2-mini';
+    const nextIsSeedance = model === 'seedance-2' || model === 'seedance-2-mini';
     const nextLockedResolution = LOCKED_RESOLUTIONS[model];
     updateData({
       model,
@@ -174,7 +177,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         ? { aspectRatio: supportedAspectRatios[0] }
         : {}),
       ...(nextLockedResolution ? { seedanceResolution: nextLockedResolution } : {}),
-      ...(nextIsSeedanceMini && (data.duration ?? 5) < 4
+      ...(nextIsSeedance && (data.duration ?? 5) < 4
         ? { duration: 5 }
         : {}),
     });
