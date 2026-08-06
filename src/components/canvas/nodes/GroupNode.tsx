@@ -5,6 +5,8 @@ import { NodeResizer } from '@xyflow/react';
 import { useState } from 'react';
 import { Layers, Edit2, Check } from 'lucide-react';
 import type { GroupNodeData } from '@/types';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 const GROUP_COLORS = [
   { label: 'Blue',   bg: 'rgba(59,158,255,0.06)',   border: 'rgba(59,158,255,0.35)',   header: 'rgba(59,158,255,0.12)'  },
@@ -51,9 +53,10 @@ export function GroupNode({ data, selected, id }: NodeProps & { data: GroupNodeD
       />
 
       <div
-        className="w-full h-full rounded-xl overflow-hidden"
+        className={cn(glassStyles.nodeShell, 'w-full h-full overflow-hidden')}
         style={{
           background: theme.bg,
+          borderRadius: 16,
           border: `1.5px solid ${selected ? theme.border : theme.border.replace('0.35', '0.2')}`,
           boxShadow: selected ? `0 0 0 1px ${theme.border}` : 'none',
           transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -76,14 +79,12 @@ export function GroupNode({ data, selected, id }: NodeProps & { data: GroupNodeD
                 if (e.key === 'Enter') saveLabel();
                 if (e.key === 'Escape') { setEditingLabel(false); setLabelValue(data.label ?? 'Group'); }
               }}
-              className="flex-1 bg-transparent outline-none text-xs font-semibold nodrag"
-              style={{ color: 'var(--color-white)', borderBottom: `1px solid ${theme.border}` }}
+              className={cn(glassStyles.titleText, 'flex-1 bg-transparent outline-none nodrag')}
+              // User-authored labels keep their own casing; node titles are uppercased.
+              style={{ color: '#fff', textTransform: 'none', borderBottom: `1px solid ${theme.border}` }}
             />
           ) : (
-            <span
-              className="flex-1 text-xs font-semibold truncate"
-              style={{ color: 'var(--color-white-muted)' }}
-            >
+            <span className={cn(glassStyles.titleText, 'flex-1 truncate')} style={{ textTransform: 'none' }}>
               {data.label || 'Group'}
             </span>
           )}

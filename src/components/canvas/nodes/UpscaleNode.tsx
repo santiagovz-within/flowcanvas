@@ -13,6 +13,8 @@ import { UPSCALE_MODELS, FAL_MODELS } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 type Dims = { w: number; h: number };
 
@@ -90,9 +92,9 @@ function ComparisonSlider({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl
       </div>
 
       {/* Resolution row */}
-      <div className="flex justify-between px-1 pt-1" style={{ fontSize: 9, color: 'var(--color-white-muted)' }}>
-        <span>{dimLabel(beforeDims)}</span>
-        <span>{dimLabel(afterDims)}</span>
+      <div className={glassStyles.rowBetween} style={{ padding: '4px 8px 6px' }}>
+        <span className={glassStyles.mediaCaption} style={{ padding: 0 }}>{dimLabel(beforeDims)}</span>
+        <span className={glassStyles.mediaCaption} style={{ padding: 0 }}>{dimLabel(afterDims)}</span>
       </div>
     </>
   );
@@ -179,31 +181,44 @@ export function UpscaleNode({ data, selected, id }: NodeProps & { data: UpscaleN
   }
 
   const footerButtons = (
-    <>
+    <div className={glassStyles.footerStack}>
       <button
         onClick={handleUpscale}
         disabled={isUpscaling || !inputImageUrl}
-        className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-        style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+        className={cn(
+          glassStyles.glassSurface,
+          glassStyles.button,
+          glassStyles.generateButton,
+          'transition-opacity disabled:opacity-40 nodrag',
+        )}
       >
-        <Play size={12} />
-        {isUpscaling ? 'Upscaling…' : 'Upscale'}
+        <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+          <Play size={12} />
+          {isUpscaling ? 'Upscaling…' : 'Upscale'}
+        </span>
       </button>
 
       {data.outputImageUrl && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+        <div className={glassStyles.footerSecondary}>
           <button
             onClick={() => downloadFromUrl(data.outputImageUrl!)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-            style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.downloadButton,
+              glassStyles.footerAction,
+              'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+            )}
           >
-            <Download size={12} />
-            Download
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Download size={12} />
+              Download
+            </span>
           </button>
-          <SendToFigmaButton imageUrl={data.outputImageUrl} style={{ flex: 1, minWidth: 0 }} />
+          <SendToFigmaButton imageUrl={data.outputImageUrl} style={{ flex: '1 1 0', minWidth: 0 }} />
         </div>
       )}
-    </>
+    </div>
   );
 
   return (
@@ -213,9 +228,10 @@ export function UpscaleNode({ data, selected, id }: NodeProps & { data: UpscaleN
       status={data.status}
       errorMessage={data.errorMessage}
       selected={selected}
-      minWidth={280}
+      minWidth={300}
       accentColor={PORT_COLORS.image}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={footerButtons}
     >
       <TypedHandle
@@ -226,40 +242,41 @@ export function UpscaleNode({ data, selected, id }: NodeProps & { data: UpscaleN
         connected={storeEdges.some(e => e.target === id && e.targetHandle === 'image')}
       />
 
-      <div className="mb-2">
-        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Model</label>
-        <ModelSelect options={UPSCALE_MODELS} value={data.model} onChange={handleModelChange} />
-      </div>
+      <ModelSelect options={UPSCALE_MODELS} value={data.model} onChange={handleModelChange} />
 
-      <div className="mb-3">
-        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Scale</label>
-        <div className="flex gap-1.5">
+      <div className={glassStyles.field}>
+        <span className={glassStyles.microLabel}>Scale</span>
+        <div className={glassStyles.chipRow}>
           {scaleOptions.map((scale) => (
             <button
               key={scale}
               onClick={() => updateData({ scaleFactor: scale })}
-              className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors nodrag"
-              style={{
-                background: validScaleFactor === scale ? '#fff' : 'var(--color-bg-surface)',
-                color: validScaleFactor === scale ? '#000' : 'var(--color-white-muted)',
-                border: 'var(--border-default)',
-              }}
+              className={cn(
+                glassStyles.glassSurface,
+                glassStyles.chip,
+                validScaleFactor === scale && glassStyles.chipActive,
+                'nodrag',
+              )}
             >
-              {scale}x
+              <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>{scale}x</span>
             </button>
           ))}
         </div>
       </div>
 
       {inputImageUrl && data.outputImageUrl ? (
-        <div style={{ margin: '0 -18px 12px -18px', overflow: 'hidden' }}>
+        <div className={glassStyles.mediaFrame}>
           <ComparisonSlider beforeUrl={inputImageUrl} afterUrl={data.outputImageUrl} />
         </div>
       ) : inputImageUrl ? (
-        <div style={{ margin: '0 -18px 12px -18px', overflow: 'hidden' }}>
+        <div className={glassStyles.mediaFrame}>
           <CanvasImage src={inputImageUrl} alt="Input" className="w-full block" style={{ height: 'auto' }} />
         </div>
-      ) : null}
+      ) : (
+        <div className={glassStyles.emptyState}>
+          Connect an image source
+        </div>
+      )}
 
       <TypedHandle
         type="source"

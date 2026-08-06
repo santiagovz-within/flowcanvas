@@ -87,6 +87,8 @@ interface TypedHandleProps extends Omit<HandleProps, 'style'> {
   badge?: number;
   // when true the handle renders in its "lit" state (full colour + white icon) even without hover
   connected?: boolean;
+  /** Overrides the port-type glyph — used by nodes that accept any media kind. */
+  icon?: React.ReactNode;
   appearance?: 'default' | 'imageGenerationGlass';
 }
 
@@ -96,7 +98,8 @@ export function TypedHandle({
   position,
   badge,
   connected,
-  appearance = 'default',
+  icon,
+  appearance = 'imageGenerationGlass',
   ...rest
 }: TypedHandleProps) {
   const [hovered, setHovered] = useState(false);
@@ -116,8 +119,14 @@ export function TypedHandle({
     if (nodeId && offset !== undefined) updateNodeInternals(nodeId);
   }, [nodeId, offset, position, updateNodeInternals]);
 
+  // Offsets measured from element boxes land on half-pixels when the row has an
+  // odd height, which blurs the whole handle. Snap px values to whole pixels.
+  const snappedOffset = offset?.endsWith('px')
+    ? `${Math.round(parseFloat(offset))}px`
+    : offset;
+
   const offsetStyle: React.CSSProperties = {
-    ...(offset ? (isLeft || isRight ? { top: offset } : { left: offset }) : {}),
+    ...(snappedOffset ? (isLeft || isRight ? { top: snappedOffset } : { left: snappedOffset }) : {}),
     // Override built-in translateX so only Y-centering remains; circle edge is ~8px outside node border.
     ...(isLeft  ? { left: -44, transform: 'translateY(-50%)' } : {}),
     ...(isRight ? { right: -44, transform: 'translateY(-50%)' } : {}),
@@ -156,7 +165,11 @@ export function TypedHandle({
                   glassStyles.glassSurface,
                   portType === 'text'
                     ? glassStyles.handleIdleText
-                    : glassStyles.handleIdleImage,
+                    : portType === 'video'
+                      ? glassStyles.handleIdleVideo
+                      : portType === 'neutral'
+                        ? glassStyles.handleIdleNeutral
+                        : glassStyles.handleIdleImage,
                 ],
           )}
           style={{
@@ -165,11 +178,11 @@ export function TypedHandle({
           }}
         >
           <span className={cn(glassStyles.glassContent, glassStyles.handleContent)}>
-            <PortIcon type={portType} size={15} />
+            {icon ?? <PortIcon type={portType} size={16} />}
           </span>
         </span>
       ) : (
-        <PortIcon type={portType} size={14} />
+        icon ?? <PortIcon type={portType} size={14} />
       )}
       {badge !== undefined && (
         <span

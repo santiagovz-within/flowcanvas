@@ -89,7 +89,7 @@ export function SendToFigmaButton({
   imageUrl,
   style,
   buttonStyle,
-  appearance = 'default',
+  appearance = 'imageGenerationGlass',
 }: SendToFigmaButtonProps) {
   const [status, setStatus] = useState<FigmaStatus>('idle');
   const [error,  setError]  = useState<string | null>(null);
@@ -204,9 +204,10 @@ export function SendToFigmaButton({
           onClick={handleSend}
           disabled={status === 'sending'}
           className={cn(
-            'w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50',
-            isImageGenerationGlass && glassStyles.glassSurface,
-            isImageGenerationGlass && glassStyles.footerControl,
+            'nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50',
+            isImageGenerationGlass
+              ? [glassStyles.glassSurface, glassStyles.button, glassStyles.footerControl]
+              : 'w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium',
           )}
           style={{
             borderRadius: 11,

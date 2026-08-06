@@ -1,14 +1,16 @@
 'use client';
 
 import { Position, type Node, type NodeProps } from '@xyflow/react';
-import { Handle } from '@xyflow/react';
-import { Grid, Download, Film, Image } from 'lucide-react';
+import { Grid, Download, Film, Image as ImageIcon } from 'lucide-react';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { NodeWrapper } from './NodeWrapper';
+import { TypedHandle } from './TypedHandle';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { getNodeMediaUrls, getSourceMediaType } from '../mediaOutputs';
 import type { GalleryOutputNodeData, NodeData } from '@/types';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 interface MediaItem {
   url: string;
@@ -52,69 +54,58 @@ export function GalleryOutputNode({ selected, id }: NodeProps & { data: GalleryO
       title="Output Gallery"
       icon={<Grid size={14} />}
       selected={selected}
-      minWidth={320}
+      minWidth={300}
       accentColor="#f59e0b"
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={mediaItems.length > 0 ? (
-        <button
-          onClick={() => downloadAll(mediaItems)}
-          className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity hover:opacity-80 nodrag"
-          style={{ background: '#f59e0b', color: '#000', borderRadius: 11 }}
-        >
-          <Download size={12} />
-          Download All
-        </button>
+        <div className={glassStyles.footerStack}>
+          <button
+            onClick={() => downloadAll(mediaItems)}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.generateButton,
+              'transition-opacity hover:opacity-80 nodrag',
+            )}
+            style={{ '--glass-fill': '#f59e0b' } as React.CSSProperties}
+          >
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Download size={12} />
+              Download All
+            </span>
+          </button>
+        </div>
       ) : undefined}
     >
       {/* Wide hit-area target handle — accepts any connection type */}
-      <Handle
+      <TypedHandle
         type="target"
         position={Position.Left}
         id="input"
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: '50%',
-          background: '#1f1505',
-          border: '1.5px solid #f59e0b',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#f59e0b',
-          left: -44,
-          transform: 'translateY(-50%)',
-        }}
-      >
-        <Grid size={14} style={{ pointerEvents: 'none', color: '#f59e0b', position: 'absolute' }} />
-      </Handle>
+        portType="neutral"
+        icon={<Grid size={16} />}
+        connected={mediaItems.length > 0}
+      />
 
       {mediaItems.length === 0 ? (
-        <div
-          className="flex flex-col items-center justify-center gap-2"
-          style={{
-            height: 120,
-            border: '1.5px dashed rgba(245,158,11,0.2)',
-            borderRadius: 8,
-          }}
-        >
+        <div className={glassStyles.emptyState} style={{ minHeight: 120 }}>
           <Grid size={24} style={{ color: '#f59e0b', opacity: 0.3 }} />
-          <p className="text-xs text-center" style={{ color: 'var(--color-white-muted)' }}>
-            Connect image or video nodes to populate the gallery
-          </p>
+          Connect image or video nodes to populate the gallery
         </div>
       ) : (
         <>
-          <p className="text-xs mb-2" style={{ color: 'var(--color-white-muted)' }}>
+          <span className={glassStyles.microLabel}>
             {mediaItems.length} asset{mediaItems.length !== 1 ? 's' : ''}
-          </p>
+          </span>
 
           {/* Grid */}
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}>
+          <div className={glassStyles.thumbGrid}>
             {mediaItems.map((item, i) => (
               <div
                 key={`${item.sourceNodeId}-${i}`}
-                className="relative rounded overflow-hidden cursor-pointer group"
-                style={{ aspectRatio: '1 / 1', background: 'var(--color-bg-surface)' }}
+                className="relative overflow-hidden cursor-pointer group"
+                style={{ aspectRatio: '1 / 1', borderRadius: 6, background: 'rgba(255,255,255,0.06)' }}
                 onClick={() => downloadFromUrl(item.url, `gallery-${i + 1}.${item.extension}`)}
                 title="Click to download"
               >
@@ -143,7 +134,7 @@ export function GalleryOutputNode({ selected, id }: NodeProps & { data: GalleryO
                 >
                   {item.type === 'video'
                     ? <Film size={14} style={{ color: '#fff' }} />
-                    : <Image size={14} style={{ color: '#fff' }} />
+                    : <ImageIcon size={14} style={{ color: '#fff' }} />
                   }
                 </div>
               </div>

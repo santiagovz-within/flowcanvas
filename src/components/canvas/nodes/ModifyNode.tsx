@@ -21,6 +21,8 @@ import type {
 import { getSourceMediaType } from '../mediaOutputs';
 import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { CanvasNodeFocusContext } from '@/components/canvas/mediaFocus';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -30,8 +32,7 @@ const MODIFY_MODELS = [
   { id: 'seedream-5',      name: 'Seedream v5 Edit' },
 ];
 
-const IMAGE_ROW_HEIGHT = 36;
-const CANVAS_MAX_W = 232;
+const CANVAS_MAX_W = 260;
 const CANVAS_MAX_H = 268;
 const HANDLE_ZONE  = 10;
 
@@ -233,7 +234,7 @@ function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLe
             onNaturalSize(s.w, s.h);
           }} />
         )}
-        <div className="rounded-lg mb-3 overflow-hidden" style={{ height: 160, background: 'var(--color-bg-surface)' }}>
+        <div className={glassStyles.mediaFrame} style={{ height: 160 }}>
           <CanvasImage src={imageUrl} alt="Source" fill style={{ objectFit: 'contain' }} />
         </div>
       </>
@@ -245,7 +246,7 @@ function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLe
 
   return (
     <div
-      className="nodrag mx-auto mb-3"
+      className="nodrag mx-auto"
       style={{ position: 'relative', width: dispW, height: dispH, flexShrink: 0, userSelect: 'none' }}
     >
       {hasAny && (
@@ -405,7 +406,7 @@ function VideoOutpaintCanvas({ videoUrl, tgtAspect, onDuration }: {
 
   return (
     <div
-      className="nodrag mx-auto mb-3"
+      className="nodrag mx-auto"
       style={{ position: 'relative', width: tgtDispW, height: tgtDispH, userSelect: 'none', flexShrink: 0 }}
     >
       {hasExpansion && (
@@ -636,7 +637,8 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
       setPromptHandleTop(el.offsetTop + el.offsetHeight / 2);
     }
     if (imageSlotRef.current) {
-      setImageHandleTop(imageSlotRef.current.offsetTop + IMAGE_ROW_HEIGHT / 2);
+      const el = imageSlotRef.current;
+      setImageHandleTop(el.offsetTop + el.offsetHeight / 2);
     }
   });
 
@@ -922,26 +924,38 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
   // ── Footer ────────────────────────────────────────────────────────────────────
 
   const footer = (
-    <div className="flex flex-col gap-1.5">
+    <div className={glassStyles.footerStack}>
       {inputMediaType === 'video' ? (
         <>
           <button
             onClick={handleVideoOutpaintGenerate}
             disabled={isGenerating || !inputVideoUrl || !hasOutpaintPrompt}
-            className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-            style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.generateButton,
+              'transition-opacity disabled:opacity-40 nodrag',
+            )}
           >
-            <Play size={12} />
-            {isGenerating ? 'Outpainting…' : 'Outpaint Video'}
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Play size={12} />
+              {isGenerating ? 'Outpainting…' : 'Outpaint Video'}
+            </span>
           </button>
           {hasVideoOutput && (
             <button
               onClick={() => downloadFromUrl(data.outputVideoUrl!)}
-              className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-              style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
+              className={cn(
+                glassStyles.glassSurface,
+                glassStyles.button,
+                glassStyles.downloadButton,
+                'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+              )}
             >
-              <Download size={12} />
-              Download
+              <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+                <Download size={12} />
+                Download
+              </span>
             </button>
           )}
         </>
@@ -950,36 +964,55 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           <button
             onClick={mode === 'prompt' ? handlePromptGenerate : handleExpandGenerate}
             disabled={isGenerating || !hasImage || (mode === 'expand' && !hasExpansion)}
-            className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-            style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.generateButton,
+              'transition-opacity disabled:opacity-40 nodrag',
+            )}
           >
-            <Play size={12} />
-            {mode === 'prompt'
-              ? (isGenerating ? 'Modifying…' : 'Modify')
-              : (isGenerating ? 'Expanding…' : 'Expand')
-            }
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Play size={12} />
+              {mode === 'prompt'
+                ? (isGenerating ? 'Modifying…' : 'Modify')
+                : (isGenerating ? 'Expanding…' : 'Expand')
+              }
+            </span>
           </button>
           {hasPendingEditRequest && !isGenerating && (
             <button
               onClick={resumeEditPolling}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium nodrag"
-              style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--color-error)', borderRadius: 11, border: '1px solid var(--color-error)' }}
+              className={cn(
+                glassStyles.glassSurface,
+                glassStyles.button,
+                glassStyles.buttonDanger,
+                'nodrag transition-opacity hover:opacity-80',
+              )}
             >
-              <AlertTriangle size={12} />
-              Check status on FAL
+              <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+                <AlertTriangle size={12} />
+                Check status on FAL
+              </span>
             </button>
           )}
           {data.outputImageUrl && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <div className={glassStyles.footerSecondary}>
               <button
                 onClick={() => downloadFromUrl(data.outputImageUrl!)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-                style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
+                className={cn(
+                  glassStyles.glassSurface,
+                  glassStyles.button,
+                  glassStyles.downloadButton,
+                  glassStyles.footerAction,
+                  'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+                )}
               >
-                <Download size={12} />
-                Download
+                <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+                  <Download size={12} />
+                  Download
+                </span>
               </button>
-              <SendToFigmaButton imageUrl={data.outputImageUrl} style={{ flex: 1, minWidth: 0 }} />
+              <SendToFigmaButton imageUrl={data.outputImageUrl} style={{ flex: '1 1 0', minWidth: 0 }} />
             </div>
           )}
         </>
@@ -994,9 +1027,10 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
       status={data.status}
       errorMessage={data.errorMessage}
       selected={selected}
-      minWidth={280}
+      minWidth={300}
       accentColor={accentColor}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={footer}
     >
       {/* Handles */}
@@ -1021,11 +1055,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
 
       {/* ── No input ── */}
       {inputMediaType === null && (
-        <div
-          ref={imageSlotRef}
-          className="flex items-center justify-center rounded-lg"
-          style={{ height: 52, background: 'var(--color-bg-surface)', border: '1px dashed rgba(255,255,255,0.12)', color: 'var(--color-white-muted)', fontSize: 12 }}
-        >
+        <div ref={imageSlotRef} className={glassStyles.emptyState}>
           Connect an image or video
         </div>
       )}
@@ -1034,65 +1064,52 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
       {inputMediaType === 'image' && (
         <>
           {/* Mode toggle */}
-          <div
-            className="flex gap-0.5 mb-3 p-0.5 nodrag"
-            style={{ background: 'var(--color-bg-surface)', borderRadius: 11 }}
-          >
-            {(['prompt', 'expand'] as const).map((m) => (
-              <button
-                key={m}
-                className="nodrag flex-1 py-1 text-xs font-medium capitalize transition-colors"
-                style={{
-                  borderRadius: 9,
-                  background: mode === m ? '#fff' : 'transparent',
-                  color:       mode === m ? '#000' : 'var(--color-white-muted)',
-                  border: 'none', cursor: 'pointer',
-                }}
-                onClick={() => updateData({ mode: m })}
-              >
-                {m === 'prompt' ? 'Prompt' : 'Expand'}
-              </button>
-            ))}
+          <div className={cn(glassStyles.glassSurface, glassStyles.segmented, 'nodrag')}>
+            <span className={cn(glassStyles.glassContent, 'flex w-full gap-[3px]')}>
+              {(['prompt', 'expand'] as const).map((m) => (
+                <button
+                  key={m}
+                  className={cn(glassStyles.segment, mode === m && glassStyles.segmentActive, 'nodrag')}
+                  onClick={() => updateData({ mode: m })}
+                >
+                  {m === 'prompt' ? 'Prompt' : 'Expand'}
+                </button>
+              ))}
+            </span>
           </div>
 
           {/* ── Prompt mode ── */}
           {mode === 'prompt' && (
             <>
-              <div ref={promptSectionRef} className="mb-3">
+              <div
+                ref={promptSectionRef}
+                className={cn(glassStyles.glassSurface, glassStyles.promptSection, glassStyles.promptSurface)}
+              >
                 {data.promptConnected ? (
-                  <div
-                    className="flex items-center gap-2 px-3"
-                    style={{ height: 36, background: '#3999F8', color: '#fff', borderRadius: 8 }}
-                  >
-                    <span style={{ fontSize: 10 }}>T</span>
-                    <span className="text-xs font-medium">Prompt connected</span>
+                  <div className={cn(glassStyles.glassContent, glassStyles.connectedPrompt)}>
+                    Prompt connected
                   </div>
                 ) : (
                   <textarea
                     ref={promptTextareaRef}
-                    className="w-full text-xs outline-none nodrag"
+                    className={cn(glassStyles.glassContent, glassStyles.promptContent, 'outline-none nodrag')}
                     rows={2}
                     placeholder="Describe the changes…"
                     value={data.prompt ?? ''}
                     onChange={(e) => { autoResize(e.target); updateData({ prompt: e.target.value }); }}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-white)', resize: 'none', overflow: 'hidden', minHeight: 40 }}
                   />
                 )}
               </div>
 
               <div
                 ref={imageSlotRef}
-                className="flex items-center text-xs"
-                style={{
-                  height: IMAGE_ROW_HEIGHT, paddingLeft: 12, paddingRight: 12,
-                  borderRadius: '4px 16px 16px 4px',
-                  background: hasImage ? '#a855f7' : 'var(--color-bg-surface)',
-                  color: hasImage ? '#fff' : 'var(--color-white-muted)',
-                  transition: 'background 0.15s, color 0.15s',
-                  marginBottom: availableImages.length > 1 ? 8 : 12,
-                }}
+                className={cn(
+                  glassStyles.glassSurface,
+                  glassStyles.connector,
+                  hasImage ? glassStyles.connectorActive : glassStyles.connectorInactive,
+                )}
               >
-                Source Image
+                <span className={glassStyles.glassContent}>Source Image</span>
               </div>
 
               {availableImages.length > 1 && (
@@ -1101,28 +1118,24 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                   selectedIndex={safeIndex}
                   aspect={thumbnailAspect}
                   onSelect={setSelectedIndex}
-                  className="mb-3"
                 />
               )}
 
-              <div className="mb-3">
-                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Model</label>
-                <ModelSelect options={MODIFY_MODELS} value={data.model} onChange={(v) => updateData({ model: v })} />
-              </div>
+              <ModelSelect options={MODIFY_MODELS} value={data.model} onChange={(v) => updateData({ model: v })} />
 
-              <div className="flex gap-2 mb-3">
-                <div className="flex-1">
-                  <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Aspect</label>
+              <div className={glassStyles.grid2}>
+                <div className={glassStyles.field}>
+                  <span className={glassStyles.microLabel}>Aspect</span>
                   <NodeSelect options={ASPECT_RATIOS.map(r => r.value)} value={data.aspectRatio ?? '1:1'} onChange={(v) => updateData({ aspectRatio: v })} />
                 </div>
-                <div className="flex-1">
-                  <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Resolution</label>
+                <div className={glassStyles.field}>
+                  <span className={glassStyles.microLabel}>Resolution</span>
                   <NodeSelect options={RESOLUTIONS.map(r => r.value)} value={data.resolution ?? '1K'} onChange={(v) => updateData({ resolution: v })} />
                 </div>
               </div>
 
               {data.outputImageUrl && (
-                <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div className={glassStyles.mediaFrame}>
                   <CanvasImage src={data.outputImageUrl} alt="Modified" className="w-full block nodrag" style={{ height: 'auto' }} />
                 </div>
               )}
@@ -1134,16 +1147,13 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
             <>
               <div
                 ref={imageSlotRef}
-                className="flex items-center text-xs mb-3"
-                style={{
-                  height: IMAGE_ROW_HEIGHT, paddingLeft: 12, paddingRight: 12,
-                  borderRadius: '4px 16px 16px 4px',
-                  background: hasImage ? '#a855f7' : 'var(--color-bg-surface)',
-                  color: hasImage ? '#fff' : 'var(--color-white-muted)',
-                  transition: 'background 0.15s, color 0.15s',
-                }}
+                className={cn(
+                  glassStyles.glassSurface,
+                  glassStyles.connector,
+                  hasImage ? glassStyles.connectorActive : glassStyles.connectorInactive,
+                )}
               >
-                Source Image
+                <span className={glassStyles.glassContent}>Source Image</span>
               </div>
 
               {availableImages.length > 1 && (
@@ -1152,34 +1162,30 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                   selectedIndex={safeIndex}
                   aspect={thumbnailAspect}
                   onSelect={setSelectedIndex}
-                  className="mb-3"
                 />
               )}
 
-              <div className="flex items-start gap-3 mb-3">
-                <div className="flex-1">
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-white-muted)' }}>Preset</label>
-                  <div className="flex flex-wrap gap-1">
+              <div className={glassStyles.fieldRow} style={{ alignItems: 'flex-start' }}>
+                <div className={glassStyles.field}>
+                  <span className={glassStyles.microLabel}>Preset</span>
+                  <div className={glassStyles.chipRow}>
                     {ASPECT_PRESETS.map(({ label, ratio }) => (
                       <button
                         key={label}
-                        className="nodrag text-xs px-2 py-0.5 rounded-md transition-colors"
+                        className={cn(glassStyles.glassSurface, glassStyles.chip, glassStyles.chipAuto, 'nodrag')}
                         style={{
-                          background: 'var(--color-bg-surface)',
-                          color: 'var(--color-white-muted)',
-                          border: '1px solid rgba(255,255,255,0.1)',
                           cursor: naturalSize ? 'pointer' : 'default',
                           opacity: naturalSize ? 1 : 0.4,
                         }}
                         onClick={() => handleAspectPreset(ratio)}
                       >
-                        {label}
+                        <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>{label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-white-muted)' }}>Anchor</label>
+                <div className={glassStyles.field} style={{ flex: '0 0 auto' }}>
+                  <span className={glassStyles.microLabel}>Anchor</span>
                   <AnchorPicker value={expandAnchor} onChange={(v) => updateData({ expandAnchor: v })} />
                 </div>
               </div>
@@ -1195,22 +1201,19 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                   onNaturalSize={(w, h) => setNaturalSize({ w, h })}
                 />
               ) : (
-                <div
-                  className="flex items-center justify-center rounded-lg mb-3 text-xs"
-                  style={{ height: 80, background: 'var(--color-bg-surface)', border: '1px dashed rgba(255,255,255,0.12)', color: 'var(--color-white-muted)' }}
-                >
+                <div className={glassStyles.emptyState}>
                   Connect a source image
                 </div>
               )}
 
               {outputDimsLabel && (
-                <p className="text-center mb-2" style={{ fontSize: 10, color: 'var(--color-white-muted)' }}>
+                <p className={glassStyles.helperText}>
                   Output: {outputDimsLabel}
                 </p>
               )}
 
               {data.outputImageUrl && (
-                <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div className={glassStyles.mediaFrame}>
                   <CanvasImage src={data.outputImageUrl} alt="Expanded" className="w-full block nodrag" style={{ height: 'auto' }} />
                 </div>
               )}
@@ -1225,16 +1228,13 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           {/* Source video slot */}
           <div
             ref={imageSlotRef}
-            className="flex items-center text-xs mb-3"
-            style={{
-              height: IMAGE_ROW_HEIGHT, paddingLeft: 12, paddingRight: 12,
-              borderRadius: '4px 16px 16px 4px',
-              background: inputVideoUrl ? PORT_COLORS.video : 'var(--color-bg-surface)',
-              color: inputVideoUrl ? '#fff' : 'var(--color-white-muted)',
-              transition: 'background 0.15s, color 0.15s',
-            }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.connector,
+              inputVideoUrl ? glassStyles.connectorActiveVideo : glassStyles.connectorInactive,
+            )}
           >
-            Source Video
+            <span className={glassStyles.glassContent}>Source Video</span>
           </div>
 
           {/* Outpaint canvas preview */}
@@ -1245,38 +1245,39 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           />
 
           {/* Target aspect ratio */}
-          <div className="mb-3">
-            <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--color-white-muted)' }}>Target Aspect Ratio</label>
-            <div className="flex flex-wrap gap-1">
+          <div className={glassStyles.field}>
+            <span className={glassStyles.microLabel}>Target Aspect Ratio</span>
+            <div className={glassStyles.chipRow}>
               {OUTPAINT_ASPECT_RATIOS.map((ratio) => (
                 <button
                   key={ratio}
-                  className="nodrag text-xs px-2 py-0.5 rounded-md transition-colors"
-                  style={{
-                    background: outpaintAspect === ratio ? '#fff' : 'var(--color-bg-surface)',
-                    color:      outpaintAspect === ratio ? '#000' : 'var(--color-white-muted)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                  }}
+                  className={cn(
+                    glassStyles.glassSurface,
+                    glassStyles.chip,
+                    glassStyles.chipAuto,
+                    outpaintAspect === ratio && glassStyles.chipActive,
+                    'nodrag',
+                  )}
                   onClick={() => updateData({ outpaintAspectRatio: ratio })}
                 >
-                  {ratio}
+                  <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>{ratio}</span>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Resolution + FPS */}
-          <div className="flex gap-2 mb-3">
-            <div className="flex-1">
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Resolution</label>
+          <div className={glassStyles.grid2}>
+            <div className={glassStyles.field}>
+              <span className={glassStyles.microLabel}>Resolution</span>
               <NodeSelect
                 options={['720p', '1080p']}
                 value={outpaintResolution}
                 onChange={(v) => updateData({ outpaintResolution: v as '720p' | '1080p' })}
               />
             </div>
-            <div className="flex-1">
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>FPS</label>
+            <div className={glassStyles.field}>
+              <span className={glassStyles.microLabel}>FPS</span>
               <NodeSelect
                 options={['24', '30', '60']}
                 value={String(outpaintFps)}
@@ -1286,35 +1287,38 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
           </div>
 
           {/* Prompt */}
-          <div className="mb-3">
-            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Prompt</label>
-            <textarea
-              ref={outpaintPromptRef}
-              className="w-full text-xs outline-none nodrag"
-              rows={2}
-              placeholder="Describe the outpainted surroundings…"
-              value={data.outpaintPrompt ?? VIDEO_OUTPAINT_DEFAULT_PROMPT}
-              onChange={(e) => { autoResize(e.target); updateData({ outpaintPrompt: e.target.value }); }}
-              style={{ background: 'transparent', border: 'none', color: 'var(--color-white)', resize: 'none', overflow: 'hidden', minHeight: 40 }}
-            />
+          <div className={glassStyles.field}>
+            <span className={glassStyles.microLabel}>Prompt</span>
+            <div className={cn(glassStyles.glassSurface, glassStyles.promptSection, glassStyles.promptSurface)}>
+              <textarea
+                ref={outpaintPromptRef}
+                className={cn(glassStyles.glassContent, glassStyles.promptContent, 'outline-none nodrag')}
+                rows={2}
+                placeholder="Describe the outpainted surroundings…"
+                value={data.outpaintPrompt ?? VIDEO_OUTPAINT_DEFAULT_PROMPT}
+                onChange={(e) => { autoResize(e.target); updateData({ outpaintPrompt: e.target.value }); }}
+              />
+            </div>
           </div>
 
           {/* Negative prompt */}
-          <div className="mb-3">
-            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Negative Prompt</label>
-            <textarea
-              ref={outpaintNegPromptRef}
-              className="w-full text-xs outline-none nodrag"
-              rows={3}
-              value={data.outpaintNegativePrompt ?? VIDEO_OUTPAINT_DEFAULT_NEGATIVE_PROMPT}
-              onChange={(e) => { autoResize(e.target); updateData({ outpaintNegativePrompt: e.target.value }); }}
-              style={{ background: 'transparent', border: 'none', color: 'var(--color-white-muted)', resize: 'none', overflow: 'hidden', minHeight: 40 }}
-            />
+          <div className={glassStyles.field}>
+            <span className={glassStyles.microLabel}>Negative Prompt</span>
+            <div className={cn(glassStyles.glassSurface, glassStyles.promptSection, glassStyles.promptSurface)}>
+              <textarea
+                ref={outpaintNegPromptRef}
+                className={cn(glassStyles.glassContent, glassStyles.promptContent, 'outline-none nodrag')}
+                rows={3}
+                value={data.outpaintNegativePrompt ?? VIDEO_OUTPAINT_DEFAULT_NEGATIVE_PROMPT}
+                onChange={(e) => { autoResize(e.target); updateData({ outpaintNegativePrompt: e.target.value }); }}
+                style={{ color: 'rgba(255,255,255,0.6)' }}
+              />
+            </div>
           </div>
 
           {/* Output video */}
           {hasVideoOutput && (
-            <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div className={glassStyles.mediaFrame}>
               <CanvasVideo src={data.outputVideoUrl!} controls className="w-full block nodrag" style={{ height: 'auto' }} />
             </div>
           )}

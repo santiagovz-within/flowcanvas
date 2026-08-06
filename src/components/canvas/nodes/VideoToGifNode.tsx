@@ -23,6 +23,8 @@ import { playSuccessSound } from '@/lib/utils/sound';
 import type { FFmpeg } from '@ffmpeg/ffmpeg';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 // ── Module-level FFmpeg singleton (lazy, shared across all instances) ─────────
 
@@ -79,17 +81,17 @@ function SliderRow({
   disabled?: boolean;
 }) {
   return (
-    <div className="mb-2">
-      <div className="flex justify-between mb-0.5">
-        <span className="text-xs font-medium" style={{ color: 'var(--color-white-muted)' }}>{label}</span>
-        <span className="text-xs" style={{ color: 'var(--color-white-muted)' }}>{display ?? value}</span>
+    <div className={glassStyles.sliderRow}>
+      <div className={glassStyles.sliderHead}>
+        <span className={glassStyles.microLabel}>{label}</span>
+        <span className={glassStyles.sliderValue}>{display ?? value}</span>
       </div>
       <input
         type="range"
         min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         disabled={disabled}
-        className="w-full nodrag"
+        className={cn(glassStyles.sliderInput, 'nodrag')}
         style={{ accentColor: PORT_COLORS.image }}
       />
     </div>
@@ -98,14 +100,14 @@ function SliderRow({
 
 function ProgressBar({ percent, label }: { percent: number; label: string }) {
   return (
-    <div className="mt-2 mb-3">
-      <div className="flex justify-between mb-1">
-        <span className="text-xs" style={{ color: 'var(--color-white-muted)', fontSize: 10 }}>{label}</span>
-        <span className="text-xs" style={{ color: 'var(--color-white-muted)', fontSize: 10 }}>{percent}%</span>
+    <div className={glassStyles.sliderRow}>
+      <div className={glassStyles.sliderHead}>
+        <span className={glassStyles.microLabel}>{label}</span>
+        <span className={glassStyles.sliderValue}>{percent}%</span>
       </div>
-      <div className="w-full rounded-full overflow-hidden" style={{ height: 4, background: 'rgba(255,255,255,0.1)' }}>
+      <div className={glassStyles.progressTrack}>
         <div
-          className="h-full rounded-full transition-all duration-200 ease-out"
+          className={glassStyles.progressFill}
           style={{ width: `${Math.max(2, percent)}%`, background: PORT_COLORS.image }}
         />
       </div>
@@ -364,83 +366,93 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
   // ── Footer ────────────────────────────────────────────────────────────────
 
   const footer = (
-    <>
+    <div className={glassStyles.footerStack}>
       {/* Convert button */}
       <button
         onClick={handleConvert}
         disabled={!data.videoUrl || isConverting}
-        className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-        style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+        className={cn(
+          glassStyles.glassSurface,
+          glassStyles.button,
+          glassStyles.generateButton,
+          'transition-opacity disabled:opacity-40 nodrag',
+        )}
       >
-        <Play size={12} />
-        {isConverting ? progressLabel || 'Converting…' : 'Convert to GIF'}
+        <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+          <Play size={12} />
+          {isConverting ? progressLabel || 'Converting…' : 'Convert to GIF'}
+        </span>
       </button>
 
-      {/* Download button */}
-      {gifUrl && !isConverting && (
-        <button
-          onClick={() => downloadFromUrl(gifUrl, `animation-${Date.now()}.gif`)}
-          className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium mt-1.5 nodrag transition-opacity hover:opacity-80 active:opacity-60"
-          style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
-        >
-          <Download size={12} />
-          Download GIF
-        </button>
-      )}
-
-      {/* Send to Figma button with status */}
+      {/* Download + Send to Figma */}
       {gifUrl && !isConverting && (
         <>
-          <button
-            onClick={handleSendToFigma}
-            disabled={figmaStatus === 'sending'}
-            className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium mt-1.5 nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50"
-            style={{
-              borderRadius: 11,
-              background: figmaStatus === 'sent'
-                ? 'rgba(34,197,94,0.15)'
-                : 'rgba(255,255,255,0.06)',
-              color: figmaStatus === 'sent'
-                ? 'var(--color-success)'
-                : figmaStatus === 'error' || figmaStatus === 'no_token'
-                ? '#f87171'
-                : 'var(--color-white-muted)',
-              border: figmaStatus === 'sent'
-                ? '1px solid rgba(34,197,94,0.3)'
-                : figmaStatus === 'error' || figmaStatus === 'no_token'
-                ? '1px solid rgba(239,68,68,0.3)'
-                : '1px solid transparent',
-              cursor: 'pointer',
-            }}
-          >
-            {figmaStatus === 'sending' ? (
-              <>
-                <div
-                  className="animate-spin"
-                  style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--color-white-muted)', flexShrink: 0 }}
-                />
-                Sending…
-              </>
-            ) : figmaStatus === 'sent' ? (
-              <>
-                <Check size={12} style={{ color: 'var(--color-success)' }} />
-                Sent to Figma
-              </>
-            ) : (
-              <>
-                <FigmaIcon size={12} />
-                Send to Figma
-              </>
-            )}
-          </button>
+          <div className={glassStyles.footerSecondary}>
+            <button
+              onClick={() => downloadFromUrl(gifUrl, `animation-${Date.now()}.gif`)}
+              className={cn(
+                glassStyles.glassSurface,
+                glassStyles.button,
+                glassStyles.downloadButton,
+                glassStyles.footerAction,
+                'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+              )}
+            >
+              <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+                <Download size={12} />
+                Download GIF
+              </span>
+            </button>
+
+            <button
+              onClick={handleSendToFigma}
+              disabled={figmaStatus === 'sending'}
+              className={cn(
+                glassStyles.glassSurface,
+                glassStyles.button,
+                glassStyles.footerControl,
+                glassStyles.footerAction,
+                'nodrag transition-opacity hover:opacity-80 active:opacity-60 disabled:opacity-50',
+              )}
+              style={{
+                color: figmaStatus === 'sent'
+                  ? 'var(--color-success)'
+                  : figmaStatus === 'error' || figmaStatus === 'no_token'
+                  ? '#f87171'
+                  : undefined,
+              }}
+            >
+              <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+                {figmaStatus === 'sending' ? (
+                  <>
+                    <div
+                      className="animate-spin"
+                      style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.2)', borderTopColor: 'rgba(255,255,255,0.6)', flexShrink: 0 }}
+                    />
+                    Sending…
+                  </>
+                ) : figmaStatus === 'sent' ? (
+                  <>
+                    <Check size={12} style={{ color: 'var(--color-success)' }} />
+                    Sent to Figma
+                  </>
+                ) : (
+                  <>
+                    <FigmaIcon size={12} />
+                    Send to Figma
+                  </>
+                )}
+              </span>
+            </button>
+          </div>
 
           {/* Inline contextual help / error text */}
           {figmaStatus === 'no_token' && (
-            <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: '#f87171' }}>
+            <p className={cn(glassStyles.helperText, 'nodrag')} style={{ color: '#f87171' }}>
               Go to{' '}
               <button
                 className="underline"
-                style={{ color: '#f87171', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 10 }}
+                style={{ color: '#f87171', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 9 }}
                 onClick={() => window.open('/dashboard/settings', '_blank')}
               >
                 Settings → Figma Integration
@@ -450,25 +462,25 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
           )}
 
           {figmaStatus === 'error' && figmaError && (
-            <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: '#f87171' }}>
+            <p className={cn(glassStyles.helperText, 'nodrag')} style={{ color: '#f87171' }}>
               {figmaError}
             </p>
           )}
 
           {figmaStatus === 'sent' && (
-            <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: 'var(--color-white-muted)' }}>
+            <p className={cn(glassStyles.helperText, 'nodrag')}>
               Make sure the Figma plugin is open in your target file — the GIF drops into whatever file is open.
             </p>
           )}
 
           {figmaStatus === 'idle' && (
-            <p className="text-center mt-1 nodrag" style={{ fontSize: 10, color: 'var(--color-white-muted)', opacity: 0.6 }}>
+            <p className={cn(glassStyles.helperText, 'nodrag')} style={{ opacity: 0.7 }}>
               Make sure the Figma plugin is open in your target file.
             </p>
           )}
         </>
       )}
-    </>
+    </div>
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -481,6 +493,7 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
       minWidth={300}
       accentColor={PORT_COLORS.image}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={footer}
     >
       <TypedHandle
@@ -501,14 +514,7 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
 
       {/* ── No video connected ─────────────────────────────────────────── */}
       {!data.videoUrl && (
-        <div
-          className="flex items-center justify-center rounded-lg mb-3 text-xs"
-          style={{
-            height: 56,
-            border: '1.5px dashed rgba(255,255,255,0.15)',
-            color: 'var(--color-white-muted)',
-          }}
-        >
+        <div className={glassStyles.emptyState}>
           Connect a video source
         </div>
       )}
@@ -562,12 +568,9 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
 
       {/* ── Error ──────────────────────────────────────────────────────── */}
       {error && !isConverting && (
-        <div
-          className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg mb-2 text-xs"
-          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}
-        >
+        <div className={cn(glassStyles.notice, glassStyles.noticeError)} style={{ alignItems: 'center', justifyContent: 'space-between' }}>
           <span className="truncate">{error}</span>
-          <button onClick={() => setError(null)} className="shrink-0 hover:opacity-60">
+          <button onClick={() => setError(null)} className="shrink-0 hover:opacity-60 nodrag">
             <X size={11} />
           </button>
         </div>
@@ -575,22 +578,20 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
 
       {/* ── GIF preview ────────────────────────────────────────────────── */}
       {gifUrl && !isConverting && (
-        <>
-          <div style={{ margin: '0 -18px 8px -18px', overflow: 'hidden' }}>
-            <CanvasImage
-              src={gifUrl}
-              alt="GIF preview"
-              className="w-full block nodrag"
-              style={{ height: 'auto' }}
-              onError={() => { setGifUrl(null); updateData({ gifUrl: undefined }); }}
-            />
-          </div>
+        <div className={glassStyles.mediaFrame}>
+          <CanvasImage
+            src={gifUrl}
+            alt="GIF preview"
+            className="w-full block nodrag"
+            style={{ height: 'auto' }}
+            onError={() => { setGifUrl(null); updateData({ gifUrl: undefined }); }}
+          />
           {gifSize !== null && (
-            <p className="text-center text-xs mb-2" style={{ color: 'var(--color-white-muted)', fontSize: 10 }}>
+            <p className={glassStyles.mediaCaption}>
               {formatBytes(gifSize)}
             </p>
           )}
-        </>
+        </div>
       )}
     </NodeWrapper>
   );

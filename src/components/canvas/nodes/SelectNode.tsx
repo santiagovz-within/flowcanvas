@@ -19,6 +19,8 @@ import type {
   VideoGenNodeData,
 } from '@/types';
 import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNodeData }) {
   const storeEdges = useFlowStore(state => state.edges);
@@ -77,15 +79,13 @@ export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNod
 
   // Block 2 (image) + download button — lives in footer so it's visually separated from Block 1
   const footer = currentUrl ? (
-    <div className="flex flex-col gap-2">
+    <div className={glassStyles.footerStack}>
       {/* Block 2: Selected media — fills all 4 sides of its card */}
       <div
+        className={cn(glassStyles.glassSurface, glassStyles.nodeSurface, glassStyles.nodeCard, 'overflow-hidden')}
         style={{
-          borderRadius: 17,
-          overflow: 'hidden',
-          background: 'var(--color-bg-elevated)',
-          border: selected ? `1px solid ${PORT_COLORS.image}` : 'var(--border-default)',
-          boxShadow: 'var(--shadow-node)',
+          outline: selected ? `1px solid ${PORT_COLORS.image}` : 'none',
+          outlineOffset: selected ? 1 : 0,
         }}
       >
         {mediaType === 'video' ? (
@@ -96,17 +96,24 @@ export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNod
       </div>
 
       {/* Download + Send to Figma (images only) */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+      <div className={glassStyles.footerSecondary}>
         <button
           onClick={() => downloadFromUrl(currentUrl)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-          style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
+          className={cn(
+            glassStyles.glassSurface,
+            glassStyles.button,
+            glassStyles.downloadButton,
+            glassStyles.footerAction,
+            'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+          )}
         >
-          <Download size={12} />
-          Download
+          <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+            <Download size={12} />
+            Download
+          </span>
         </button>
         {mediaType === 'image' && (
-          <SendToFigmaButton imageUrl={currentUrl} style={{ flex: 1, minWidth: 0 }} />
+          <SendToFigmaButton imageUrl={currentUrl} style={{ flex: '1 1 0', minWidth: 0 }} />
         )}
       </div>
     </div>
@@ -117,9 +124,10 @@ export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNod
       title="Select"
       icon={<Pointer size={14} />}
       selected={selected}
-      minWidth={240}
+      minWidth={300}
       accentColor={PORT_COLORS.image}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={footer}
     >
       <TypedHandle
@@ -154,7 +162,7 @@ export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNod
                 width: '100%',
                 aspectRatio: thumbnailAspect,
                 borderRadius: THUMBNAIL_RADIUS,
-                background: 'var(--color-bg-surface)',
+                background: 'rgba(255,255,255,0.06)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -167,13 +175,8 @@ export function SelectNode({ data, selected, id }: NodeProps & { data: SelectNod
           </div>
         )
       ) : (
-        <div
-          className="flex items-center justify-center"
-          style={{ height: 80, border: '1.5px dashed rgba(168,85,247,0.2)', borderRadius: 8 }}
-        >
-          <p className="text-xs text-center" style={{ color: 'var(--color-white-muted)' }}>
-            Connect an image or video node
-          </p>
+        <div className={glassStyles.emptyState}>
+          Connect an image or video node
         </div>
       )}
     </NodeWrapper>

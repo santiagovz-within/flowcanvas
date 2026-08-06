@@ -475,10 +475,13 @@ textarea.promptContent {
   gap: 8px;
 }
 
+/* Sized so every nested offset is a whole pixel inside the 36×36 hit box:
+   pill insets 0/3, then a 16px glyph insets 10/7. Odd sizes here put the
+   glyph on half-pixels, which blurs its strokes toward one corner. */
 .handleVisual {
   display: flex;
-  width: 35px;
-  height: 29px;
+  width: 36px;
+  height: 30px;
   align-items: center;
   justify-content: center;
   border-radius: 100px;
@@ -505,7 +508,426 @@ textarea.promptContent {
     #0f0f10;
 }
 
+.handleIdleVideo {
+  --glass-fill:
+    linear-gradient(rgba(22, 89, 66, 0.65), rgba(22, 89, 66, 0.65)),
+    #0f0f10;
+}
+
+.handleIdleNeutral {
+  --glass-fill:
+    linear-gradient(rgba(63, 64, 68, 0.7), rgba(63, 64, 68, 0.7)),
+    #0f0f10;
+}
+
 .handleActive {
   box-shadow: none;
   color: #fff;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Shared node primitives
+   Every class that pairs with .glassSurface MUST define its own
+   --glass-fill; .glassSurface defaults the fill to `transparent`, so a
+   glass element without a fill class renders invisible.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Layout ─────────────────────────────────────────────── */
+
+.field {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldRow {
+  display: flex;
+  width: 100%;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.fieldRow > * {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.grid2,
+.grid3 {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+}
+
+.grid2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rowBetween {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.section {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+
+.buttonSmall {
+  height: 32px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.buttonDanger {
+  --glass-fill: rgba(239, 68, 68, 0.14);
+
+  border: 0;
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chipRow {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  --glass-fill: rgba(99, 99, 99, 0.2);
+
+  display: inline-flex;
+  height: 29px;
+  min-width: 0;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 11px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.11px;
+  line-height: normal;
+  cursor: pointer;
+  outline: none;
+}
+
+.chipActive {
+  --glass-fill: rgba(255, 255, 255, 0.9);
+
+  color: #000;
+}
+
+.chipAuto {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.segmented {
+  --glass-fill: rgba(99, 99, 99, 0.2);
+
+  display: flex;
+  width: 100%;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 12px;
+}
+
+.segment {
+  flex: 1 1 0;
+  height: 23px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.11px;
+  cursor: pointer;
+  outline: none;
+  transition: background 150ms, color 150ms;
+}
+
+.segmentActive {
+  background: rgba(255, 255, 255, 0.9);
+  color: #000;
+}
+
+/* ── Toggle switch ──────────────────────────────────────── */
+
+.switch {
+  --glass-fill: rgba(99, 99, 99, 0.2);
+
+  position: relative;
+  display: inline-flex;
+  width: 34px;
+  height: 20px;
+  flex: 0 0 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 100px;
+  cursor: pointer;
+  outline: none;
+}
+
+.switchOn {
+  --glass-fill: rgba(255, 255, 255, 0.9);
+}
+
+.switchKnob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  transition: transform 150ms ease, background 150ms ease;
+}
+
+.switchOn .switchKnob {
+  transform: translateX(14px);
+  background: #111;
+}
+
+/* ── Placeholders, media and notices ────────────────────── */
+
+.emptyState {
+  display: flex;
+  width: 100%;
+  min-height: 72px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.11px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.dropzone {
+  display: flex;
+  width: 100%;
+  min-height: 96px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms;
+}
+
+.dropzoneActive {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.dropzoneTitle {
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.11px;
+}
+
+.dropzoneHint {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.mediaFrame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: #0f0f10;
+}
+
+.mediaCheckered {
+  background-image: conic-gradient(
+    #3a3a3a 90deg,
+    #2a2a2a 90deg 180deg,
+    #3a3a3a 180deg 270deg,
+    #2a2a2a 270deg
+  );
+  background-size: 14px 14px;
+}
+
+.mediaCaption {
+  padding: 4px 8px 6px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.28px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.mediaAction {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+
+.statusBlock {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.notice {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.noticeWarning {
+  background: rgba(234, 179, 8, 0.12);
+  color: #eab308;
+}
+
+.noticeError {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+}
+
+.helperText {
+  width: 100%;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: center;
+}
+
+/* ── Progress ───────────────────────────────────────────── */
+
+.progressTrack {
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 300ms ease-out;
+}
+
+/* ── Sliders ────────────────────────────────────────────── */
+
+.sliderRow {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sliderHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sliderValue {
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+
+.sliderInput {
+  width: 100%;
+  height: 4px;
+}
+
+/* ── Thumbnails ─────────────────────────────────────────── */
+
+.thumbGrid {
+  display: grid;
+  width: 100%;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+}
+
+.thumbStrip {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+/* ── Connector rows (typed input slots) ─────────────────── */
+
+.connectorActiveVideo {
+  --glass-fill: linear-gradient(
+    79.79deg,
+    #34d399 0%,
+    rgba(29, 116, 86, 0.2) 74.13%,
+    rgba(20, 52, 41, 0.42) 100%
+  );
+
+  color: #fff;
+  font-weight: 600;
 }

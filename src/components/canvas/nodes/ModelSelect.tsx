@@ -87,7 +87,7 @@ function ModelIcon({
   }
 }
 
-export function ModelSelect({ options, value, onChange, appearance = 'default' }: ModelSelectProps) {
+export function ModelSelect({ options, value, onChange, appearance = 'imageGenerationGlass' }: ModelSelectProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const [pos, setPos] = useState<DropdownPosition>({ top: 0, left: 0, width: 0, scale: 1 });

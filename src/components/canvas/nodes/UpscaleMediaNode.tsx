@@ -16,6 +16,8 @@ import { ModelSelect } from './ModelSelect';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { getNodeMediaUrls, getSourceMediaType } from '../mediaOutputs';
 import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 type Dims = { w: number; h: number };
 
@@ -97,9 +99,9 @@ function ComparisonSlider({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl
         <span className="absolute top-1.5 left-2 text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>Before</span>
         <span className="absolute top-1.5 right-2 text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>After</span>
       </div>
-      <div className="flex justify-between px-1 pt-1" style={{ fontSize: 9, color: 'var(--color-white-muted)' }}>
-        <span>{dimLabel(beforeDims)}</span>
-        <span>{dimLabel(afterDims)}</span>
+      <div className={glassStyles.rowBetween} style={{ padding: '4px 8px 6px' }}>
+        <span className={glassStyles.mediaCaption} style={{ padding: 0 }}>{dimLabel(beforeDims)}</span>
+        <span className={glassStyles.mediaCaption} style={{ padding: 0 }}>{dimLabel(afterDims)}</span>
       </div>
     </>
   );
@@ -133,7 +135,7 @@ function ImageThumb({ url, result }: { url: string | undefined; result: BulkItem
       {url ? (
         <CanvasImage src={url} alt="" focused={false} fill className="w-full h-full" style={{ objectFit: 'cover' }} />
       ) : (
-        <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--color-bg-surface)' }}>
+        <div className="w-full h-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.06)' }}>
           <Zap size={14} style={{ opacity: 0.4 }} />
         </div>
       )}
@@ -161,7 +163,7 @@ function VideoThumb({
           style={{ objectFit: 'cover', pointerEvents: 'none' }}
         />
       ) : (
-        <div className="w-full h-full" style={{ background: 'var(--color-bg-surface)' }} />
+        <div className="w-full h-full" style={{ background: 'rgba(255,255,255,0.06)' }} />
       )}
       {/* Film icon overlay */}
       <div
@@ -179,7 +181,7 @@ function VideoThumb({
 
 function ImageResultCard({ result, onRetry }: { result: BulkItemResult; onRetry: () => void }) {
   return (
-    <div className="relative rounded overflow-hidden" style={{ aspectRatio: '1', background: 'var(--color-bg-surface)' }}>
+    <div className="relative overflow-hidden" style={{ aspectRatio: '1', borderRadius: 6, background: 'rgba(255,255,255,0.06)' }}>
       {result.status === 'completed' && result.outputUrl ? (
         <>
           <CanvasImage src={result.outputUrl} alt="" focused={false} fill className="w-full h-full" style={{ objectFit: 'cover' }} />
@@ -200,7 +202,7 @@ function ImageResultCard({ result, onRetry }: { result: BulkItemResult; onRetry:
           <button
             onClick={onRetry}
             className="nodrag flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded"
-            style={{ background: 'var(--color-bg-surface-elevated)', color: 'var(--color-white-muted)' }}
+            style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)' }}
           >
             <RefreshCw size={8} />
             Retry
@@ -219,7 +221,7 @@ function VideoResultCard({
   result, onRetry, onExpand,
 }: { result: BulkItemResult; onRetry: () => void; onExpand: () => void }) {
   return (
-    <div className="relative rounded overflow-hidden" style={{ aspectRatio: '1', background: 'var(--color-bg-surface)' }}>
+    <div className="relative overflow-hidden" style={{ aspectRatio: '1', borderRadius: 6, background: 'rgba(255,255,255,0.06)' }}>
       {result.status === 'completed' && result.outputUrl ? (
         <>
           <div className="w-full h-full cursor-pointer" onClick={onExpand}>
@@ -252,7 +254,7 @@ function VideoResultCard({
           <button
             onClick={onRetry}
             className="nodrag flex items-center gap-0.5 text-[9px] font-medium px-1.5 py-0.5 rounded"
-            style={{ background: 'var(--color-bg-surface-elevated)', color: 'var(--color-white-muted)' }}
+            style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)' }}
           >
             <RefreshCw size={8} />
             Retry
@@ -639,30 +641,43 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
   // ── Footer ──────────────────────────────────────────────────────────────────
 
   const footer = (
-    <div className="flex flex-col gap-1.5">
+    <div className={glassStyles.footerStack}>
       {/* ── Single image ── */}
       {!isBulk && inputMediaType === 'image' && (
         <>
           <button
             onClick={handleUpscaleImage}
             disabled={isRunning || !inputImageUrl}
-            className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-            style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.generateButton,
+              'transition-opacity disabled:opacity-40 nodrag',
+            )}
           >
-            <Play size={12} />
-            {isRunning ? 'Upscaling…' : 'Upscale'}
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Play size={12} />
+              {isRunning ? 'Upscaling…' : 'Upscale'}
+            </span>
           </button>
           {hasImageOutput && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <div className={glassStyles.footerSecondary}>
               <button
                 onClick={() => downloadFromUrl(data.outputImageUrl!)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-                style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
+                className={cn(
+                  glassStyles.glassSurface,
+                  glassStyles.button,
+                  glassStyles.downloadButton,
+                  glassStyles.footerAction,
+                  'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+                )}
               >
-                <Download size={12} />
-                Download
+                <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+                  <Download size={12} />
+                  Download
+                </span>
               </button>
-              <SendToFigmaButton imageUrl={data.outputImageUrl} style={{ flex: 1, minWidth: 0 }} />
+              <SendToFigmaButton imageUrl={data.outputImageUrl} style={{ flex: '1 1 0', minWidth: 0 }} />
             </div>
           )}
         </>
@@ -674,20 +689,32 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           <button
             onClick={handleUpscaleVideo}
             disabled={isRunning || !inputVideoUrl}
-            className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-            style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.generateButton,
+              'transition-opacity disabled:opacity-40 nodrag',
+            )}
           >
-            <Play size={12} />
-            {isRunning ? 'Upscaling…' : 'Upscale Video'}
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Play size={12} />
+              {isRunning ? 'Upscaling…' : 'Upscale Video'}
+            </span>
           </button>
           {hasVideoOutput && (
             <button
               onClick={() => downloadFromUrl(data.outputVideoUrl!)}
-              className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-              style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
+              className={cn(
+                glassStyles.glassSurface,
+                glassStyles.button,
+                glassStyles.downloadButton,
+                'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+              )}
             >
-              <Download size={12} />
-              Download
+              <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+                <Download size={12} />
+                Download
+              </span>
             </button>
           )}
         </>
@@ -698,13 +725,19 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
         <button
           onClick={handleBulkUpscale}
           disabled={isRunning || inputItems.every((i) => !i.url)}
-          className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-          style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+          className={cn(
+            glassStyles.glassSurface,
+            glassStyles.button,
+            glassStyles.generateButton,
+            'transition-opacity disabled:opacity-40 nodrag',
+          )}
         >
-          <Play size={12} />
-          {isRunning
-            ? `Upscaling ${bulkDoneCount + 1} of ${itemCount}…`
-            : `Upscale all ${itemCount}`}
+          <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+            <Play size={12} />
+            {isRunning
+              ? `Upscaling ${bulkDoneCount + 1} of ${itemCount}…`
+              : `Upscale all ${itemCount}`}
+          </span>
         </button>
       )}
 
@@ -712,11 +745,17 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
       {inputMediaType === null && (
         <button
           disabled
-          className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-          style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+          className={cn(
+            glassStyles.glassSurface,
+            glassStyles.button,
+            glassStyles.generateButton,
+            'transition-opacity disabled:opacity-40 nodrag',
+          )}
         >
-          <Play size={12} />
-          Upscale
+          <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+            <Play size={12} />
+            Upscale
+          </span>
         </button>
       )}
     </div>
@@ -729,11 +768,11 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
     bulkResults.some((r) => r.status === 'completed' || r.status === 'failed' || r.status === 'processing');
 
   const resultsGrid = hasBulkResults ? (
-    <div className="mt-3">
-      <p className="text-[10px] mb-2 font-medium" style={{ color: 'var(--color-white-muted)' }}>
+    <div className={glassStyles.field}>
+      <span className={glassStyles.microLabel}>
         Results — {bulkResults!.filter((r) => r.status === 'completed').length} of {bulkResults!.length} done
-      </p>
-      <div className="grid gap-1.5 nodrag" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))' }}>
+      </span>
+      <div className={cn(glassStyles.thumbGrid, 'nodrag')}>
         {bulkResults!.map((result, i) =>
           inputMediaType === 'image' ? (
             <ImageResultCard
@@ -766,6 +805,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
       minWidth={560}
       accentColor={accentColor}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={footer}
     >
       <TypedHandle
@@ -778,10 +818,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
 
       {/* ── No input ── */}
       {inputMediaType === null && (
-        <div
-          className="flex items-center justify-center rounded-lg mb-3"
-          style={{ height: 52, background: 'var(--color-bg-surface)', border: '1px dashed rgba(255,255,255,0.12)', color: 'var(--color-white-muted)', fontSize: 12 }}
-        >
+        <div className={glassStyles.emptyState}>
           Connect an image or video to upscale
         </div>
       )}
@@ -789,26 +826,23 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
       {/* ── Image settings ── */}
       {inputMediaType === 'image' && (
         <>
-          <div className="mb-2">
-            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Model</label>
-            <ModelSelect options={UPSCALE_MODELS} value={data.model} onChange={handleModelChange} />
-          </div>
+          <ModelSelect options={UPSCALE_MODELS} value={data.model} onChange={handleModelChange} />
 
-          <div className="mb-3">
-            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Scale</label>
-            <div className="flex gap-1.5">
+          <div className={glassStyles.field}>
+            <span className={glassStyles.microLabel}>Scale</span>
+            <div className={glassStyles.chipRow}>
               {scaleOptions.map((scale) => (
                 <button
                   key={scale}
                   onClick={() => dispatchUpdate({ scaleFactor: scale })}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors nodrag"
-                  style={{
-                    background: validScaleFactor === scale ? '#fff' : 'var(--color-bg-surface)',
-                    color:      validScaleFactor === scale ? '#000' : 'var(--color-white-muted)',
-                    border: 'var(--border-default)',
-                  }}
+                  className={cn(
+                    glassStyles.glassSurface,
+                    glassStyles.chip,
+                    validScaleFactor === scale && glassStyles.chipActive,
+                    'nodrag',
+                  )}
                 >
-                  {scale}x
+                  <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>{scale}x</span>
                 </button>
               ))}
             </div>
@@ -819,70 +853,62 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
       {/* ── Video settings ── */}
       {inputMediaType === 'video' && (
         <>
-          <div className="mb-3">
-            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Scale Factor</label>
-            <div className="flex gap-1.5">
+          <div className={glassStyles.field}>
+            <span className={glassStyles.microLabel}>Scale Factor</span>
+            <div className={glassStyles.chipRow}>
               {VIDEO_SCALE_OPTIONS.map((scale) => (
                 <button
                   key={scale}
                   onClick={() => dispatchUpdate({ upscaleFactor: scale })}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors nodrag"
-                  style={{
-                    background: upscaleFactor === scale ? '#fff' : 'var(--color-bg-surface)',
-                    color:      upscaleFactor === scale ? '#000' : 'var(--color-white-muted)',
-                    border: 'var(--border-default)',
-                  }}
+                  className={cn(
+                    glassStyles.glassSurface,
+                    glassStyles.chip,
+                    upscaleFactor === scale && glassStyles.chipActive,
+                    'nodrag',
+                  )}
                 >
-                  {scale}x
+                  <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>{scale}x</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="mb-3">
-            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Target FPS</label>
-            <div className="flex gap-1.5">
+          <div className={glassStyles.field}>
+            <span className={glassStyles.microLabel}>Target FPS</span>
+            <div className={glassStyles.chipRow}>
               {VIDEO_FPS_OPTIONS.map(({ label, value }) => {
                 const isSelected = (data.targetFps ?? null) === value;
                 return (
                   <button
                     key={label}
                     onClick={() => dispatchUpdate({ targetFps: value ?? undefined })}
-                    className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors nodrag"
-                    style={{
-                      background: isSelected ? '#fff' : 'var(--color-bg-surface)',
-                      color:      isSelected ? '#000' : 'var(--color-white-muted)',
-                      border: 'var(--border-default)',
-                    }}
+                    className={cn(
+                      glassStyles.glassSurface,
+                      glassStyles.chip,
+                      isSelected && glassStyles.chipActive,
+                      'nodrag',
+                    )}
                   >
-                    {label}
+                    <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>{label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="flex items-center justify-between mb-3 nodrag">
-            <label className="text-xs font-medium" style={{ color: 'var(--color-white-muted)' }}>H264 Output</label>
+          <div className={cn(glassStyles.rowBetween, 'nodrag')}>
+            <span className={glassStyles.microLabel}>H264 Output</span>
             <button
               onClick={() => dispatchUpdate({ h264Output: !(data.h264Output ?? false) })}
-              className="nodrag transition-colors"
-              style={{
-                width: 36, height: 20, borderRadius: 10,
-                background: data.h264Output ? '#fff' : 'var(--color-bg-surface)',
-                border: 'var(--border-default)',
-                position: 'relative', flexShrink: 0, padding: 0,
-              }}
+              className={cn(
+                glassStyles.glassSurface,
+                glassStyles.switch,
+                data.h264Output && glassStyles.switchOn,
+                'nodrag',
+              )}
+              aria-pressed={!!data.h264Output}
             >
-              <span
-                style={{
-                  position: 'absolute', top: 2,
-                  left: data.h264Output ? 18 : 2,
-                  width: 16, height: 16, borderRadius: '50%',
-                  background: data.h264Output ? '#000' : 'var(--color-white-muted)',
-                  transition: 'left 0.15s',
-                }}
-              />
+              <span className={cn(glassStyles.glassContent, glassStyles.switchKnob)} />
             </button>
           </div>
         </>
@@ -892,20 +918,17 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
       {isBulk && inputMediaType !== null && (
         <>
           {/* Count + note */}
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-medium" style={{ color: 'var(--color-white-muted)' }}>
+          <div className={glassStyles.rowBetween}>
+            <span className={glassStyles.microLabel}>
               {itemCount} / {cap} {inputMediaType === 'video' ? 'videos' : 'images'}
             </span>
-            <span className="text-[10px]" style={{ color: 'var(--color-white-muted)', opacity: 0.6 }}>
+            <span className={glassStyles.microLabel} style={{ opacity: 0.7 }}>
               Settings apply to all
             </span>
           </div>
 
           {/* Thumbnail strip */}
-          <div
-            className="flex gap-1.5 mb-3 nodrag"
-            style={{ overflowX: 'auto', paddingBottom: 2 }}
-          >
+          <div className={cn(glassStyles.thumbStrip, 'nodrag')}>
             {inputItems.map((item, i) => {
               const result = data.bulkResults?.[i];
               return inputMediaType === 'image' ? (
@@ -926,11 +949,11 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
       {/* ── Single image: preview ── */}
       {!isBulk && inputMediaType === 'image' && (
         inputImageUrl && data.outputImageUrl ? (
-          <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <div className={glassStyles.mediaFrame}>
             <ComparisonSlider beforeUrl={inputImageUrl} afterUrl={data.outputImageUrl} />
           </div>
         ) : inputImageUrl ? (
-          <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <div className={glassStyles.mediaFrame}>
             <CanvasImage src={inputImageUrl} alt="Input" className="w-full block" style={{ height: 'auto' }} />
           </div>
         ) : null
@@ -938,17 +961,17 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
 
       {/* ── Single video: previews ── */}
       {!isBulk && inputMediaType === 'video' && (
-        <div className="flex flex-col gap-3">
+        <div className={glassStyles.section}>
           {inputVideoUrl && (
-            <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div className={glassStyles.mediaFrame}>
               <CanvasVideo src={inputVideoUrl} controls className="w-full block nodrag" style={{ height: 'auto' }} />
-              <p className="px-3 pt-1 text-center" style={{ fontSize: 9, color: 'var(--color-white-muted)' }}>Input</p>
+              <p className={glassStyles.mediaCaption}>Input</p>
             </div>
           )}
           {hasVideoOutput && (
-            <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div className={glassStyles.mediaFrame}>
               <CanvasVideo src={data.outputVideoUrl!} controls className="w-full block nodrag" style={{ height: 'auto' }} />
-              <p className="px-3 pt-1 text-center" style={{ fontSize: 9, color: 'var(--color-white-muted)' }}>Output ({upscaleFactor}x)</p>
+              <p className={glassStyles.mediaCaption}>Output ({upscaleFactor}x)</p>
             </div>
           )}
         </div>
@@ -959,13 +982,13 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
 
       {/* ── Expanded video overlay ── */}
       {expandedUrl && (
-        <div className="mt-3 relative" style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+        <div className={glassStyles.mediaFrame}>
           <button
             onClick={() => setExpandedUrl(null)}
-            className="absolute top-1.5 right-1.5 z-10 nodrag flex items-center justify-center rounded-full"
-            style={{ width: 22, height: 22, background: 'rgba(0,0,0,0.6)', flexShrink: 0 }}
+            className={cn(glassStyles.mediaAction, 'z-10 nodrag')}
+            aria-label="Close preview"
           >
-            <X size={12} color="#fff" />
+            <X size={12} />
           </button>
           <CanvasVideo src={expandedUrl} focused controls className="w-full block nodrag" style={{ height: 'auto' }} />
         </div>

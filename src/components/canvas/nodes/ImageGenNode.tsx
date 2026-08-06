@@ -297,7 +297,6 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           <SendToFigmaButton
             imageUrl={downloadableImages[0]}
             style={{ flex: '1 1 0', minWidth: 0 }}
-            buttonStyle={{ height: 40, padding: '12px 10px' }}
             appearance="imageGenerationGlass"
           />
         </div>

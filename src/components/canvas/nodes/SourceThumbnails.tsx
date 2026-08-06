@@ -9,12 +9,13 @@ import { CanvasImage } from '@/components/canvas/CanvasMedia';
 
 export const THUMBNAIL_GRID_STYLE: CSSProperties = {
   display: 'grid',
+  width: '100%',
   gridTemplateColumns: 'repeat(3, 1fr)',
   gap: 6,
   padding: 3,
 };
 
-export const THUMBNAIL_RADIUS = 3;
+export const THUMBNAIL_RADIUS = 6;
 
 interface SourceThumbnailsProps {
   images: string[];
@@ -37,7 +38,7 @@ export function SourceThumbnails({ images, selectedIndex, aspect, onSelect, clas
             className="nodrag"
             style={{
               width: '100%', aspectRatio: aspect, borderRadius: THUMBNAIL_RADIUS, padding: 0,
-              overflow: 'hidden', display: 'block', background: 'var(--color-bg-surface)',
+              overflow: 'hidden', display: 'block', background: 'rgba(255,255,255,0.06)',
               outline: isSelected ? '2px solid #a855f7' : '2px solid transparent',
               outlineOffset: 1,
             }}

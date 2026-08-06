@@ -8,6 +8,8 @@ import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import { NodeSelect } from './NodeSelect';
 import type { PromptNodeData, PaletteColor } from '@/types';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 const GEMINI_MODELS = [
   { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
@@ -22,7 +24,6 @@ const LENGTH_OPTIONS = [
 ];
 
 const MAX_PALETTE_COLORS = 5;
-const LINE_H = '1.6';
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
@@ -102,16 +103,16 @@ function ColorTextOverlay({ text, palette }: { text: string; palette: PaletteCol
     }
 
     if (firstIdx === -1) {
-      parts.push(<span key={key++} style={{ color: 'var(--color-white)', fontWeight: 700 }}>{remaining}</span>);
+      parts.push(<span key={key++} style={{ color: '#fff' }}>{remaining}</span>);
       break;
     }
     if (firstIdx > 0) {
-      parts.push(<span key={key++} style={{ color: 'var(--color-white)', fontWeight: 700 }}>{remaining.slice(0, firstIdx)}</span>);
+      parts.push(<span key={key++} style={{ color: '#fff' }}>{remaining.slice(0, firstIdx)}</span>);
     }
 
     const c = palette[firstColorIdx];
     parts.push(
-      <span key={key++} style={{ color: c?.hex ?? 'var(--color-white)', fontWeight: 700 }}>
+      <span key={key++} style={{ color: c?.hex ?? '#fff' }}>
         {firstRef}
       </span>
     );
@@ -257,11 +258,37 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
   }
 
   return (
-    <NodeWrapper title="Prompt" icon={<Type size={14} />} selected={selected} accentColor={PORT_COLORS.text} titlePosition="outside">
-
+    <NodeWrapper
+      title="Prompt"
+      icon={<Type size={14} />}
+      selected={selected}
+      minWidth={300}
+      accentColor={PORT_COLORS.text}
+      titlePosition="outside"
+      appearance="imageGenerationGlass"
+      footer={
+        <div className={glassStyles.footerStack}>
+          <button
+            onClick={handleEnhance}
+            disabled={enhancing || !data.prompt?.trim()}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.generateButton,
+              'transition-opacity disabled:opacity-40 nodrag',
+            )}
+          >
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Sunrise size={11} className={enhancing ? 'animate-pulse' : ''} />
+              {enhancing ? 'Enhancing…' : 'Enhance'}
+            </span>
+          </button>
+        </div>
+      }
+    >
       {/* History navigation */}
       {promptHistory.length > 1 && (
-        <div className="flex items-center justify-between my-1.5">
+        <div className={glassStyles.historyNav}>
           <button
             onClick={() => navigateHistory(Math.max(0, historyIdx - 1))}
             disabled={historyIdx === 0}
@@ -270,7 +297,10 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
           >
             <ChevronLeft size={13} />
           </button>
-          <span className="text-xs" style={{ color: isViewingHistory ? 'var(--color-accent)' : 'var(--color-white-muted)', fontSize: 10 }}>
+          <span
+            className={glassStyles.microLabel}
+            style={{ color: isViewingHistory ? 'var(--color-accent)' : undefined }}
+          >
             {`VERSION ${historyIdx + 1}`}
           </span>
           <button
@@ -285,13 +315,16 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
       )}
 
       {/* Prompt area */}
-      <div className="relative mb-2">
+      <div className={cn(glassStyles.glassSurface, glassStyles.promptSection, glassStyles.promptSurface)}>
         {hasColorRefs && (
           <div
             aria-hidden="true"
-            className="absolute inset-0 text-xs pointer-events-none"
+            className={cn(glassStyles.glassContent, glassStyles.promptContent, 'pointer-events-none')}
+            // Inline positioning: utility classes and the CSS module both set
+            // `position`, and the module wins — inline keeps the overlay pinned.
             style={{
-              lineHeight: LINE_H,
+              position: 'absolute',
+              inset: 0,
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               overflow: 'hidden',
@@ -302,7 +335,7 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
         )}
         <textarea
           ref={textareaRef}
-          className="w-full text-xs outline-none nodrag"
+          className={cn(glassStyles.glassContent, glassStyles.promptContent, 'outline-none nodrag')}
           rows={2}
           placeholder="Write your prompt here…"
           value={localPrompt}
@@ -310,21 +343,14 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
           onBlur={handleBlur}
           onChange={handlePromptChange}
           style={{
-            background: 'transparent',
-            border: 'none',
-            color: hasColorRefs ? 'transparent' : 'var(--color-white)',
-            caretColor: 'var(--color-white)',
-            fontWeight: 700,
-            resize: 'none',
-            overflow: 'hidden',
-            minHeight: 40,
-            lineHeight: LINE_H,
+            color: hasColorRefs ? 'transparent' : '#fff',
+            caretColor: '#fff',
           }}
         />
       </div>
 
       {/* Model + length selectors */}
-      <div className="grid grid-cols-2 gap-1.5 mb-2">
+      <div className={glassStyles.selectRow}>
         <NodeSelect
           options={GEMINI_MODELS.map(m => m.label)}
           value={GEMINI_MODELS.find(m => m.id === geminiModel)?.label ?? GEMINI_MODELS[0].label}
@@ -337,39 +363,30 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
         />
       </div>
 
-      {/* [Add Palette]  [Enhance →] */}
-      <div className="flex gap-1.5">
+      {/* Palette toggle */}
+      <div className={glassStyles.chipRow}>
         <button
           onClick={() => dispatchUpdate({ paletteEnabled: !paletteEnabled })}
-          className="flex items-center gap-1 px-2.5 py-2 text-xs font-medium transition-colors nodrag shrink-0"
-          style={{
-            background: paletteEnabled ? 'var(--color-accent)' : 'var(--color-bg-surface)',
-            color: paletteEnabled ? '#fff' : 'var(--color-white-muted)',
-            borderRadius: 11,
-          }}
+          className={cn(
+            glassStyles.glassSurface,
+            glassStyles.chip,
+            paletteEnabled && glassStyles.chipActive,
+            'nodrag',
+          )}
         >
-          <Droplet size={11} />
-          {paletteEnabled ? 'Palette' : 'Add Palette'}
-        </button>
-        <button
-          onClick={handleEnhance}
-          disabled={enhancing || !data.prompt?.trim()}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-          style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
-        >
-          <Sunrise size={11} className={enhancing ? 'animate-pulse' : ''} />
-          {enhancing ? 'Enhancing…' : 'Enhance'}
+          <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+            <Droplet size={11} />
+            {paletteEnabled ? 'Palette' : 'Add Palette'}
+          </span>
         </button>
       </div>
 
       {/* Color palette section */}
       {paletteEnabled && (
-        <div className="mt-2.5">
-          <p className="text-[9px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: 'var(--color-white-muted)' }}>
-            Color Palette
-          </p>
+        <div className={glassStyles.field}>
+          <span className={glassStyles.microLabel}>Color Palette</span>
           {palette.map((color, i) => (
-            <div key={i} className="flex items-center gap-2 mb-1.5">
+            <div key={i} className="flex items-center gap-2">
               <label
                 className="nodrag shrink-0 cursor-pointer"
                 style={{ display: 'block', width: 20, height: 20, borderRadius: 5, background: color.hex, overflow: 'hidden', position: 'relative' }}
@@ -382,7 +399,7 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
                   style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
                 />
               </label>
-              <span className="flex-1 text-xs" style={{ color: 'var(--color-white-muted)', fontFamily: 'monospace', fontSize: 11 }}>
+              <span className="flex-1" style={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', fontSize: 11 }}>
                 @color{i + 1}
               </span>
               <button onClick={() => removeColor(i)} className="nodrag shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }}>
@@ -391,7 +408,11 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
             </div>
           ))}
           {palette.length < MAX_PALETTE_COLORS && (
-            <button onClick={addColor} className="flex items-center gap-1 mt-0.5 text-xs nodrag" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            <button
+              onClick={addColor}
+              className="flex items-center gap-1 nodrag"
+              style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}
+            >
               <Plus size={11} />
               Add color
             </button>

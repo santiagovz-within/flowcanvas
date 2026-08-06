@@ -10,6 +10,8 @@ import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { VideoUpscaleNodeData, VideoGenNodeData, VideoInputNodeData } from '@/types';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasVideo } from '@/components/canvas/CanvasMedia';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 const SCALE_OPTIONS = [2, 3, 4];
 
@@ -108,28 +110,40 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
   }
 
   const footer = (
-    <>
+    <div className={glassStyles.footerStack}>
       <button
         onClick={handleUpscale}
         disabled={isProcessing || !inputVideoUrl}
-        className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-        style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+        className={cn(
+          glassStyles.glassSurface,
+          glassStyles.button,
+          glassStyles.generateButton,
+          'transition-opacity disabled:opacity-40 nodrag',
+        )}
       >
-        <Play size={12} />
-        {isProcessing ? 'Upscaling…' : 'Upscale Video'}
+        <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+          <Play size={12} />
+          {isProcessing ? 'Upscaling…' : 'Upscale Video'}
+        </span>
       </button>
 
       {data.videoUrl && data.status === 'completed' && (
         <button
           onClick={() => downloadFromUrl(data.videoUrl!)}
-          className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-          style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
+          className={cn(
+            glassStyles.glassSurface,
+            glassStyles.button,
+            glassStyles.downloadButton,
+            'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+          )}
         >
-          <Download size={12} />
-          Download
+          <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+            <Download size={12} />
+            Download
+          </span>
         </button>
       )}
-    </>
+    </div>
   );
 
   return (
@@ -139,9 +153,10 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
       status={data.status}
       errorMessage={data.errorMessage}
       selected={selected}
-      minWidth={280}
+      minWidth={300}
       accentColor={PORT_COLORS.video}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={footer}
     >
       <TypedHandle
@@ -152,47 +167,53 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
         connected={storeEdges.some(e => e.target === id && e.targetHandle === 'video_in')}
       />
 
-      <div className="mb-3">
-        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-white-muted)' }}>Scale Factor</label>
-        <div className="flex gap-1.5">
+      <div className={glassStyles.field}>
+        <span className={glassStyles.microLabel}>Scale Factor</span>
+        <div className={glassStyles.chipRow}>
           {SCALE_OPTIONS.map((scale) => (
             <button
               key={scale}
               onClick={() => updateData({ upscaleFactor: scale })}
-              className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors nodrag"
-              style={{
-                background: upscaleFactor === scale ? '#fff' : 'var(--color-bg-surface)',
-                color: upscaleFactor === scale ? '#000' : 'var(--color-white-muted)',
-                border: 'var(--border-default)',
-              }}
+              className={cn(
+                glassStyles.glassSurface,
+                glassStyles.chip,
+                upscaleFactor === scale && glassStyles.chipActive,
+                'nodrag',
+              )}
             >
-              {scale}x
+              <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>{scale}x</span>
             </button>
           ))}
         </div>
       </div>
 
+      {!inputVideoUrl && (
+        <div className={glassStyles.emptyState}>
+          Connect a video source
+        </div>
+      )}
+
       {inputVideoUrl && (
-        <div style={{ margin: '0 -18px 12px -18px', overflow: 'hidden' }}>
+        <div className={glassStyles.mediaFrame}>
           <CanvasVideo
             src={inputVideoUrl}
             controls
             className="w-full block nodrag"
             style={{ height: 'auto' }}
           />
-          <p className="px-3 pt-1 text-center" style={{ fontSize: 9, color: 'var(--color-white-muted)' }}>Input</p>
+          <p className={glassStyles.mediaCaption}>Input</p>
         </div>
       )}
 
       {data.videoUrl && data.status === 'completed' && (
-        <div style={{ margin: '0 -18px 12px -18px', overflow: 'hidden' }}>
+        <div className={glassStyles.mediaFrame}>
           <CanvasVideo
             src={data.videoUrl}
             controls
             className="w-full block nodrag"
             style={{ height: 'auto' }}
           />
-          <p className="px-3 pt-1 text-center" style={{ fontSize: 9, color: 'var(--color-white-muted)' }}>Output ({upscaleFactor}x)</p>
+          <p className={glassStyles.mediaCaption}>Output ({upscaleFactor}x)</p>
         </div>
       )}
 

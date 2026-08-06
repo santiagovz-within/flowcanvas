@@ -15,6 +15,8 @@ import { uploadImageToStorage } from '@/lib/utils/uploadImage';
 import { resolveGcsRefs } from '@/lib/utils/mediaUtils';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 // ── Stage types ──────────────────────────────────────────────────────────────
 
@@ -120,19 +122,14 @@ function GalleryPicker({ onSelect, onClose }: { onSelect: (url: string) => void;
 
 function ProgressBar({ percent }: { percent: number }) {
   return (
-    <div className="w-full mt-2">
-      <div
-        className="w-full rounded-full overflow-hidden"
-        style={{ height: 4, background: 'rgba(255,255,255,0.1)' }}
-      >
+    <div className={glassStyles.sliderRow}>
+      <div className={glassStyles.progressTrack}>
         <div
-          className="h-full rounded-full transition-all duration-300 ease-out"
+          className={glassStyles.progressFill}
           style={{ width: `${Math.max(2, percent)}%`, background: 'var(--color-accent)' }}
         />
       </div>
-      <p className="text-right text-xs mt-1" style={{ color: 'var(--color-white-muted)', fontSize: 10 }}>
-        {percent}%
-      </p>
+      <span className={glassStyles.helperText} style={{ textAlign: 'right' }}>{percent}%</span>
     </div>
   );
 }
@@ -268,11 +265,18 @@ export function ImageInputNode({ data, selected, id }: NodeProps & { data: Image
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <NodeWrapper title="Image Input" icon={<Image size={14} />} selected={selected} minWidth={280} accentColor={PORT_COLORS.image} titlePosition="outside">
-
+    <NodeWrapper
+      title="Image Input"
+      icon={<Image size={14} />}
+      selected={selected}
+      minWidth={300}
+      accentColor={PORT_COLORS.image}
+      titlePosition="outside"
+      appearance="imageGenerationGlass"
+    >
       {/* ── Processing state ───────────────────────────────────────────── */}
       {isProcessing && (
-        <div className="relative overflow-hidden" style={{ margin: '-18px', minHeight: 90 }}>
+        <div className={glassStyles.mediaFrame}>
           {/* Blurred preview background (only for local drops that have a preview) */}
           {previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -285,60 +289,42 @@ export function ImageInputNode({ data, selected, id }: NodeProps & { data: Image
           )}
           <div
             className="relative flex flex-col items-center justify-center gap-2 p-4"
-            style={{
-              minHeight: 90,
-              background: previewUrl ? 'rgba(0,0,0,0.5)' : 'var(--color-bg-surface)',
-            }}
+            style={{ minHeight: 96, background: previewUrl ? 'rgba(0,0,0,0.5)' : 'transparent' }}
           >
             <RefreshCw
               size={18}
               className="animate-spin"
               style={{ color: 'var(--color-accent)' }}
             />
-            <p className="text-xs font-medium text-center" style={{ color: '#fff' }}>
+            <p className={glassStyles.dropzoneTitle}>
               {stageLabel[activeStage as ProcessStage]}
             </p>
-            {activeStage === 'compressing' && (
-              <div className="w-full px-2">
-                <ProgressBar percent={activeProgress} />
-              </div>
-            )}
+            {activeStage === 'compressing' && <ProgressBar percent={activeProgress} />}
           </div>
         </div>
       )}
 
       {/* ── Error state ────────────────────────────────────────────────── */}
       {!isProcessing && activeError && (
-        <div
-          className="flex flex-col items-center gap-3"
-          style={{ margin: '-18px', padding: 16, borderRadius: '0 0 17px 17px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderTop: 'none' }}
-        >
+        <div className={cn(glassStyles.notice, glassStyles.noticeError)} style={{ flexDirection: 'column', alignItems: 'center', gap: 10, padding: 14 }}>
           <AlertTriangle size={20} style={{ color: '#f87171', flexShrink: 0 }} />
-          <p className="text-xs text-center leading-relaxed" style={{ color: '#fca5a5' }}>
-            {activeError}
-          </p>
+          <p className="text-center leading-relaxed">{activeError}</p>
           <button
             onClick={handleRetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium nodrag transition-opacity hover:opacity-80"
-            style={{ background: 'rgba(239,68,68,0.2)', color: '#fca5a5' }}
+            className={cn(glassStyles.glassSurface, glassStyles.chip, glassStyles.chipAuto, 'nodrag transition-opacity hover:opacity-80')}
+            style={{ color: '#fca5a5' }}
           >
-            <RotateCcw size={11} />
-            {pendingFile ? 'Try Again' : 'Dismiss'}
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <RotateCcw size={11} />
+              {pendingFile ? 'Try Again' : 'Dismiss'}
+            </span>
           </button>
         </div>
       )}
 
       {/* ── Image display ──────────────────────────────────────────────── */}
       {!isProcessing && !activeError && data.imageUrl && (
-        <div
-          className="relative overflow-hidden"
-          style={{
-            margin: '-18px',
-            backgroundImage:
-              'conic-gradient(#3a3a3a 90deg, #2a2a2a 90deg 180deg, #3a3a3a 180deg 270deg, #2a2a2a 270deg)',
-            backgroundSize: '14px 14px',
-          }}
-        >
+        <div className={cn(glassStyles.mediaFrame, glassStyles.mediaCheckered)}>
           <CanvasImage
             src={data.imageUrl}
             alt="Input"
@@ -346,12 +332,8 @@ export function ImageInputNode({ data, selected, id }: NodeProps & { data: Image
             style={{ height: 'auto' }}
             onLoad={handleImageLoad}
           />
-          <button
-            className="absolute top-1 right-1 p-0.5 rounded-full nodrag"
-            style={{ background: 'rgba(0,0,0,0.6)' }}
-            onClick={clearImage}
-          >
-            <X size={12} style={{ color: 'var(--color-white)' }} />
+          <button className={cn(glassStyles.mediaAction, 'nodrag')} onClick={clearImage} aria-label="Remove image">
+            <X size={12} />
           </button>
         </div>
       )}
@@ -361,33 +343,29 @@ export function ImageInputNode({ data, selected, id }: NodeProps & { data: Image
         <>
           <div
             {...getRootProps()}
-            className="flex flex-col items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors nodrag"
-            style={{
-              height: 90,
-              border: isDragActive
-                ? '1.5px dashed var(--color-accent)'
-                : '1.5px dashed rgba(255,255,255,0.2)',
-              background: isDragActive ? 'var(--color-accent-glow)' : 'transparent',
-            }}
+            className={cn(glassStyles.dropzone, isDragActive && glassStyles.dropzoneActive, 'nodrag')}
           >
             <input {...getInputProps()} />
-            <Upload size={18} style={{ color: 'var(--color-white-muted)' }} />
-            <p className="text-xs text-center" style={{ color: 'var(--color-white-muted)' }}>
+            <Upload size={18} style={{ color: 'rgba(255,255,255,0.55)' }} />
+            <p className={glassStyles.dropzoneTitle}>
               {isDragActive ? 'Drop image here' : 'Drop or click to upload'}
             </p>
           </div>
 
           <button
             onClick={() => setShowGallery(true)}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium mt-2 transition-opacity hover:opacity-80 nodrag"
-            style={{
-              background: 'var(--color-bg-surface)',
-              border: 'var(--border-default)',
-              color: 'var(--color-white-muted)',
-            }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.footerControl,
+              glassStyles.buttonSmall,
+              'transition-opacity hover:opacity-80 nodrag',
+            )}
           >
-            <Layout size={12} />
-            Browse Gallery
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Layout size={12} />
+              Browse Gallery
+            </span>
           </button>
         </>
       )}

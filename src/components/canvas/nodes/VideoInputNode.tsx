@@ -9,6 +9,8 @@ import type { VideoInputNodeData } from '@/types';
 import type { FFmpeg } from '@ffmpeg/ffmpeg';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasVideo } from '@/components/canvas/CanvasMedia';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 const COMPRESS_THRESHOLD_BYTES = 50 * 1024 * 1024; // 50 MB
 const ACCEPTED_VIDEO_TYPES = 'video/mp4,video/webm,video/quicktime,video/mpeg';
@@ -165,22 +167,27 @@ export function VideoInputNode({ data, selected, id }: NodeProps & { data: Video
   const isProcessing = stage !== null && stage !== 'error';
 
   return (
-    <NodeWrapper title="Video Input" icon={<Film size={14} />} selected={selected} minWidth={280} accentColor={PORT_COLORS.video} titlePosition="outside">
-
+    <NodeWrapper
+      title="Video Input"
+      icon={<Film size={14} />}
+      selected={selected}
+      minWidth={300}
+      accentColor={PORT_COLORS.video}
+      titlePosition="outside"
+      appearance="imageGenerationGlass"
+    >
       {/* Processing */}
       {isProcessing && (
-        <div
-          className="flex flex-col items-center justify-center gap-2 rounded-lg"
-          style={{ minHeight: 90, background: 'var(--color-bg-surface)', padding: 16 }}
-        >
+        <div className={glassStyles.statusBlock}>
           <RefreshCw size={18} className="animate-spin" style={{ color: PORT_COLORS.video }} />
-          <p className="text-xs font-medium text-center" style={{ color: 'var(--color-white)' }}>
+          <p className={glassStyles.dropzoneTitle}>
             {stage === 'compressing' ? `Compressing… ${progress}%` : 'Uploading…'}
           </p>
           {stage === 'compressing' && (
-            <div className="w-full" style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            <div className={glassStyles.progressTrack}>
               <div
-                style={{ height: '100%', width: `${Math.max(2, progress)}%`, background: PORT_COLORS.video, transition: 'width 0.3s ease-out' }}
+                className={glassStyles.progressFill}
+                style={{ width: `${Math.max(2, progress)}%`, background: PORT_COLORS.video }}
               />
             </div>
           )}
@@ -189,38 +196,33 @@ export function VideoInputNode({ data, selected, id }: NodeProps & { data: Video
 
       {/* Error */}
       {!isProcessing && error && (
-        <div
-          className="flex flex-col items-center gap-3 rounded-lg p-4"
-          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
-        >
+        <div className={cn(glassStyles.notice, glassStyles.noticeError)} style={{ flexDirection: 'column', alignItems: 'center', gap: 10, padding: 14 }}>
           <AlertTriangle size={20} style={{ color: '#f87171' }} />
-          <p className="text-xs text-center" style={{ color: '#fca5a5' }}>{error}</p>
+          <p className="text-center leading-relaxed">{error}</p>
           <button
             onClick={handleRetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium nodrag transition-opacity hover:opacity-80"
-            style={{ background: 'rgba(239,68,68,0.2)', color: '#fca5a5' }}
+            className={cn(glassStyles.glassSurface, glassStyles.chip, glassStyles.chipAuto, 'nodrag transition-opacity hover:opacity-80')}
+            style={{ color: '#fca5a5' }}
           >
-            <RotateCcw size={11} />
-            {pendingFile ? 'Try Again' : 'Dismiss'}
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <RotateCcw size={11} />
+              {pendingFile ? 'Try Again' : 'Dismiss'}
+            </span>
           </button>
         </div>
       )}
 
       {/* Video preview */}
       {!isProcessing && !error && data.videoUrl && (
-        <div className="relative" style={{ margin: '-18px' }}>
+        <div className={glassStyles.mediaFrame}>
           <CanvasVideo
             src={data.videoUrl}
             controls
             className="w-full block nodrag"
             style={{ height: 'auto' }}
           />
-          <button
-            className="absolute top-1 right-1 p-0.5 rounded-full nodrag"
-            style={{ background: 'rgba(0,0,0,0.6)' }}
-            onClick={clearVideo}
-          >
-            <X size={12} style={{ color: 'var(--color-white)' }} />
+          <button className={cn(glassStyles.mediaAction, 'nodrag')} onClick={clearVideo} aria-label="Remove video">
+            <X size={12} />
           </button>
         </div>
       )}
@@ -229,19 +231,14 @@ export function VideoInputNode({ data, selected, id }: NodeProps & { data: Video
       {!isProcessing && !error && !data.videoUrl && (
         <>
           <div
-            className="flex flex-col items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors nodrag"
-            style={{
-              height: 90,
-              border: '1.5px dashed rgba(255,255,255,0.2)',
-              background: 'transparent',
-            }}
+            className={cn(glassStyles.dropzone, 'nodrag')}
             onClick={() => inputRef.current?.click()}
           >
-            <Upload size={18} style={{ color: 'var(--color-white-muted)' }} />
-            <p className="text-xs text-center" style={{ color: 'var(--color-white-muted)' }}>
+            <Upload size={18} style={{ color: 'rgba(255,255,255,0.55)' }} />
+            <p className={glassStyles.dropzoneTitle}>
               Click to upload video
             </p>
-            <p className="text-xs" style={{ color: 'var(--color-white-muted)', fontSize: 10, opacity: 0.6 }}>
+            <p className={glassStyles.dropzoneHint}>
               MP4, WebM, MOV · compressed if &gt;50 MB
             </p>
           </div>

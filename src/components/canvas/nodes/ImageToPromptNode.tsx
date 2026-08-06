@@ -9,6 +9,8 @@ import { NodeSelect } from './NodeSelect';
 import type { ImageToPromptNodeData } from '@/types';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
@@ -114,27 +116,29 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
       icon={<Wand2 size={14} />}
       status={data.status}
       selected={selected}
-      minWidth={280}
+      minWidth={300}
       accentColor={PORT_COLORS.text}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={
-        <div className="flex gap-1.5 items-stretch">
-          <NodeSelect
-            options={LENGTH_OPTIONS.map(o => o.label)}
-            value={LENGTH_OPTIONS.find(o => o.id === length)?.label ?? 'Auto'}
-            onChange={(label) => { const o = LENGTH_OPTIONS.find(o => o.label === label); if (o) setLength(o.id); }}
-          />
+        <div className={glassStyles.footerStack}>
           <button
             onClick={handleAnalyze}
             disabled={!hasImage || isProcessing}
-            className="flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-            style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
-          >
-            {isProcessing ? (
-              <><RefreshCw size={11} className="animate-spin" /> Analyzing…</>
-            ) : (
-              <><Wand2 size={11} /> Analyze Image</>
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.generateButton,
+              'transition-opacity disabled:opacity-40 nodrag',
             )}
+          >
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              {isProcessing ? (
+                <><RefreshCw size={11} className="animate-spin" /> Analyzing…</>
+              ) : (
+                <><Wand2 size={11} /> Analyze Image</>
+              )}
+            </span>
           </button>
         </div>
       }
@@ -156,7 +160,7 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
 
       {/* Version history navigation */}
       {promptHistory.length > 1 && (
-        <div className="flex items-center justify-between my-1.5">
+        <div className={glassStyles.historyNav}>
           <button
             onClick={() => navigateHistory(Math.max(0, historyIdx - 1))}
             disabled={historyIdx === 0}
@@ -165,7 +169,10 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
           >
             <ChevronLeft size={13} />
           </button>
-          <span className="text-xs" style={{ color: isViewingHistory ? 'var(--color-accent)' : 'var(--color-white-muted)', fontSize: 10 }}>
+          <span
+            className={glassStyles.microLabel}
+            style={{ color: isViewingHistory ? 'var(--color-accent)' : undefined }}
+          >
             {`VERSION ${historyIdx + 1}`}
           </span>
           <button
@@ -181,12 +188,7 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
 
       {/* Image preview */}
       {hasImage ? (
-        <div
-          style={{
-            margin: !hasPrompt ? '-18px' : promptHistory.length > 1 ? '0 -18px 12px -18px' : '-18px -18px 12px -18px',
-            overflow: 'hidden',
-          }}
-        >
+        <div className={glassStyles.mediaFrame}>
           <CanvasImage
             src={data.inputImageUrl!}
             alt="Input"
@@ -195,20 +197,24 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
           />
         </div>
       ) : (
-        <div
-          className="flex items-center justify-center mb-3 rounded-lg text-xs"
-          style={{ height: 72, background: 'var(--color-bg-surface)', border: '1px dashed rgba(255,255,255,0.15)', color: 'var(--color-white-muted)' }}
-        >
+        <div className={glassStyles.emptyState}>
           Connect an image to analyze
         </div>
       )}
 
+      {/* Length */}
+      <div className={glassStyles.field}>
+        <span className={glassStyles.microLabel}>Prompt Length</span>
+        <NodeSelect
+          options={LENGTH_OPTIONS.map(o => o.label)}
+          value={LENGTH_OPTIONS.find(o => o.id === length)?.label ?? 'Auto'}
+          onChange={(label) => { const o = LENGTH_OPTIONS.find(o => o.label === label); if (o) setLength(o.id); }}
+        />
+      </div>
+
       {/* Error state */}
       {data.status === 'error' && !hasPrompt && (
-        <div
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-2"
-          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5' }}
-        >
+        <div className={cn(glassStyles.notice, glassStyles.noticeError)}>
           <AlertTriangle size={12} style={{ flexShrink: 0 }} />
           Analysis failed. Try again.
         </div>
@@ -216,21 +222,13 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
 
       {/* Generated prompt — editable */}
       {hasPrompt && (
-        <div className="relative">
+        <div className={cn(glassStyles.glassSurface, glassStyles.promptSection, glassStyles.promptSurface)}>
           <textarea
             ref={textareaRef}
             value={localPrompt}
             rows={1}
-            className="w-full text-xs outline-none nodrag resize-none"
-            style={{
-              background: 'var(--color-bg-surface)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 8,
-              color: 'var(--color-white)',
-              padding: '8px 32px 8px 10px',
-              lineHeight: 1.6,
-              overflow: 'hidden',
-            }}
+            className={cn(glassStyles.glassContent, glassStyles.promptContent, 'outline-none nodrag')}
+            style={{ paddingRight: 32 }}
             onFocus={() => { isFocused.current = true; }}
             onBlur={() => { isFocused.current = false; }}
             onChange={(e) => {
@@ -243,8 +241,8 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
           />
           <button
             onClick={handleCopy}
-            className="absolute top-1.5 right-1.5 p-1 rounded nodrag transition-opacity hover:opacity-80"
-            style={{ color: 'var(--color-white-muted)' }}
+            className="p-1 rounded nodrag transition-opacity hover:opacity-80"
+            style={{ position: 'absolute', top: 6, right: 6, zIndex: 2, color: 'rgba(255,255,255,0.6)' }}
             title="Copy prompt"
           >
             {copied ? <Check size={11} /> : <Copy size={11} />}

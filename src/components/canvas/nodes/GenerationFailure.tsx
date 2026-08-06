@@ -1,6 +1,8 @@
 'use client';
 
 import { AlertCircle, Check } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 /**
  * Fills a generation thumbnail with the reason FAL rejected it — the same
@@ -16,7 +18,7 @@ export function GenerationFailureOverlay({
   return (
     <div
       className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 py-3 text-center nodrag nowheel"
-      style={{ background: 'var(--color-bg-surface)', overflowY: 'auto' }}
+      style={{ background: '#151516', overflowY: 'auto' }}
     >
       <div className="flex items-center gap-1.5" style={{ color: 'var(--color-error)' }}>
         <AlertCircle size={11} className="shrink-0" />
@@ -24,7 +26,7 @@ export function GenerationFailureOverlay({
       </div>
       <p
         className="text-xs leading-snug"
-        style={{ color: 'var(--color-white-muted)', fontSize: 10, wordBreak: 'break-word' }}
+        style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, wordBreak: 'break-word' }}
       >
         {message ?? 'FAL did not report a reason for this failure.'}
       </p>
@@ -47,17 +49,23 @@ export function GenerationFailureOverlay({
  */
 export function RegenerateGate({ onChangesApplied }: { onChangesApplied: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-2 px-1">
-      <span style={{ color: 'var(--color-white-muted)', fontSize: 10 }}>
+    <div className={glassStyles.rowBetween} style={{ paddingInline: 2 }}>
+      <span className={glassStyles.microLabel}>
         Make changes before regenerating
       </span>
       <button
         onClick={onChangesApplied}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg nodrag transition-opacity hover:opacity-80 active:opacity-60"
-        style={{ background: 'var(--color-bg-hover)', color: 'var(--color-white-muted)', fontSize: 10 }}
+        className={cn(
+          glassStyles.glassSurface,
+          glassStyles.chip,
+          glassStyles.chipAuto,
+          'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+        )}
       >
-        <Check size={10} />
-        Changes applied
+        <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+          <Check size={10} />
+          Changes applied
+        </span>
       </button>
     </div>
   );

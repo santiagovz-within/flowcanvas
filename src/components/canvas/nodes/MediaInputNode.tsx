@@ -15,6 +15,8 @@ import { uploadImageToStorage } from '@/lib/utils/uploadImage';
 import { resolveGcsRefs } from '@/lib/utils/mediaUtils';
 import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { useFlowStore } from '@/lib/stores/flowStore';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 import type { FFmpeg } from '@ffmpeg/ffmpeg';
 
 const MAX_VIDEO_BYTES     = 150 * 1024 * 1024; // 150 MB — hard reject
@@ -146,16 +148,14 @@ function GalleryPicker({ onSelect, onClose }: { onSelect: (url: string) => void;
 
 function ProgressBar({ percent, color }: { percent: number; color: string }) {
   return (
-    <div className="w-full">
-      <div className="w-full rounded-full overflow-hidden" style={{ height: 4, background: 'rgba(255,255,255,0.1)' }}>
+    <div className={glassStyles.sliderRow}>
+      <div className={glassStyles.progressTrack}>
         <div
-          className="h-full rounded-full transition-all duration-300 ease-out"
+          className={glassStyles.progressFill}
           style={{ width: `${Math.max(2, percent)}%`, background: color }}
         />
       </div>
-      <p className="text-right mt-1" style={{ color: 'var(--color-white-muted)', fontSize: 10 }}>
-        {percent}%
-      </p>
+      <span className={glassStyles.helperText} style={{ textAlign: 'right' }}>{percent}%</span>
     </div>
   );
 }
@@ -436,13 +436,14 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
       title="Media Input"
       icon={data.mediaType === 'video' ? <Film size={14} /> : <Image size={14} />}
       selected={selected}
-      minWidth={280}
+      minWidth={300}
       accentColor={accentColor}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
     >
       {/* Processing */}
       {isProcessing && (
-        <div className="relative overflow-hidden" style={{ margin: '-18px', minHeight: 90 }}>
+        <div className={glassStyles.mediaFrame}>
           {previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -454,16 +455,14 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
           )}
           <div
             className="relative flex flex-col items-center justify-center gap-2 p-4"
-            style={{ minHeight: 90, background: previewUrl ? 'rgba(0,0,0,0.5)' : 'var(--color-bg-surface)' }}
+            style={{ minHeight: 96, background: previewUrl ? 'rgba(0,0,0,0.5)' : 'transparent' }}
           >
             <RefreshCw size={18} className="animate-spin" style={{ color: accentColor }} />
-            <p className="text-xs font-medium text-center" style={{ color: '#fff' }}>
+            <p className={glassStyles.dropzoneTitle}>
               {stageLabel[activeStage as string] ?? 'Processing…'}
             </p>
             {activeStage === 'compressing' && (
-              <div className="w-full px-2">
-                <ProgressBar percent={activeProgress} color={accentColor} />
-              </div>
+              <ProgressBar percent={activeProgress} color={accentColor} />
             )}
           </div>
         </div>
@@ -471,41 +470,25 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
 
       {/* Error */}
       {!isProcessing && activeError && (
-        <div
-          className="flex flex-col items-center gap-3"
-          style={{
-            margin: '-18px',
-            padding: 16,
-            background: 'rgba(239,68,68,0.08)',
-            border: '1px solid rgba(239,68,68,0.2)',
-            borderTop: 'none',
-          }}
-        >
+        <div className={cn(glassStyles.notice, glassStyles.noticeError)} style={{ flexDirection: 'column', alignItems: 'center', gap: 10, padding: 14 }}>
           <AlertTriangle size={20} style={{ color: '#f87171', flexShrink: 0 }} />
-          <p className="text-xs text-center leading-relaxed" style={{ color: '#fca5a5' }}>
-            {activeError}
-          </p>
+          <p className="text-center leading-relaxed">{activeError}</p>
           <button
             onClick={handleRetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium nodrag transition-opacity hover:opacity-80"
-            style={{ background: 'rgba(239,68,68,0.2)', color: '#fca5a5' }}
+            className={cn(glassStyles.glassSurface, glassStyles.chip, glassStyles.chipAuto, 'nodrag transition-opacity hover:opacity-80')}
+            style={{ color: '#fca5a5' }}
           >
-            <RotateCcw size={11} />
-            {pendingFile ? 'Try Again' : 'Dismiss'}
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <RotateCcw size={11} />
+              {pendingFile ? 'Try Again' : 'Dismiss'}
+            </span>
           </button>
         </div>
       )}
 
       {/* Image preview */}
       {!isProcessing && !activeError && hasImage && (
-        <div
-          className="relative overflow-hidden"
-          style={{
-            margin: '-18px',
-            backgroundImage: 'conic-gradient(#3a3a3a 90deg, #2a2a2a 90deg 180deg, #3a3a3a 180deg 270deg, #2a2a2a 270deg)',
-            backgroundSize: '14px 14px',
-          }}
-        >
+        <div className={cn(glassStyles.mediaFrame, glassStyles.mediaCheckered)}>
           <CanvasImage
             src={data.imageUrl!}
             alt="Input"
@@ -514,31 +497,23 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
             draggable={false}
             onLoad={handleImageLoad}
           />
-          <button
-            className="absolute top-1.5 right-1.5 p-0.5 rounded-full nodrag"
-            style={{ background: '#fff' }}
-            onClick={clearMedia}
-          >
-            <X size={12} style={{ color: '#000' }} />
+          <button className={cn(glassStyles.mediaAction, 'nodrag')} onClick={clearMedia} aria-label="Remove media">
+            <X size={12} />
           </button>
         </div>
       )}
 
       {/* Video preview */}
       {!isProcessing && !activeError && hasVideo && (
-        <div className="relative" style={{ margin: '-18px' }}>
+        <div className={glassStyles.mediaFrame}>
           <CanvasVideo
             src={data.videoUrl!}
             controls
             className="w-full block nodrag"
             style={{ height: 'auto' }}
           />
-          <button
-            className="absolute top-1.5 right-1.5 p-0.5 rounded-full nodrag"
-            style={{ background: '#fff' }}
-            onClick={clearMedia}
-          >
-            <X size={12} style={{ color: '#000' }} />
+          <button className={cn(glassStyles.mediaAction, 'nodrag')} onClick={clearMedia} aria-label="Remove media">
+            <X size={12} />
           </button>
         </div>
       )}
@@ -548,36 +523,32 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
         <>
           <div
             {...getRootProps()}
-            className="flex flex-col items-center justify-center gap-2 rounded-lg cursor-pointer transition-colors nodrag"
-            style={{
-              height: 90,
-              border: isDragActive
-                ? '1.5px dashed var(--color-accent)'
-                : '1.5px dashed rgba(255,255,255,0.2)',
-              background: isDragActive ? 'var(--color-accent-glow)' : 'transparent',
-            }}
+            className={cn(glassStyles.dropzone, isDragActive && glassStyles.dropzoneActive, 'nodrag')}
           >
             <input {...getInputProps()} />
-            <Upload size={18} style={{ color: 'var(--color-white-muted)' }} />
-            <p className="text-xs text-center" style={{ color: 'var(--color-white-muted)' }}>
+            <Upload size={18} style={{ color: 'rgba(255,255,255,0.55)' }} />
+            <p className={glassStyles.dropzoneTitle}>
               {isDragActive ? 'Drop file here' : 'Drop or click to upload'}
             </p>
-            <p className="text-center px-4" style={{ color: 'var(--color-white-muted)', fontSize: 10, opacity: 0.6 }}>
+            <p className={glassStyles.dropzoneHint}>
               Image (JPEG, PNG, WebP) · Video (MP4, WebM, MOV, max 150 MB)
             </p>
           </div>
 
           <button
             onClick={() => setShowGallery(true)}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium mt-2 transition-opacity hover:opacity-80 nodrag"
-            style={{
-              background: 'var(--color-bg-surface)',
-              border: 'var(--border-default)',
-              color: 'var(--color-white-muted)',
-            }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.footerControl,
+              glassStyles.buttonSmall,
+              'transition-opacity hover:opacity-80 nodrag',
+            )}
           >
-            <Layout size={12} />
-            Browse Gallery
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Layout size={12} />
+              Browse Gallery
+            </span>
           </button>
         </>
       )}

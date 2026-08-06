@@ -8,6 +8,8 @@ import type { OutputNodeData, ImageInputNodeData, ImageGenNodeData, UpscaleNodeD
 import { downloadFromUrl } from '@/lib/utils/download';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 export function OutputNode({ data, selected, id }: NodeProps & { data: OutputNodeData }) {
   const storeEdges = useFlowStore(state => state.edges);
@@ -38,18 +40,27 @@ export function OutputNode({ data, selected, id }: NodeProps & { data: OutputNod
       title="Output"
       icon={<Monitor size={14} />}
       selected={selected}
-      minWidth={280}
+      minWidth={300}
       accentColor="var(--color-white)"
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={mediaUrl ? (
-        <button
-          onClick={() => downloadFromUrl(mediaUrl)}
-          className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-          style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
-        >
-          <Download size={12} />
-          Download
-        </button>
+        <div className={glassStyles.footerStack}>
+          <button
+            onClick={() => downloadFromUrl(mediaUrl)}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.downloadButton,
+              'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+            )}
+          >
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Download size={12} />
+              Download
+            </span>
+          </button>
+        </div>
       ) : undefined}
     >
       <TypedHandle
@@ -70,7 +81,7 @@ export function OutputNode({ data, selected, id }: NodeProps & { data: OutputNod
       />
 
       {mediaUrl ? (
-        <div style={{ margin: '-18px', overflow: 'hidden' }}>
+        <div className={glassStyles.mediaFrame}>
           {mediaType === 'video' ? (
             <CanvasVideo
               src={mediaUrl}
@@ -89,18 +100,9 @@ export function OutputNode({ data, selected, id }: NodeProps & { data: OutputNod
           )}
         </div>
       ) : (
-        <div
-          className="flex flex-col items-center justify-center gap-2"
-          style={{
-            height: 120,
-            border: '1.5px dashed rgba(255,255,255,0.1)',
-            borderRadius: '8px',
-          }}
-        >
-          <Image size={24} className="opacity-20" style={{ color: 'var(--color-white)' }} />
-          <p className="text-xs" style={{ color: 'var(--color-white-muted)' }}>
-            Connect a node to preview output
-          </p>
+        <div className={glassStyles.emptyState} style={{ minHeight: 120 }}>
+          <Image size={24} className="opacity-20" style={{ color: '#fff' }} />
+          Connect a node to preview output
         </div>
       )}
     </NodeWrapper>

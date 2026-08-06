@@ -11,12 +11,8 @@ import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type { RemoveBgNodeData, ImageInputNodeData, ImageGenNodeData, UpscaleNodeData, SelectNodeData, ModifyNodeData, MediaInputNodeData } from '@/types';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
-
-const CHECKERBOARD: React.CSSProperties = {
-  backgroundImage:
-    'conic-gradient(#3a3a3a 90deg, #2a2a2a 90deg 180deg, #3a3a3a 180deg 270deg, #2a2a2a 270deg)',
-  backgroundSize: '14px 14px',
-};
+import { cn } from '@/lib/utils/cn';
+import glassStyles from './ImageGenerationGlass.module.css';
 
 export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveBgNodeData }) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -84,35 +80,49 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
       status={data.status}
       errorMessage={data.errorMessage}
       selected={selected}
-      minWidth={280}
+      minWidth={300}
       accentColor={PORT_COLORS.image}
       titlePosition="outside"
+      appearance="imageGenerationGlass"
       footer={
-        <>
+        <div className={glassStyles.footerStack}>
           <button
             onClick={handleRemove}
             disabled={isProcessing || !inputImageUrl}
-            className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-opacity disabled:opacity-40 nodrag"
-            style={{ background: 'var(--action-btn-bg)', color: 'var(--action-btn-color)', borderRadius: 11 }}
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.button,
+              glassStyles.generateButton,
+              'transition-opacity disabled:opacity-40 nodrag',
+            )}
           >
-            <Play size={12} />
-            {isProcessing ? 'Processing…' : 'Remove Background'}
+            <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+              <Play size={12} />
+              {isProcessing ? 'Processing…' : 'Remove Background'}
+            </span>
           </button>
 
           {data.outputImageUrl && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'flex-start' }}>
+            <div className={glassStyles.footerSecondary}>
               <button
                 onClick={() => downloadFromUrl(data.outputImageUrl!)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium nodrag transition-opacity hover:opacity-80 active:opacity-60"
-                style={{ background: 'var(--color-bg-surface)', color: 'var(--color-white-muted)', borderRadius: 11 }}
+                className={cn(
+                  glassStyles.glassSurface,
+                  glassStyles.button,
+                  glassStyles.downloadButton,
+                  glassStyles.footerAction,
+                  'nodrag transition-opacity hover:opacity-80 active:opacity-60',
+                )}
               >
-                <Download size={12} />
-                Download PNG
+                <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+                  <Download size={12} />
+                  Download PNG
+                </span>
               </button>
-              <SendToFigmaButton imageUrl={data.outputImageUrl} style={{ flex: 1, minWidth: 0 }} />
+              <SendToFigmaButton imageUrl={data.outputImageUrl} style={{ flex: '1 1 0', minWidth: 0 }} />
             </div>
           )}
-        </>
+        </div>
       }
     >
       <TypedHandle
@@ -133,7 +143,7 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
       {/* ── Preview ─────────────────────────────────────────────────────── */}
       {data.outputImageUrl ? (
         // Output on checkerboard so transparency is visible
-        <div style={{ margin: '-18px', overflow: 'hidden', ...CHECKERBOARD }}>
+        <div className={cn(glassStyles.mediaFrame, glassStyles.mediaCheckered)}>
           <CanvasImage
             src={data.outputImageUrl}
             alt="Background removed"
@@ -143,7 +153,7 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
           />
         </div>
       ) : inputImageUrl ? (
-        <div style={{ margin: '-18px', overflow: 'hidden' }}>
+        <div className={glassStyles.mediaFrame}>
           <CanvasImage
             src={inputImageUrl}
             alt="Input"
@@ -153,14 +163,7 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
           />
         </div>
       ) : (
-        <div
-          className="flex items-center justify-center rounded-lg mb-3 text-xs"
-          style={{
-            height: 56,
-            border: '1.5px dashed rgba(255,255,255,0.15)',
-            color: 'var(--color-white-muted)',
-          }}
-        >
+        <div className={glassStyles.emptyState}>
           Connect an image source
         </div>
       )}
