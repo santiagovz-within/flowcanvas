@@ -64,23 +64,21 @@ export function NodeWrapper({
         )}
         style={{ width: width ?? minWidth }}
       >
-        {/* Title floats above the card unless loaded media is displayed on its own. */}
-        {!mediaOnly && (
-          <div className={cn(
-            isImageGenerationGlass ? glassStyles.titleRow : 'flex items-center gap-2 mb-2 px-1',
-          )}>
-            <span className={cn(isImageGenerationGlass && glassStyles.titleIcon)} style={{ color }}>{icon}</span>
-            <span
-              className={cn(
-                isImageGenerationGlass ? glassStyles.titleText : 'text-xs font-semibold uppercase tracking-wider',
-              )}
-              style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)' }}
-            >
-              {title}
-            </span>
-            {status && status !== 'idle' && <StatusBadge status={status} errorMessage={errorMessage} />}
-          </div>
-        )}
+        {/* Title floats above the card. */}
+        <div className={cn(
+          isImageGenerationGlass ? glassStyles.titleRow : 'flex items-center gap-2 mb-2 px-1',
+        )}>
+          <span className={cn(isImageGenerationGlass && glassStyles.titleIcon)} style={{ color }}>{icon}</span>
+          <span
+            className={cn(
+              isImageGenerationGlass ? glassStyles.titleText : 'text-xs font-semibold uppercase tracking-wider',
+            )}
+            style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)' }}
+          >
+            {title}
+          </span>
+          {status && status !== 'idle' && <StatusBadge status={status} errorMessage={errorMessage} />}
+        </div>
 
         {/* Card (no inner title bar) */}
         <div
