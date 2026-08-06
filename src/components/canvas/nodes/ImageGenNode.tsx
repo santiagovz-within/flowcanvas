@@ -498,7 +498,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
                     isConnected ? glassStyles.connectorActive : glassStyles.connectorInactive,
                   )}
                 >
-                  <span className={glassStyles.glassContent}>Image {i + 1}</span>
+                  <span className={glassStyles.glassContent}>@image{i + 1}</span>
                 </div>
               );
             })}
