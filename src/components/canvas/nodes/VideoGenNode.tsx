@@ -2,6 +2,7 @@
 
 import { Position, type NodeProps } from '@xyflow/react';
 import { Film, Play, AlertTriangle, Download, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
+import Image from 'next/image';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NodeWrapper } from './NodeWrapper';
@@ -23,7 +24,14 @@ const KLING_ASPECT_RATIOS    = ['16:9', '9:16', '1:1'];
 const OMNI_ASPECT_RATIOS     = ['16:9', '9:16'];
 const SEEDANCE_ASPECT_RATIOS = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
 const SEEDANCE_RESOLUTIONS   = ['720p', '1080p', '4k'];
-const SEEDANCE_MINI_RESOLUTIONS = ['720p', '480p'];
+
+type VideoResolution = NonNullable<VideoGenNodeData['seedanceResolution']>;
+
+const LOCKED_RESOLUTIONS: Partial<Record<string, VideoResolution>> = {
+  'google-omni-flash': '720p',
+  'seedance-2-mini': '720p',
+  'kling-3-pro': '1080p',
+};
 
 const DURATION_OPTIONS = ['3s', '5s', '8s', '10s'];
 const SEEDANCE_MINI_DURATION_OPTIONS = ['4s', '5s', '8s', '10s'];
@@ -81,9 +89,12 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     : isOmni
       ? OMNI_ASPECT_RATIOS
       : KLING_ASPECT_RATIOS;
-  const seedanceResolutionOptions = isSeedanceMini
-    ? SEEDANCE_MINI_RESOLUTIONS
-    : SEEDANCE_RESOLUTIONS;
+  const lockedResolution = LOCKED_RESOLUTIONS[data.model];
+  const resolutionOptions = isSeedanceFull
+    ? SEEDANCE_RESOLUTIONS
+    : lockedResolution
+      ? [lockedResolution]
+      : ['720p'];
   const durationOptions = isSeedanceMini
     ? SEEDANCE_MINI_DURATION_OPTIONS
     : DURATION_OPTIONS;
@@ -93,9 +104,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   const selectedDuration = isSeedanceMini && (data.duration ?? 5) < 4
     ? 5
     : data.duration ?? 5;
-  const selectedSeedanceResolution = isSeedanceMini && !SEEDANCE_MINI_RESOLUTIONS.includes(data.seedanceResolution ?? '720p')
-    ? '720p'
-    : data.seedanceResolution ?? '720p';
+  const selectedResolution = lockedResolution ?? data.seedanceResolution ?? '720p';
 
   // Read start-frame source node directly from store (reactive, zero-latency)
   const storeEdges = useFlowStore(state => state.edges);
@@ -158,14 +167,13 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     const modelConfig = VIDEO_MODELS.find(option => option.id === model);
     const supportedAspectRatios = modelConfig?.supportedAspectRatios ?? [];
     const nextIsSeedanceMini = model === 'seedance-2-mini';
+    const nextLockedResolution = LOCKED_RESOLUTIONS[model];
     updateData({
       model,
       ...(!supportedAspectRatios.includes(data.aspectRatio) && supportedAspectRatios[0]
         ? { aspectRatio: supportedAspectRatios[0] }
         : {}),
-      ...(nextIsSeedanceMini && !SEEDANCE_MINI_RESOLUTIONS.includes(data.seedanceResolution ?? '720p')
-        ? { seedanceResolution: '720p' as const }
-        : {}),
+      ...(nextLockedResolution ? { seedanceResolution: nextLockedResolution } : {}),
       ...(nextIsSeedanceMini && (data.duration ?? 5) < 4
         ? { duration: 5 }
         : {}),
@@ -217,7 +225,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         startFrameUrl: data.startFrameUrl,
         endFrameUrl: data.endFrameUrl,
         generateAudio: data.generateAudio ?? true,
-        seedanceResolution: selectedSeedanceResolution,
+        seedanceResolution: selectedResolution,
         sourceType: 'canvas',
         sourceId: currentFlow.id,
         nodeId: id,
@@ -385,7 +393,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         </div>
       )}
 
-      <div className={isSeedance ? glassStyles.grid3 : glassStyles.grid2}>
+      <div className={glassStyles.grid3}>
         <div className={glassStyles.field}>
           <NodeSelect
             options={currentAspectOptions}
@@ -404,16 +412,16 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
             optionIcon={() => <Clock3 size={10} />}
           />
         </div>
-        {isSeedance && (
-          <div className={glassStyles.field}>
-            <span className={glassStyles.microLabel}>Resolution</span>
-            <NodeSelect
-              options={seedanceResolutionOptions}
-              value={selectedSeedanceResolution}
-              onChange={(v) => updateData({ seedanceResolution: v as '480p' | '720p' | '1080p' | '4k' })}
-            />
-          </div>
-        )}
+        <div className={glassStyles.field}>
+          <NodeSelect
+            options={resolutionOptions}
+            value={selectedResolution}
+            onChange={(v) => updateData({ seedanceResolution: v as VideoResolution })}
+            leadingIcon={<Image src="/node-icons/icon-resolution.svg" alt="" width={10} height={10} aria-hidden />}
+            optionIcon={() => <Image src="/node-icons/icon-resolution.svg" alt="" width={10} height={10} aria-hidden />}
+            locked={!!lockedResolution}
+          />
+        </div>
       </div>
 
       {/* Frame reference slots */}

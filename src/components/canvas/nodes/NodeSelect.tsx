@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStoreApi } from '@xyflow/react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
 
@@ -14,6 +14,7 @@ interface NodeSelectProps {
   leadingIcon?: React.ReactNode;
   optionIcon?: (option: string) => React.ReactNode;
   appearance?: 'default' | 'imageGenerationGlass';
+  locked?: boolean;
 }
 
 interface DropdownPosition {
@@ -41,6 +42,7 @@ export function NodeSelect({
   leadingIcon,
   optionIcon,
   appearance = 'imageGenerationGlass',
+  locked = false,
 }: NodeSelectProps) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -52,6 +54,7 @@ export function NodeSelect({
 
   function openDropdown(e: React.MouseEvent) {
     e.stopPropagation();
+    if (locked) return;
     if (!triggerRef.current) return;
     setPos(measureDropdown(triggerRef.current));
     setOpen((o) => !o);
@@ -102,16 +105,24 @@ export function NodeSelect({
           {value}
         </span>
       </span>
-      <ChevronDown
-        size={isImageGenerationGlass ? 14 : 20}
-        className={cn(isImageGenerationGlass && glassStyles.chevron)}
-        style={{
-          opacity: isImageGenerationGlass ? 1 : 0.6,
-          flexShrink: 0,
-          transform: open ? 'rotate(180deg)' : 'none',
-          transition: 'transform 0.15s',
-        }}
-      />
+      {locked ? (
+        <Lock
+          size={isImageGenerationGlass ? 12 : 18}
+          className={cn(isImageGenerationGlass && glassStyles.lockIcon)}
+          aria-hidden
+        />
+      ) : (
+        <ChevronDown
+          size={isImageGenerationGlass ? 14 : 20}
+          className={cn(isImageGenerationGlass && glassStyles.chevron)}
+          style={{
+            opacity: isImageGenerationGlass ? 1 : 0.6,
+            flexShrink: 0,
+            transform: open ? 'rotate(180deg)' : 'none',
+            transition: 'transform 0.15s',
+          }}
+        />
+      )}
     </>
   );
 
@@ -153,7 +164,7 @@ export function NodeSelect({
         className={cn(
           'nodrag',
           isImageGenerationGlass
-            ? [glassStyles.glassSurface, glassStyles.selectTrigger]
+            ? [glassStyles.glassSurface, glassStyles.selectTrigger, locked && glassStyles.selectTriggerLocked]
             : 'w-full h-full flex items-center gap-1.5 px-2 py-1.5 text-xs',
         )}
         style={isImageGenerationGlass ? undefined : {
@@ -166,6 +177,8 @@ export function NodeSelect({
           outline: 'none',
           lineHeight: 1.4,
         }}
+        disabled={locked}
+        aria-label={locked ? `${value}, locked` : undefined}
         onClick={openDropdown}
       >
         {isImageGenerationGlass ? (
@@ -175,7 +188,7 @@ export function NodeSelect({
         ) : triggerContent}
       </button>
 
-      {open && typeof document !== 'undefined' && createPortal(
+      {open && !locked && typeof document !== 'undefined' && createPortal(
         <div
           ref={dropdownRef}
           className={cn(

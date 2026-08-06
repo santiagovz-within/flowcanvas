@@ -80,8 +80,9 @@ export async function POST(request: NextRequest) {
       const isSeedanceMini = model === 'seedance-2-mini';
       const isSeedance = model === 'seedance-2' || isSeedanceMini;
       const isOmni = model === 'google-omni-flash';
+      const isKling = model === 'kling-3-pro';
       const requestedSeedanceResolution = (body as GenerateRequestBody & { seedanceResolution?: string }).seedanceResolution ?? '720p';
-      const seedanceResolution = isSeedanceMini && !['480p', '720p'].includes(requestedSeedanceResolution)
+      const seedanceResolution = isSeedanceMini && requestedSeedanceResolution !== '720p'
         ? '720p'
         : requestedSeedanceResolution;
       const requestedDuration = body.duration ?? 5;
@@ -117,7 +118,11 @@ export async function POST(request: NextRequest) {
           prompt,
           ...(!hasImage || isOmni ? { aspect_ratio: aspectRatio } : {}),
           duration: isOmni ? duration : String(duration),
-          ...(startFrameUrl ? { image_url: startFrameUrl } : {}),
+          ...(startFrameUrl
+            ? isKling
+              ? { start_image_url: startFrameUrl }
+              : { image_url: startFrameUrl }
+            : {}),
           ...(!isOmni && endFrameUrl ? { end_image_url: endFrameUrl } : {}),
           ...(isSeedance    ? { generate_audio: generateAudio !== false, resolution: seedanceResolution } : {}),
         },
