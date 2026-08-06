@@ -80,6 +80,8 @@ function SliderRow({
   onChange: (v: number) => void;
   disabled?: boolean;
 }) {
+  const progress = max === min ? 0 : ((value - min) / (max - min)) * 100;
+
   return (
     <div className={glassStyles.sliderRow}>
       <div className={glassStyles.sliderHead}>
@@ -92,7 +94,7 @@ function SliderRow({
         onChange={(e) => onChange(Number(e.target.value))}
         disabled={disabled}
         className={cn(glassStyles.sliderInput, 'nodrag')}
-        style={{ accentColor: PORT_COLORS.image }}
+        style={{ '--slider-progress': `${progress}%` } as React.CSSProperties}
       />
     </div>
   );
