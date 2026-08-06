@@ -25,6 +25,7 @@ import { generationJobId, useGenerationStore } from '@/lib/stores/generationStor
 import { startTrackedImageGeneration } from '@/lib/generationTracker';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { AspectRatioGlyph } from './AspectRatioGlyph';
 
 const RESOLUTIONS = ['1K', '2K', '4K'];
 const REF_ROW_HEIGHT = 29;
@@ -34,26 +35,6 @@ const GLASS_PERFORMANCE_NODE_THRESHOLD = 20;
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
   el.style.height = `${el.scrollHeight}px`;
-}
-
-function AspectRatioGlyph({ ratio }: { ratio: string }) {
-  const [width, height] = ratio.split(':').map(Number);
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return <span className={glassStyles.aspectGlyphBox} aria-hidden />;
-  }
-
-  const scale = Math.min(width, height) / Math.max(width, height);
-  const glyphWidth = width >= height ? 10 : 10 * scale;
-  const glyphHeight = height >= width ? 10 : 10 * scale;
-
-  return (
-    <span className={glassStyles.aspectGlyphBox} aria-hidden>
-      <span
-        className={glassStyles.aspectGlyph}
-        style={{ width: glyphWidth, height: glyphHeight }}
-      />
-    </span>
-  );
 }
 
 export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGenNodeData }) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useLayoutEffect } from 'react';
-import { Type, Aperture, Film, Zap, Monitor, Grid, Layers, Sliders, Pointer, Wand2, Clapperboard, Scissors, FileImage } from 'lucide-react';
+import { Type, Aperture, Film, Zap, Grid, Layers, Sliders, Pointer, Wand2, Clapperboard, Scissors, FileImage } from 'lucide-react';
 import type { NodeType } from '@/types';
 
 interface NodeOption {
@@ -22,7 +22,6 @@ const NODE_OPTIONS: NodeOption[] = [
   { type: 'selectNode',        label: 'Select',           icon: <Pointer size={14} />,  category: 'Enhance'  },
   { type: 'removeBgNode',      label: 'Remove Background', icon: <Scissors size={14} />,     category: 'Enhance' },
   { type: 'videoToGifNode',    label: 'Video to GIF',      icon: <Clapperboard size={14} />, category: 'Enhance' },
-  { type: 'outputNode',        label: 'Output',           icon: <Monitor size={14} />,  category: 'Output'   },
   { type: 'galleryOutputNode', label: 'Output Gallery',   icon: <Grid size={14} />,     category: 'Output'   },
 ];
 

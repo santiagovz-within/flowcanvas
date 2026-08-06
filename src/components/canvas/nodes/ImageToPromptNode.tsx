@@ -1,7 +1,7 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Wand2, RefreshCw, Copy, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Wand2, RefreshCw, Copy, Check, AlertTriangle, ChevronLeft, ChevronRight, Layout, AlignLeft } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NodeWrapper } from './NodeWrapper';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
@@ -11,6 +11,7 @@ import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { GalleryPicker } from './MediaInputNode';
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto';
@@ -27,6 +28,7 @@ const LENGTH_OPTIONS = [
 export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: ImageToPromptNodeData }) {
   const [copied, setCopied] = useState(false);
   const [length, setLength] = useState('auto');
+  const [showGallery, setShowGallery] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isFocused = useRef(false);
@@ -102,6 +104,11 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
     setCopied(true);
     if (copiedTimer.current) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleGallerySelect(url: string) {
+    setShowGallery(false);
+    updateData({ inputImageUrl: url });
   }
 
   useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
@@ -202,6 +209,24 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
         </div>
       )}
 
+      {!hasImage && (
+        <button
+          onClick={() => setShowGallery(true)}
+          className={cn(
+            glassStyles.glassSurface,
+            glassStyles.button,
+            glassStyles.footerControl,
+            glassStyles.buttonSmall,
+            'transition-opacity hover:opacity-80 nodrag',
+          )}
+        >
+          <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
+            <Layout size={12} />
+            Browse Gallery
+          </span>
+        </button>
+      )}
+
       {/* Length */}
       <div className={glassStyles.field}>
         <span className={glassStyles.microLabel}>Prompt Length</span>
@@ -209,6 +234,7 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
           options={LENGTH_OPTIONS.map(o => o.label)}
           value={LENGTH_OPTIONS.find(o => o.id === length)?.label ?? 'Auto'}
           onChange={(label) => { const o = LENGTH_OPTIONS.find(o => o.label === label); if (o) setLength(o.id); }}
+          leadingIcon={<AlignLeft size={10} />}
         />
       </div>
 
@@ -248,6 +274,10 @@ export function ImageToPromptNode({ data, selected, id }: NodeProps & { data: Im
             {copied ? <Check size={11} /> : <Copy size={11} />}
           </button>
         </div>
+      )}
+
+      {showGallery && (
+        <GalleryPicker onSelect={handleGallerySelect} onClose={() => setShowGallery(false)} />
       )}
     </NodeWrapper>
   );

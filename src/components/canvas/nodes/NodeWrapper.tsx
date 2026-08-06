@@ -21,6 +21,8 @@ interface NodeWrapperProps {
   footer?: React.ReactNode;
   appearance?: 'default' | 'imageGenerationGlass';
   glassPerformanceMode?: boolean;
+  /** Collapse a loaded media node down to the media itself. */
+  mediaOnly?: boolean;
 }
 
 export function NodeWrapper({
@@ -28,6 +30,7 @@ export function NodeWrapper({
   minWidth = 280, width, accentColor,
   titlePosition = 'inside', footer,
   appearance = 'default', glassPerformanceMode = false,
+  mediaOnly = false,
 }: NodeWrapperProps) {
   const color = accentColor ?? 'var(--color-accent)';
   const glow  = accentColor ? `${accentColor}4d` : 'var(--color-accent-glow)';
@@ -35,8 +38,8 @@ export function NodeWrapper({
 
   const cardStyle: React.CSSProperties = {
     ...(isImageGenerationGlass ? {
-      outline: selected ? `1px solid ${color}` : 'none',
-      outlineOffset: selected ? 1 : 0,
+      outline: selected && !mediaOnly ? `1px solid ${color}` : 'none',
+      outlineOffset: selected && !mediaOnly ? 1 : 0,
       // The glass primitive establishes this card as a positioning context.
       // Keep overflow open so React Flow handles can retain their existing
       // outward offsets and full hit targets instead of being clipped.
@@ -61,21 +64,23 @@ export function NodeWrapper({
         )}
         style={{ width: width ?? minWidth }}
       >
-        {/* Title floats above the card */}
-        <div className={cn(
-          isImageGenerationGlass ? glassStyles.titleRow : 'flex items-center gap-2 mb-2 px-1',
-        )}>
-          <span className={cn(isImageGenerationGlass && glassStyles.titleIcon)} style={{ color }}>{icon}</span>
-          <span
-            className={cn(
-              isImageGenerationGlass ? glassStyles.titleText : 'text-xs font-semibold uppercase tracking-wider',
-            )}
-            style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)' }}
-          >
-            {title}
-          </span>
-          {status && status !== 'idle' && <StatusBadge status={status} errorMessage={errorMessage} />}
-        </div>
+        {/* Title floats above the card unless loaded media is displayed on its own. */}
+        {!mediaOnly && (
+          <div className={cn(
+            isImageGenerationGlass ? glassStyles.titleRow : 'flex items-center gap-2 mb-2 px-1',
+          )}>
+            <span className={cn(isImageGenerationGlass && glassStyles.titleIcon)} style={{ color }}>{icon}</span>
+            <span
+              className={cn(
+                isImageGenerationGlass ? glassStyles.titleText : 'text-xs font-semibold uppercase tracking-wider',
+              )}
+              style={isImageGenerationGlass ? undefined : { color: 'var(--color-white-muted)' }}
+            >
+              {title}
+            </span>
+            {status && status !== 'idle' && <StatusBadge status={status} errorMessage={errorMessage} />}
+          </div>
+        )}
 
         {/* Card (no inner title bar) */}
         <div
@@ -84,6 +89,7 @@ export function NodeWrapper({
             isImageGenerationGlass && glassStyles.glassSurface,
             isImageGenerationGlass && glassStyles.nodeSurface,
             isImageGenerationGlass && glassStyles.nodeCard,
+            isImageGenerationGlass && mediaOnly && glassStyles.mediaOnlyNodeCard,
           )}
           style={cardStyle}
         >
@@ -91,6 +97,7 @@ export function NodeWrapper({
             className={cn(
               isImageGenerationGlass && glassStyles.glassContent,
               isImageGenerationGlass && glassStyles.nodeContent,
+              isImageGenerationGlass && mediaOnly && glassStyles.mediaOnlyNodeContent,
             )}
             style={isImageGenerationGlass ? undefined : { padding: 18 }}
           >

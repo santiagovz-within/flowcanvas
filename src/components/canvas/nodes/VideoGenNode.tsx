@@ -1,7 +1,7 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Film, Play, AlertTriangle, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Film, Play, AlertTriangle, Download, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NodeWrapper } from './NodeWrapper';
@@ -17,6 +17,7 @@ import { generationJobId, useGenerationStore } from '@/lib/stores/generationStor
 import { startTrackedVideoGeneration } from '@/lib/generationTracker';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { AspectRatioGlyph } from './AspectRatioGlyph';
 
 const KLING_ASPECT_RATIOS    = ['16:9', '9:16', '1:1'];
 const OMNI_ASPECT_RATIOS     = ['16:9', '9:16'];
@@ -386,19 +387,21 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
 
       <div className={isSeedance ? glassStyles.grid3 : glassStyles.grid2}>
         <div className={glassStyles.field}>
-          <span className={glassStyles.microLabel}>Aspect</span>
           <NodeSelect
             options={currentAspectOptions}
             value={data.aspectRatio}
             onChange={(v) => updateData({ aspectRatio: v })}
+            leadingIcon={<AspectRatioGlyph ratio={data.aspectRatio} />}
+            optionIcon={(ratio) => <AspectRatioGlyph ratio={ratio} />}
           />
         </div>
         <div className={glassStyles.field}>
-          <span className={glassStyles.microLabel}>Duration</span>
           <NodeSelect
             options={durationOptions}
             value={`${selectedDuration}s`}
             onChange={(v) => updateData({ duration: durationMap[v] ?? 5 })}
+            leadingIcon={<Clock3 size={10} />}
+            optionIcon={() => <Clock3 size={10} />}
           />
         </div>
         {isSeedance && (

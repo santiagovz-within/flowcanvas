@@ -60,7 +60,7 @@ interface GalleryImage {
   model: string;
 }
 
-function GalleryPicker({ onSelect, onClose }: { onSelect: (url: string) => void; onClose: () => void }) {
+export function GalleryPicker({ onSelect, onClose }: { onSelect: (url: string) => void; onClose: () => void }) {
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -440,6 +440,7 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
       accentColor={accentColor}
       titlePosition="outside"
       appearance="imageGenerationGlass"
+      mediaOnly={hasMedia}
     >
       {/* Processing */}
       {isProcessing && (

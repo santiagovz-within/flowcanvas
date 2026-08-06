@@ -97,6 +97,26 @@
   padding: 10px;
 }
 
+.mediaOnlyNodeCard {
+  background: transparent;
+  border-radius: 0;
+}
+
+.mediaOnlyNodeCard::before,
+.mediaOnlyNodeCard::after {
+  display: none;
+}
+
+.mediaOnlyNodeContent {
+  gap: 0;
+  padding: 0;
+}
+
+.mediaOnlyNodeContent .mediaFrame {
+  border: 0;
+  border-radius: 0;
+}
+
 .nodeFooter {
   margin-top: calc(var(--spacing) * 2);
 }
