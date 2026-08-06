@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStoreApi } from '@xyflow/react';
-import { ByteDance, Fal, Flux, Gemini, Google, Kling, NanoBanana, OpenAI, TopazLabs } from '@lobehub/icons';
+import { Bfl, ByteDance, Fal, Flux, Gemini, Google, Kling, Minimax, NanoBanana, OpenAI, TopazLabs } from '@lobehub/icons';
 import { Box, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
@@ -48,6 +48,8 @@ const MODEL_SUBTITLES: Record<string, string> = {
   'seedance-2': 'BEST MODEL',
   'seedance-2-mini': 'GOOD MODEL',
   'kling-3-pro': 'GOOD MODEL',
+  'flux-3': 'BLACK FOREST LABS VIDEO MODEL',
+  'minimax-h3': 'HIGH-RESOLUTION VIDEO MODEL',
 };
 
 function ModelIcon({
@@ -75,6 +77,10 @@ function ModelIcon({
       return <Google.Color size={size} />;
     case 'kling-3-pro':
       return <Kling.Color size={size} />;
+    case 'flux-3':
+      return <Bfl size={size} />;
+    case 'minimax-h3':
+      return <Minimax.Color size={size} />;
     case 'seedance-2':
     case 'seedance-2-mini':
       return <ByteDance.Color size={size} />;

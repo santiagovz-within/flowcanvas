@@ -8,7 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NodeWrapper } from './NodeWrapper';
 import { GenerationFailureOverlay, RegenerateGate } from './GenerationFailure';
 import { TypedHandle, PORT_COLORS } from './TypedHandle';
-import type { VideoGenNodeData, ImageInputNodeData, ImageGenNodeData } from '@/types';
+import type { VideoGenNodeData, ImageInputNodeData, ImageGenNodeData, MediaInputNodeData } from '@/types';
 import { VIDEO_MODELS, FAL_MODELS } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { NodeSelect } from './NodeSelect';
@@ -20,12 +20,7 @@ import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
 import { AspectRatioGlyph } from './AspectRatioGlyph';
 
-const KLING_ASPECT_RATIOS    = ['16:9', '9:16', '1:1'];
-const OMNI_ASPECT_RATIOS     = ['16:9', '9:16'];
-const SEEDANCE_ASPECT_RATIOS = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
-const SEEDANCE_RESOLUTIONS   = ['720p', '1080p', '4k'];
-
-type VideoResolution = NonNullable<VideoGenNodeData['seedanceResolution']>;
+type VideoResolution = NonNullable<VideoGenNodeData['videoResolution']>;
 
 const LOCKED_RESOLUTIONS: Partial<Record<string, VideoResolution>> = {
   'google-omni-flash': '720p',
@@ -36,8 +31,8 @@ const LOCKED_RESOLUTIONS: Partial<Record<string, VideoResolution>> = {
 const DURATION_OPTIONS = ['3s', '5s', '8s', '10s'];
 const SEEDANCE_DURATION_OPTIONS = ['4s', '5s', '8s', '10s', '15s'];
 const SEEDANCE_MINI_DURATION_OPTIONS = ['4s', '5s', '8s', '10s'];
-const DURATION_MAP: Record<string, number> = { '3s': 3, '4s': 4, '5s': 5, '8s': 8, '10s': 10, '15s': 15 };
-const SEEDANCE_MINI_DURATION_MAP: Record<string, number> = { '4s': 4, '5s': 5, '8s': 8, '10s': 10 };
+const FLUX_DURATION_OPTIONS = ['5s', '8s', '10s', '15s', '20s'];
+const MINIMAX_DURATION_OPTIONS = ['5s', '8s', '10s', '15s'];
 
 function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
@@ -83,31 +78,38 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   const isSeedanceFull = data.model === 'seedance-2';
   const isSeedanceMini = data.model === 'seedance-2-mini';
   const isSeedance  = isSeedanceFull || isSeedanceMini;
+  const isFlux3     = data.model === 'flux-3';
+  const isMinimaxH3 = data.model === 'minimax-h3';
   const hasImage    = !!data.startFrameUrl;
+  const modelConfig = VIDEO_MODELS.find(option => option.id === data.model) ?? VIDEO_MODELS[0];
 
-  const aspectRatios = isSeedance
-    ? SEEDANCE_ASPECT_RATIOS
-    : isOmni
-      ? OMNI_ASPECT_RATIOS
-      : KLING_ASPECT_RATIOS;
+  const aspectRatios = modelConfig.supportedAspectRatios;
   const lockedResolution = LOCKED_RESOLUTIONS[data.model];
-  const resolutionOptions = isSeedanceFull
-    ? SEEDANCE_RESOLUTIONS
-    : lockedResolution
-      ? [lockedResolution]
-      : ['720p'];
+  const resolutionOptions = (lockedResolution
+    ? [lockedResolution]
+    : modelConfig.supportedResolutions) as VideoResolution[];
   const durationOptions = isSeedanceFull
     ? SEEDANCE_DURATION_OPTIONS
     : isSeedanceMini
       ? SEEDANCE_MINI_DURATION_OPTIONS
-      : DURATION_OPTIONS;
-  const durationMap = isSeedanceMini
-    ? SEEDANCE_MINI_DURATION_MAP
-    : DURATION_MAP;
-  const selectedDuration = isSeedance && (data.duration ?? 5) < 4
-    ? 5
-    : data.duration ?? 5;
-  const selectedResolution = lockedResolution ?? data.seedanceResolution ?? '720p';
+      : isFlux3
+        ? FLUX_DURATION_OPTIONS
+        : isMinimaxH3
+          ? MINIMAX_DURATION_OPTIONS
+          : DURATION_OPTIONS;
+  const requestedDuration = `${data.duration ?? 5}s`;
+  const selectedDuration = Number.parseInt(
+    durationOptions.includes(requestedDuration) ? requestedDuration : durationOptions[0],
+    10,
+  );
+  const storedResolution = data.videoResolution ?? data.seedanceResolution;
+  const selectedResolution = lockedResolution
+    ?? (storedResolution && resolutionOptions.includes(storedResolution as VideoResolution)
+      ? storedResolution as VideoResolution
+      : resolutionOptions[0]) ?? '720p';
+  const followsInputAspect = hasImage && (isKling || isMinimaxH3);
+  const supportsEndFrame = !isOmni && !isFlux3;
+  const supportsAudio = isSeedance || isFlux3;
 
   // Read start-frame source node directly from store (reactive, zero-latency)
   const storeEdges = useFlowStore(state => state.edges);
@@ -117,9 +119,9 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
 
   // Derive aspect ratio from source node data synchronously
   const derivedAspect = (() => {
-    if (!isKling || !startFrameSource) return undefined;
-    if (startFrameSource.type === 'imageInputNode') {
-      const { naturalWidth, naturalHeight } = startFrameSource.data as ImageInputNodeData;
+    if (!followsInputAspect || !startFrameSource) return undefined;
+    if (startFrameSource.type === 'imageInputNode' || startFrameSource.type === 'mediaInputNode') {
+      const { naturalWidth, naturalHeight } = startFrameSource.data as ImageInputNodeData | MediaInputNodeData;
       if (naturalWidth && naturalHeight) {
         const g = gcd(naturalWidth, naturalHeight);
         return `${naturalWidth / g}:${naturalHeight / g}`;
@@ -139,13 +141,16 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [derivedAspect]);
 
-  // Clear stored ratio when image is disconnected or model changes away from Kling
+  // Clear an input-derived ratio when the image is disconnected or the model no longer follows it.
   useEffect(() => {
-    if ((!isKling || !hasImage) && data.imageAspectRatio) {
-      updateData({ imageAspectRatio: undefined });
+    if (!followsInputAspect && data.imageAspectRatio) {
+      updateData({
+        imageAspectRatio: undefined,
+        ...(!aspectRatios.includes(data.aspectRatio) ? { aspectRatio: aspectRatios[0] } : {}),
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isKling, hasImage]);
+  }, [followsInputAspect]);
 
   useLayoutEffect(() => {
     if (!promptSectionRef.current) return;
@@ -158,7 +163,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     const end = endFrameRowRef.current;
     if (start) setStartFrameHandleTop(start.offsetTop + start.offsetHeight / 2);
     if (end) setEndFrameHandleTop(end.offsetTop + end.offsetHeight / 2);
-  }, [isOmni, data.startFrameUrl, data.endFrameUrl, isSeedance, isSeedanceFull, localPrompt, data.promptConnected]);
+  }, [supportsEndFrame, data.startFrameUrl, data.endFrameUrl, supportsAudio, isSeedanceFull, localPrompt, data.promptConnected]);
 
   function updateData(updates: Partial<VideoGenNodeData>) {
     document.dispatchEvent(new CustomEvent('node:update', {
@@ -169,16 +174,29 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   function handleModelChange(model: string) {
     const modelConfig = VIDEO_MODELS.find(option => option.id === model);
     const supportedAspectRatios = modelConfig?.supportedAspectRatios ?? [];
-    const nextIsSeedance = model === 'seedance-2' || model === 'seedance-2-mini';
+    const supportedResolutions = modelConfig?.supportedResolutions as VideoResolution[] | undefined;
+    const nextDurationOptions = model === 'seedance-2'
+      ? SEEDANCE_DURATION_OPTIONS
+      : model === 'seedance-2-mini'
+        ? SEEDANCE_MINI_DURATION_OPTIONS
+        : model === 'flux-3'
+          ? FLUX_DURATION_OPTIONS
+          : model === 'minimax-h3'
+            ? MINIMAX_DURATION_OPTIONS
+            : DURATION_OPTIONS;
     const nextLockedResolution = LOCKED_RESOLUTIONS[model];
+    const nextResolution = nextLockedResolution
+      ?? (storedResolution && supportedResolutions?.includes(storedResolution as VideoResolution)
+        ? storedResolution as VideoResolution
+        : supportedResolutions?.[0]);
     updateData({
       model,
       ...(!supportedAspectRatios.includes(data.aspectRatio) && supportedAspectRatios[0]
         ? { aspectRatio: supportedAspectRatios[0] }
         : {}),
-      ...(nextLockedResolution ? { seedanceResolution: nextLockedResolution } : {}),
-      ...(nextIsSeedance && (data.duration ?? 5) < 4
-        ? { duration: 5 }
+      ...(nextResolution ? { videoResolution: nextResolution } : {}),
+      ...(!nextDurationOptions.includes(`${data.duration ?? 5}s`)
+        ? { duration: Number.parseInt(nextDurationOptions[0], 10) }
         : {}),
     });
   }
@@ -228,7 +246,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         startFrameUrl: data.startFrameUrl,
         endFrameUrl: data.endFrameUrl,
         generateAudio: data.generateAudio ?? true,
-        seedanceResolution: selectedResolution,
+        videoResolution: selectedResolution,
         sourceType: 'canvas',
         sourceId: currentFlow.id,
         nodeId: id,
@@ -253,7 +271,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   })();
 
   const currentAspectOptions = [
-    ...(isKling && hasImage && data.imageAspectRatio && !aspectRatios.includes(data.imageAspectRatio)
+    ...(followsInputAspect && data.imageAspectRatio && !aspectRatios.includes(data.imageAspectRatio)
       ? [data.imageAspectRatio]
       : []),
     ...aspectRatios,
@@ -334,7 +352,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         offset={`${startFrameHandleTop}px`}
         connected={storeEdges.some(e => e.target === id && e.targetHandle === 'start_frame')}
       />
-      {!isOmni && (
+      {supportsEndFrame && (
         <TypedHandle
           type="target"
           position={Position.Left}
@@ -378,7 +396,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         </div>
       )}
 
-      {isSeedance && (
+      {supportsAudio && (
         <div className={glassStyles.rowBetween}>
           <span className={glassStyles.microLabel}>Generate Audio</span>
           <button
@@ -410,7 +428,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
           <NodeSelect
             options={durationOptions}
             value={`${selectedDuration}s`}
-            onChange={(v) => updateData({ duration: durationMap[v] ?? 5 })}
+            onChange={(v) => updateData({ duration: Number.parseInt(v, 10) || 5 })}
             leadingIcon={<Clock3 size={10} />}
             optionIcon={() => <Clock3 size={10} />}
           />
@@ -419,7 +437,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
           <NodeSelect
             options={resolutionOptions}
             value={selectedResolution}
-            onChange={(v) => updateData({ seedanceResolution: v as VideoResolution })}
+            onChange={(v) => updateData({ videoResolution: v as VideoResolution })}
             leadingIcon={<Image src="/node-icons/icon-resolution.svg" alt="" width={10} height={10} aria-hidden />}
             optionIcon={() => <Image src="/node-icons/icon-resolution.svg" alt="" width={10} height={10} aria-hidden />}
             locked={!!lockedResolution}
@@ -443,7 +461,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
               Start Frame{isOmni ? ' (Required)' : ''}
             </span>
           </div>
-          {!isOmni && (
+          {supportsEndFrame && (
             <div
               ref={endFrameRowRef}
               className={cn(

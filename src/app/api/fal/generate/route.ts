@@ -16,6 +16,12 @@ interface GenerateRequestBody extends GenerateImageRequest {
   nodeId?: string;
   quality?: string;
   duration?: number;
+  videoResolution?: string;
+  /** Compatibility with canvas nodes saved before videoResolution was introduced. */
+  seedanceResolution?: string;
+  generateAudio?: boolean;
+  startFrameUrl?: string;
+  endFrameUrl?: string;
   slotIndex?: number;
 }
 
@@ -73,18 +79,21 @@ export async function POST(request: NextRequest) {
 
     if (modelConfig.type === 'video') {
       // Video generation — submit async job
-      const startFrameUrl      = (body as GenerateRequestBody & { startFrameUrl?: string }).startFrameUrl;
-      const endFrameUrl        = (body as GenerateRequestBody & { endFrameUrl?: string }).endFrameUrl;
-      const generateAudio      = (body as GenerateRequestBody & { generateAudio?: boolean }).generateAudio;
+      const { startFrameUrl, endFrameUrl, generateAudio } = body;
       const hasImage = !!startFrameUrl;
       const isSeedanceMini = model === 'seedance-2-mini';
       const isSeedance = model === 'seedance-2' || isSeedanceMini;
       const isOmni = model === 'google-omni-flash';
       const isKling = model === 'kling-3-pro';
-      const requestedSeedanceResolution = (body as GenerateRequestBody & { seedanceResolution?: string }).seedanceResolution ?? '720p';
-      const seedanceResolution = isSeedanceMini && requestedSeedanceResolution !== '720p'
+      const isFlux3 = model === 'flux-3';
+      const isMinimaxH3 = model === 'minimax-h3';
+      const defaultVideoResolution = isMinimaxH3 ? '2K' : isKling ? '1080p' : '720p';
+      const requestedVideoResolution = body.videoResolution
+        ?? body.seedanceResolution
+        ?? defaultVideoResolution;
+      const videoResolution = isSeedanceMini && requestedVideoResolution !== '720p'
         ? '720p'
-        : requestedSeedanceResolution;
+        : requestedVideoResolution;
       const requestedDuration = body.duration ?? 5;
       const duration = isSeedance
         ? Math.min(15, requestedDuration < 4 ? 5 : requestedDuration)
@@ -111,23 +120,101 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      if (isFlux3 && (!Number.isInteger(duration) || duration < 5 || duration > 20)) {
+        return NextResponse.json(
+          { error: 'FLUX.3 duration must be an integer from 5 to 20 seconds.' },
+          { status: 400 }
+        );
+      }
+
+      if (isMinimaxH3 && (!Number.isInteger(duration) || duration < 5 || duration > 15)) {
+        return NextResponse.json(
+          { error: 'MiniMax H3 duration must be an integer from 5 to 15 seconds.' },
+          { status: 400 }
+        );
+      }
+
+      const allowedResolutions = isFlux3
+        ? ['720p', '1080p']
+        : isMinimaxH3
+          ? ['768P', '2K']
+          : isSeedanceMini
+            ? ['720p']
+            : isSeedance
+              ? ['720p', '1080p', '4k']
+              : isKling
+                ? ['1080p']
+                : ['720p'];
+      if (!allowedResolutions.includes(videoResolution)) {
+        return NextResponse.json(
+          { error: `${modelConfig.type === 'video' ? model : 'Video model'} does not support ${videoResolution} resolution.` },
+          { status: 400 }
+        );
+      }
+
+      const fluxAspectRatios = ['21:9', '2:1', '16:9', '4:3', '1:1', '3:4', '9:16'];
+      if (isFlux3 && !fluxAspectRatios.includes(aspectRatio)) {
+        return NextResponse.json(
+          { error: `FLUX.3 does not support the ${aspectRatio} aspect ratio.` },
+          { status: 400 }
+        );
+      }
+
+      const minimaxAspectRatios = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
+      if (isMinimaxH3 && !hasImage && !minimaxAspectRatios.includes(aspectRatio)) {
+        return NextResponse.json(
+          { error: `MiniMax H3 does not support the ${aspectRatio} aspect ratio.` },
+          { status: 400 }
+        );
+      }
+
       const endpoint = hasImage && 'imageToVideoEndpoint' in modelConfig
         ? modelConfig.imageToVideoEndpoint
         : modelConfig.endpoint;
 
+      const videoInput: Record<string, unknown> = { prompt };
+      if (isOmni) {
+        Object.assign(videoInput, {
+          aspect_ratio: aspectRatio,
+          duration,
+          image_url: startFrameUrl,
+        });
+      } else if (isKling) {
+        Object.assign(videoInput, {
+          ...(!hasImage ? { aspect_ratio: aspectRatio } : {}),
+          duration: String(duration),
+          ...(startFrameUrl ? { start_image_url: startFrameUrl } : {}),
+          ...(endFrameUrl ? { end_image_url: endFrameUrl } : {}),
+        });
+      } else if (isSeedance) {
+        Object.assign(videoInput, {
+          ...(!hasImage ? { aspect_ratio: aspectRatio } : {}),
+          duration: String(duration),
+          ...(startFrameUrl ? { image_url: startFrameUrl } : {}),
+          ...(endFrameUrl ? { end_image_url: endFrameUrl } : {}),
+          generate_audio: generateAudio !== false,
+          resolution: videoResolution,
+        });
+      } else if (isFlux3) {
+        Object.assign(videoInput, {
+          aspect_ratio: aspectRatio,
+          duration,
+          resolution: videoResolution,
+          generate_audio: generateAudio !== false,
+          ...(startFrameUrl ? { image_url: startFrameUrl } : {}),
+        });
+      } else if (isMinimaxH3) {
+        Object.assign(videoInput, {
+          ...(!hasImage ? { aspect_ratio: aspectRatio } : {}),
+          duration,
+          resolution: videoResolution,
+          ...(startFrameUrl ? { image_url: startFrameUrl } : {}),
+          ...(endFrameUrl ? { end_image_url: endFrameUrl } : {}),
+        });
+      }
+
       const { request_id } = await fal.queue.submit(endpoint as string, {
-        input: {
-          prompt,
-          ...(!hasImage || isOmni ? { aspect_ratio: aspectRatio } : {}),
-          duration: isOmni ? duration : String(duration),
-          ...(startFrameUrl
-            ? isKling
-              ? { start_image_url: startFrameUrl }
-              : { image_url: startFrameUrl }
-            : {}),
-          ...(!isOmni && endFrameUrl ? { end_image_url: endFrameUrl } : {}),
-          ...(isSeedance    ? { generate_audio: generateAudio !== false, resolution: seedanceResolution } : {}),
-        },
+        input: videoInput,
         headers: falHeaders,
       });
 
@@ -140,7 +227,7 @@ export async function POST(request: NextRequest) {
           node_id: nodeId,
           model,
           prompt,
-          parameters: { aspectRatio, resolution, endpoint },
+          parameters: { aspectRatio, resolution: videoResolution, duration, endpoint },
           reference_image_urls: referenceImageUrls,
           media_type: 'video',
           media_url: '',

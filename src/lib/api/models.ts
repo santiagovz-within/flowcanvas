@@ -51,6 +51,16 @@ export const FAL_MODELS = {
     imageToVideoEndpoint: 'fal-ai/kling-video/v3/pro/image-to-video',
     type: 'video' as const,
   },
+  'flux-3': {
+    endpoint: 'blackforestlabs/flux-3/text-to-video',
+    imageToVideoEndpoint: 'blackforestlabs/flux-3/image-to-video',
+    type: 'video' as const,
+  },
+  'minimax-h3': {
+    endpoint: 'minimax/h3/text-to-video',
+    imageToVideoEndpoint: 'minimax/h3/image-to-video',
+    type: 'video' as const,
+  },
   'seedance-2': {
     endpoint: 'bytedance/seedance-2.0/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.0/image-to-video',
@@ -168,6 +178,30 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 120,
   },
+  'flux-3': {
+    id: 'flux-3',
+    name: 'FLUX.3',
+    provider: 'fal',
+    type: 'video',
+    supportedAspectRatios: ['16:9', '21:9', '2:1', '4:3', '1:1', '3:4', '9:16'],
+    supportedResolutions: ['720p', '1080p'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: false,
+    estimatedTimeSeconds: 120,
+  },
+  'minimax-h3': {
+    id: 'minimax-h3',
+    name: 'MiniMax H3',
+    provider: 'fal',
+    type: 'video',
+    supportedAspectRatios: ['16:9', '21:9', '4:3', '1:1', '3:4', '9:16'],
+    supportedResolutions: ['2K', '768P'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: false,
+    estimatedTimeSeconds: 120,
+  },
   'seedance-2': {
     id: 'seedance-2',
     name: 'Seedance 2.0',
@@ -230,8 +264,13 @@ export const VIDEO_MODELS = [
   MODELS['seedance-2'],
   MODELS['seedance-2-mini'],
   MODELS['kling-3-pro'],
+  MODELS['flux-3'],
+  MODELS['minimax-h3'],
 ];
-export const CHAT_VIDEO_MODELS = VIDEO_MODELS.filter(m => m.id !== 'google-omni-flash');
+// The new endpoint-specific controls are currently implemented on the canvas node.
+export const CHAT_VIDEO_MODELS = VIDEO_MODELS.filter(
+  m => !['google-omni-flash', 'flux-3', 'minimax-h3'].includes(m.id),
+);
 export const UPSCALE_MODELS = Object.values(MODELS).filter(m => m.type === 'upscale');
 
 export function supportsMultipleImageReferences(modelId: string): boolean {
