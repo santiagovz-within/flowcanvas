@@ -374,7 +374,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
       {isSeedanceFull && (
         <div className={cn(glassStyles.notice, glassStyles.noticeWarning, 'nodrag')}>
           <AlertTriangle size={11} className="shrink-0 mt-0.5" />
-          This is a very expensive model to use, please use wisely.
+          Expensive model, please use carefully.
         </div>
       )}
 
