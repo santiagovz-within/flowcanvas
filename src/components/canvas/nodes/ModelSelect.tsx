@@ -44,12 +44,12 @@ const MODEL_SUBTITLES: Record<string, string> = {
   'nano-banana-pro': 'BEST OVERALL MODEL (MORE EXPENSIVE)',
   'gpt-image-2': 'GOOD FOR TEXT & POSTER DESIGN',
   'flux-2-pro': 'FOR MOODBOARDS & EXPERIMENTATION',
-  'google-omni-flash': 'GOOD & FAST MODEL',
-  'seedance-2': 'BEST MODEL',
-  'seedance-2-mini': 'GOOD MODEL',
-  'kling-3-pro': 'GOOD MODEL',
-  'flux-3': 'BLACK FOREST LABS VIDEO MODEL',
-  'minimax-h3': 'HIGH-RESOLUTION VIDEO MODEL',
+  'seedance-2': 'THE BEST VIDEO MODEL',
+  'flux-3': 'EXCELLENT ALL-AROUND VIDEO MODEL',
+  'kling-3-pro': 'VERY GOOD & FAST VIDEO MODEL',
+  'minimax-h3': 'HIGH QUALITY AND FAST',
+  'google-omni-flash': 'GOOD & FAST (720p)',
+  'seedance-2-mini': 'DRAFT QUALITY (720p)',
 };
 
 function ModelIcon({

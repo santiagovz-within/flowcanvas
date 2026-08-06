@@ -183,6 +183,7 @@ export async function POST(request: NextRequest) {
         Object.assign(videoInput, {
           ...(!hasImage ? { aspect_ratio: aspectRatio } : {}),
           duration: String(duration),
+          generate_audio: generateAudio !== false,
           ...(startFrameUrl ? { start_image_url: startFrameUrl } : {}),
           ...(endFrameUrl ? { end_image_url: endFrameUrl } : {}),
         });

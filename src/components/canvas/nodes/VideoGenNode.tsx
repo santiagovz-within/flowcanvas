@@ -109,7 +109,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
       : resolutionOptions[0]) ?? '720p';
   const followsInputAspect = hasImage && (isKling || isMinimaxH3);
   const supportsEndFrame = !isOmni && !isFlux3;
-  const supportsAudio = isSeedance || isFlux3;
+  const supportsAudio = isSeedance || isFlux3 || isKling;
 
   // Read start-frame source node directly from store (reactive, zero-latency)
   const storeEdges = useFlowStore(state => state.edges);

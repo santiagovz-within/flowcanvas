@@ -207,7 +207,7 @@ export const MODELS: Record<string, ModelConfig> = {
     name: 'Seedance 2.0',
     provider: 'fal',
     type: 'video',
-    supportedAspectRatios: ['1:1', '16:9', '9:16'],
+    supportedAspectRatios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
     supportedResolutions: ['720p', '1080p', '4k'],
     maxBatchSize: 1,
     supportsImageInput: true,
@@ -260,12 +260,12 @@ export const IMAGE_MODELS = [
   MODELS['flux-2-pro'],
 ];
 export const VIDEO_MODELS = [
-  MODELS['google-omni-flash'],
   MODELS['seedance-2'],
-  MODELS['seedance-2-mini'],
-  MODELS['kling-3-pro'],
   MODELS['flux-3'],
+  MODELS['kling-3-pro'],
   MODELS['minimax-h3'],
+  MODELS['google-omni-flash'],
+  MODELS['seedance-2-mini'],
 ];
 // The new endpoint-specific controls are currently implemented on the canvas node.
 export const CHAT_VIDEO_MODELS = VIDEO_MODELS.filter(
@@ -298,5 +298,5 @@ export function getDefaultImageModel(): ModelConfig {
 }
 
 export function getDefaultVideoModel(): ModelConfig {
-  return MODELS['kling-3-pro'];
+  return MODELS['seedance-2'];
 }
