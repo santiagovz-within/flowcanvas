@@ -1,7 +1,8 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Sliders, Play, Download, AlertTriangle } from 'lucide-react';
+import { Sliders, Download, AlertTriangle } from 'lucide-react';
+import Image from 'next/image';
 import { SendToFigmaButton } from './SendToFigmaButton';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { playSuccessSound } from '@/lib/utils/sound';
@@ -976,7 +977,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
             )}
           >
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-              <Play size={12} />
+              <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {isGenerating ? 'Outpainting…' : 'Outpaint Video'}
             </span>
           </button>
@@ -1010,7 +1011,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
             )}
           >
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-              <Play size={12} />
+              <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {mode === 'prompt'
                 ? (isGenerating ? 'Modifying…' : 'Modify')
                 : (isGenerating ? 'Expanding…' : 'Expand')

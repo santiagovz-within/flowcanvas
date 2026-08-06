@@ -1,7 +1,7 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Film, Play, AlertTriangle, Download, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
+import { Film, AlertTriangle, Download, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import Image from 'next/image';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -279,7 +279,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         )}
       >
         <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-          <Play size={12} />
+          <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
           {isGenerating ? 'Generating…' : 'Generate'}
         </span>
       </button>

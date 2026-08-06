@@ -1,7 +1,8 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Clapperboard, Play, Download, X, Check } from 'lucide-react';
+import { Clapperboard, Download, X, Check } from 'lucide-react';
+import NextImage from 'next/image';
 
 function FigmaIcon({ size = 12 }: { size?: number }) {
   return (
@@ -381,7 +382,7 @@ export function VideoToGifNode({ data, selected, id }: NodeProps & { data: Video
         )}
       >
         <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-          <Play size={12} />
+          <NextImage src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
           {isConverting ? progressLabel || 'Converting…' : 'Convert to GIF'}
         </span>
       </button>

@@ -1,7 +1,8 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Scissors, Play, Download } from 'lucide-react';
+import { Scissors, Download } from 'lucide-react';
+import Image from 'next/image';
 import { SendToFigmaButton } from './SendToFigmaButton';
 import { useState } from 'react';
 import { downloadFromUrl } from '@/lib/utils/download';
@@ -97,7 +98,7 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
             )}
           >
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-              <Play size={12} />
+              <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {isProcessing ? 'Processing…' : 'Remove Background'}
             </span>
           </button>
