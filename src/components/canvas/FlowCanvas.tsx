@@ -627,6 +627,17 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
         }
       }
 
+      // videoGenNode's End Frame requires a Start Frame — no model accepts an end
+      // frame without a start frame, so block the connection until one exists.
+      if (targetNode.type === 'videoGenNode' && conn.targetHandle === 'end_frame') {
+        const hasStartFrame = useFlowStore
+          .getState()
+          .edges.some((e) => e.target === targetNode.id && e.targetHandle === 'start_frame');
+        if (!hasStartFrame) {
+          return reject('Connect a Start Frame first — End Frame requires a Start Frame');
+        }
+      }
+
       // modifyNode's image input accepts image or video (video triggers outpaint mode)
       if (targetNode.type === 'modifyNode' && conn.targetHandle === 'image') {
         if (srcType === 'image' || srcType === 'video') return true;

@@ -87,6 +87,10 @@ interface TypedHandleProps extends Omit<HandleProps, 'style'> {
   badge?: number;
   // when true the handle renders in its "lit" state (full colour + white icon) even without hover
   connected?: boolean;
+  /** When true the handle is greyed out and cannot be connected. */
+  disabled?: boolean;
+  /** Tooltip explaining why the handle is disabled. */
+  disabledReason?: string;
   /** Overrides the port-type glyph — used by nodes that accept any media kind. */
   icon?: React.ReactNode;
   appearance?: 'default' | 'imageGenerationGlass';
@@ -98,6 +102,8 @@ export function TypedHandle({
   position,
   badge,
   connected,
+  disabled,
+  disabledReason,
   icon,
   appearance = 'imageGenerationGlass',
   ...rest
@@ -108,7 +114,7 @@ export function TypedHandle({
   const color = PORT_COLORS[portType];
   const isLeft = position === Position.Left;
   const isRight = position === Position.Right;
-  const isActive = hovered || connected;
+  const isActive = !disabled && (hovered || connected);
   const isImageGenerationGlass = appearance === 'imageGenerationGlass';
 
   // React Flow measures handle bounds separately from node dimensions. Several
@@ -136,6 +142,8 @@ export function TypedHandle({
     <Handle
       position={position}
       {...rest}
+      isConnectable={disabled ? false : rest.isConnectable}
+      title={disabled ? disabledReason : rest.title}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -151,6 +159,8 @@ export function TypedHandle({
         justifyContent: 'center',
         color: isActive ? '#fff' : `var(--port-icon-inactive-${portType})`,
         pointerEvents: 'all',
+        opacity: disabled ? 0.35 : undefined,
+        cursor: disabled ? 'not-allowed' : undefined,
         transition: isImageGenerationGlass ? undefined : 'background 0.15s, color 0.15s',
         ...offsetStyle,
       }}

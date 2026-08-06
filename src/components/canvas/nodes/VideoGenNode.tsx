@@ -360,6 +360,8 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
           portType="image"
           offset={`${endFrameHandleTop}px`}
           connected={storeEdges.some(e => e.target === id && e.targetHandle === 'end_frame')}
+          disabled={!startFrameEdge}
+          disabledReason="Connect a Start Frame first — End Frame requires a Start Frame"
         />
       )}
 
