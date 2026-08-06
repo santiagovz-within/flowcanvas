@@ -253,19 +253,25 @@ function ExpandCanvas({ imageUrl, expandTop, expandRight, expandBottom, expandLe
         <div style={{ position: 'absolute', inset: 0, background: STRIPE, borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)' }} />
       )}
 
-      <CanvasImage
-        src={imageUrl}
-        alt="Source"
-        fill
+      <div
         style={{
           position: 'absolute',
-          left: imgX, top: imgY,
-          width: imgW, height: imgH,
-          display: 'block',
+          left: imgX,
+          top: imgY,
+          width: imgW,
+          height: imgH,
+          overflow: 'hidden',
           pointerEvents: 'none',
           borderRadius: hasAny ? 0 : 5,
         }}
-      />
+      >
+        <CanvasImage
+          src={imageUrl}
+          alt="Source"
+          fill
+          style={{ objectFit: 'contain', pointerEvents: 'none' }}
+        />
+      </div>
 
       <div style={{
         position: 'absolute',
@@ -662,6 +668,30 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
     if (!measuredNaturalSize) return;
     const exp = computeExpansionForAspect(measuredNaturalSize.w, measuredNaturalSize.h, ratio, expandAnchor);
     updateData({ expandTop: exp.top, expandRight: exp.right, expandBottom: exp.bottom, expandLeft: exp.left });
+  }
+
+  function handleAnchorChange(anchor: AnchorKey) {
+    const { h, v } = anchorHV(anchor);
+    const horizontalExpansion = expandLeft + expandRight;
+    const verticalExpansion = expandTop + expandBottom;
+    const nextLeft = h === 'left'
+      ? 0
+      : h === 'right'
+        ? horizontalExpansion
+        : Math.floor(horizontalExpansion / 2);
+    const nextTop = v === 'top'
+      ? 0
+      : v === 'bottom'
+        ? verticalExpansion
+        : Math.floor(verticalExpansion / 2);
+
+    updateData({
+      expandAnchor: anchor,
+      expandTop: nextTop,
+      expandRight: horizontalExpansion - nextLeft,
+      expandBottom: verticalExpansion - nextTop,
+      expandLeft: nextLeft,
+    });
   }
 
   function isAspectPresetActive(ratio: number) {
@@ -1200,7 +1230,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                 </div>
                 <div className={cn(glassStyles.field, glassStyles.expandAnchorField)}>
                   <span className={glassStyles.microLabel}>Anchor</span>
-                  <AnchorPicker value={expandAnchor} onChange={(v) => updateData({ expandAnchor: v })} />
+                  <AnchorPicker value={expandAnchor} onChange={handleAnchorChange} />
                 </div>
               </div>
 
