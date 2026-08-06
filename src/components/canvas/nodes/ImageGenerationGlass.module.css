@@ -584,6 +584,34 @@ textarea.promptContent {
   flex: 1 1 0;
 }
 
+.expandControls {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: 10px;
+}
+
+.expandPresetGrid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.expandPresetGrid .chip {
+  width: 100%;
+}
+
+.expandPresetGrid .chip:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.expandAnchorField {
+  width: auto;
+}
+
 .grid2,
 .grid3 {
   display: grid;

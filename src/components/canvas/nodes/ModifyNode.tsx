@@ -461,7 +461,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
   const imageSlotRef = useRef<HTMLDivElement>(null);
   const [promptHandleTop, setPromptHandleTop] = useState(50);
   const [imageHandleTop, setImageHandleTop]   = useState(130);
-  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [naturalSize, setNaturalSize] = useState<{ imageUrl: string; w: number; h: number } | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const prevInputMediaTypeRef = useRef<'image' | 'video' | null>(null);
 
@@ -577,6 +577,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
   const safeIndex    = Math.min(selectedIndex, Math.max(availableImages.length - 1, 0));
   const selectedImage = availableImages[safeIndex];
   const hasImage      = !!selectedImage;
+  const measuredNaturalSize = naturalSize?.imageUrl === selectedImage ? naturalSize : null;
 
   const derivedAspect = (() => {
     if (inputMediaType !== 'image') return undefined;
@@ -658,9 +659,16 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
   }
 
   function handleAspectPreset(ratio: number) {
-    if (!naturalSize) return;
-    const exp = computeExpansionForAspect(naturalSize.w, naturalSize.h, ratio, expandAnchor);
+    if (!measuredNaturalSize) return;
+    const exp = computeExpansionForAspect(measuredNaturalSize.w, measuredNaturalSize.h, ratio, expandAnchor);
     updateData({ expandTop: exp.top, expandRight: exp.right, expandBottom: exp.bottom, expandLeft: exp.left });
+  }
+
+  function isAspectPresetActive(ratio: number) {
+    if (!measuredNaturalSize || (!expandTop && !expandRight && !expandBottom && !expandLeft)) return false;
+    const outputWidth = measuredNaturalSize.w + expandLeft + expandRight;
+    const outputHeight = measuredNaturalSize.h + expandTop + expandBottom;
+    return Math.abs(outputWidth / outputHeight - ratio) < 0.005;
   }
 
   // ── Image: Prompt generate ─────────────────────────────────────────────────
@@ -765,11 +773,11 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
   async function handleExpandGenerate() {
     if (isGenerating || !selectedImage) return;
     if (!expandTop && !expandRight && !expandBottom && !expandLeft) return;
-    if (!naturalSize) return;
+    if (!measuredNaturalSize) return;
     setIsGenerating(true);
     updateData({ status: 'processing' });
 
-    const plan = computeOutpaintResizePlan(naturalSize.w, naturalSize.h, expandTop, expandRight, expandBottom, expandLeft);
+    const plan = computeOutpaintResizePlan(measuredNaturalSize.w, measuredNaturalSize.h, expandTop, expandRight, expandBottom, expandLeft);
     useFlowStore.getState().consumeGcsOnlyEligibility();
 
     try {
@@ -900,8 +908,8 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
   // ── Derived display state ──────────────────────────────────────────────────
 
   const hasExpansion = expandTop > 0 || expandRight > 0 || expandBottom > 0 || expandLeft > 0;
-  const resizePlan = naturalSize && hasExpansion
-    ? computeOutpaintResizePlan(naturalSize.w, naturalSize.h, expandTop, expandRight, expandBottom, expandLeft)
+  const resizePlan = measuredNaturalSize && hasExpansion
+    ? computeOutpaintResizePlan(measuredNaturalSize.w, measuredNaturalSize.h, expandTop, expandRight, expandBottom, expandLeft)
     : null;
   const outputDimsLabel = resizePlan
     ? `${resizePlan.outputW} × ${resizePlan.outputH}px${resizePlan.needsResize ? ' (scaled to fit)' : ''}`
@@ -963,7 +971,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
         <>
           <button
             onClick={mode === 'prompt' ? handlePromptGenerate : handleExpandGenerate}
-            disabled={isGenerating || !hasImage || (mode === 'expand' && !hasExpansion)}
+            disabled={isGenerating || !hasImage || (mode === 'expand' && (!hasExpansion || !measuredNaturalSize))}
             className={cn(
               glassStyles.glassSurface,
               glassStyles.button,
@@ -1165,18 +1173,24 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                 />
               )}
 
-              <div className={glassStyles.fieldRow} style={{ alignItems: 'flex-start' }}>
+              <div className={glassStyles.expandControls}>
                 <div className={glassStyles.field}>
                   <span className={glassStyles.microLabel}>Preset</span>
-                  <div className={glassStyles.chipRow}>
+                  <div className={glassStyles.expandPresetGrid}>
                     {ASPECT_PRESETS.map(({ label, ratio }) => (
                       <button
                         key={label}
-                        className={cn(glassStyles.glassSurface, glassStyles.chip, glassStyles.chipAuto, 'nodrag')}
-                        style={{
-                          cursor: naturalSize ? 'pointer' : 'default',
-                          opacity: naturalSize ? 1 : 0.4,
-                        }}
+                        type="button"
+                        className={cn(
+                          glassStyles.glassSurface,
+                          glassStyles.chip,
+                          glassStyles.chipAuto,
+                          isAspectPresetActive(ratio) && glassStyles.chipActive,
+                          'nodrag',
+                        )}
+                        disabled={!measuredNaturalSize}
+                        aria-label={`Expand to ${label}`}
+                        aria-pressed={isAspectPresetActive(ratio)}
                         onClick={() => handleAspectPreset(ratio)}
                       >
                         <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>{label}</span>
@@ -1184,7 +1198,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                     ))}
                   </div>
                 </div>
-                <div className={glassStyles.field} style={{ flex: '0 0 auto' }}>
+                <div className={cn(glassStyles.field, glassStyles.expandAnchorField)}>
                   <span className={glassStyles.microLabel}>Anchor</span>
                   <AnchorPicker value={expandAnchor} onChange={(v) => updateData({ expandAnchor: v })} />
                 </div>
@@ -1192,13 +1206,14 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
 
               {selectedImage ? (
                 <ExpandCanvas
+                  key={selectedImage}
                   imageUrl={selectedImage}
                   expandTop={expandTop}
                   expandRight={expandRight}
                   expandBottom={expandBottom}
                   expandLeft={expandLeft}
                   onChange={handleExpandChange}
-                  onNaturalSize={(w, h) => setNaturalSize({ w, h })}
+                  onNaturalSize={(w, h) => setNaturalSize({ imageUrl: selectedImage, w, h })}
                 />
               ) : (
                 <div className={glassStyles.emptyState}>
