@@ -27,7 +27,6 @@ import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
 import { AspectRatioGlyph } from './AspectRatioGlyph';
 
-const RESOLUTIONS = ['1K', '2K', '4K'];
 const REF_ROW_HEIGHT = 29;
 const ROW_GAP = 10;
 const GLASS_PERFORMANCE_NODE_THRESHOLD = 20;
@@ -73,6 +72,18 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   }, [localPrompt]);
 
   const modelConfig = IMAGE_MODELS.find((m) => m.id === data.model);
+  const aspectOptions = modelConfig?.supportedAspectRatios.length
+    ? modelConfig.supportedAspectRatios
+    : ASPECT_RATIOS.map((ratio) => ratio.value);
+  const resolutionOptions = modelConfig?.supportedResolutions.length
+    ? modelConfig.supportedResolutions
+    : ['1K'];
+  const selectedAspectRatio = aspectOptions.includes(data.aspectRatio)
+    ? data.aspectRatio
+    : aspectOptions[0];
+  const selectedResolution = resolutionOptions.includes(data.resolution)
+    ? data.resolution
+    : resolutionOptions[0];
   const falConfig = FAL_MODELS[data.model as keyof typeof FAL_MODELS];
   const isMultiImageModel = supportsMultipleImageReferences(data.model);
   const maxReferenceImages = getImageReferenceLimit(data.model);
@@ -119,6 +130,18 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   }
 
   function handleModelChange(newModel: string) {
+    const newModelConfig = IMAGE_MODELS.find((model) => model.id === newModel);
+    const nextAspectRatio = newModelConfig?.supportedAspectRatios.includes(data.aspectRatio)
+      ? data.aspectRatio
+      : newModelConfig?.supportedAspectRatios[0] ?? data.aspectRatio;
+    const nextResolution = newModelConfig?.supportedResolutions.includes(data.resolution)
+      ? data.resolution
+      : newModelConfig?.supportedResolutions[0] ?? data.resolution;
+    const modelUpdates = {
+      model: newModel,
+      aspectRatio: nextAspectRatio,
+      resolution: nextResolution,
+    };
     const nowMulti = supportsMultipleImageReferences(newModel);
     const newLimit = getImageReferenceLimit(newModel);
     const freshEdges = useFlowStore.getState().edges;
@@ -134,7 +157,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     }
 
     if (!nowMulti || isMultiImageModel !== nowMulti) {
-      updateData({ model: newModel, inputImageUrls: [], imagePortCount: nowMulti ? 1 : 0 });
+      updateData({ ...modelUpdates, inputImageUrls: [], imagePortCount: nowMulti ? 1 : 0 });
       return;
     }
 
@@ -148,7 +171,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       Math.max(highestOccupied + 2, urls.filter(Boolean).length + 1, 1),
       newLimit
     );
-    updateData({ model: newModel, inputImageUrls: urls, imagePortCount: nextPortCount });
+    updateData({ ...modelUpdates, inputImageUrls: urls, imagePortCount: nextPortCount });
   }
 
   function handleGenerate() {
@@ -163,8 +186,8 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     const payload = {
       model: data.model,
       prompt: data.prompt ?? '',
-      aspectRatio: data.aspectRatio,
-      resolution: data.resolution,
+      aspectRatio: selectedAspectRatio,
+      resolution: selectedResolution,
       referenceImageUrls: inputImageUrls,
       sourceType: 'canvas',
       sourceId: useFlowStore.getState().currentFlow?.id,
@@ -397,20 +420,21 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       {/* ── Aspect ratio + resolution ─────────────────────────── */}
       <div className={glassStyles.selectRow}>
         <NodeSelect
-          options={ASPECT_RATIOS.map((r) => r.value)}
-          value={data.aspectRatio}
+          options={aspectOptions}
+          value={selectedAspectRatio}
           onChange={(v) => updateData({ aspectRatio: v })}
-          leadingIcon={<AspectRatioGlyph ratio={data.aspectRatio} />}
+          leadingIcon={<AspectRatioGlyph ratio={selectedAspectRatio} />}
           optionIcon={(ratio) => <AspectRatioGlyph ratio={ratio} />}
           appearance="imageGenerationGlass"
         />
         <NodeSelect
-          options={RESOLUTIONS}
-          value={data.resolution}
+          options={resolutionOptions}
+          value={selectedResolution}
           onChange={(v) => updateData({ resolution: v })}
           leadingIcon={<Image src="/node-icons/icon-resolution.svg" alt="" width={10} height={10} aria-hidden />}
           optionIcon={() => <Image src="/node-icons/icon-resolution.svg" alt="" width={10} height={10} aria-hidden />}
           appearance="imageGenerationGlass"
+          locked={resolutionOptions.length === 1}
         />
       </div>
 

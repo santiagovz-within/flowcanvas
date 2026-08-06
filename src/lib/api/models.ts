@@ -96,7 +96,7 @@ export const MODELS: Record<string, ModelConfig> = {
     provider: 'fal',
     type: 'image',
     supportedAspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
-    supportedResolutions: ['1K'],
+    supportedResolutions: ['1K', '2K', '4K'],
     maxBatchSize: 1,
     supportsImageInput: true,
     supportsNegativePrompt: false,
@@ -109,7 +109,7 @@ export const MODELS: Record<string, ModelConfig> = {
     provider: 'fal',
     type: 'image',
     supportedAspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'],
-    supportedResolutions: ['1K'],
+    supportedResolutions: ['1K', '2K', '4K'],
     maxBatchSize: 1,
     supportsImageInput: true,
     supportsNegativePrompt: false,
@@ -148,7 +148,7 @@ export const MODELS: Record<string, ModelConfig> = {
     provider: 'fal',
     type: 'image',
     supportedAspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '4:5', '21:9'],
-    supportedResolutions: ['1K', '2K', '4K'],
+    supportedResolutions: ['2K'],
     maxBatchSize: 1,
     supportsImageInput: false,
     supportsNegativePrompt: false,
@@ -253,8 +253,8 @@ export const MODELS: Record<string, ModelConfig> = {
 };
 
 export const IMAGE_MODELS = [
-  MODELS['nano-banana-2'],
   MODELS['seedream-5'],
+  MODELS['nano-banana-2'],
   MODELS['nano-banana-pro'],
   MODELS['gpt-image-2'],
   MODELS['flux-2-pro'],
@@ -294,7 +294,7 @@ export function getModel(id: string): ModelConfig | undefined {
 }
 
 export function getDefaultImageModel(): ModelConfig {
-  return MODELS['nano-banana-2'];
+  return MODELS['seedream-5'];
 }
 
 export function getDefaultVideoModel(): ModelConfig {
