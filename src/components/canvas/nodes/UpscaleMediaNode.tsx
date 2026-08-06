@@ -1,7 +1,8 @@
 'use client';
 
 import { Position, type NodeProps } from '@xyflow/react';
-import { Zap, Play, Maximize2, Download, Film, X, RefreshCw, Check, AlertCircle } from 'lucide-react';
+import { Zap, Maximize2, Download, Film, X, RefreshCw, Check, AlertCircle } from 'lucide-react';
+import Image from 'next/image';
 import { SendToFigmaButton } from './SendToFigmaButton';
 import { downloadFromUrl } from '@/lib/utils/download';
 import { playSuccessSound } from '@/lib/utils/sound';
@@ -656,7 +657,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
             )}
           >
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-              <Play size={12} />
+              <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {isRunning ? 'Upscaling…' : 'Upscale'}
             </span>
           </button>
@@ -697,7 +698,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
             )}
           >
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-              <Play size={12} />
+              <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {isRunning ? 'Upscaling…' : 'Upscale Video'}
             </span>
           </button>
@@ -733,7 +734,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           )}
         >
           <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-            <Play size={12} />
+            <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
             {isRunning
               ? `Upscaling ${bulkDoneCount + 1} of ${itemCount}…`
               : `Upscale all ${itemCount}`}
@@ -753,7 +754,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
           )}
         >
           <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
-            <Play size={12} />
+            <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
             Upscale
           </span>
         </button>
