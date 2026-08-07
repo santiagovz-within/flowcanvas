@@ -487,7 +487,10 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
       {isProcessing && (
         <div
           className={glassStyles.mediaFrame}
-          style={{ aspectRatio: previewAspectRatio ?? undefined }}
+          style={{
+            aspectRatio: previewAspectRatio ?? undefined,
+            minHeight: previewAspectRatio ? undefined : 96,
+          }}
         >
           {previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -500,8 +503,8 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
             />
           )}
           <div
-            className="relative flex flex-col items-center justify-center gap-2 p-4"
-            style={{ minHeight: 96, background: previewUrl ? 'rgba(0,0,0,0.5)' : 'transparent' }}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4"
+            style={{ background: previewUrl ? 'rgba(0,0,0,0.5)' : 'transparent' }}
           >
             <RefreshCw size={18} className="animate-spin" style={{ color: accentColor }} />
             <p className={glassStyles.dropzoneTitle}>
