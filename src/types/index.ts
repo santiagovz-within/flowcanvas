@@ -327,6 +327,8 @@ export interface MediaInputNodeData extends Record<string, unknown> {
   uploadStatus?: 'validating' | 'compressing' | 'uploading' | 'error';
   uploadProgress?: number;
   uploadError?: string;
+  /** Transient local preview shown while a canvas-dropped image uploads. */
+  uploadPreviewUrl?: string;
 }
 
 export interface VideoUpscaleNodeData extends Record<string, unknown> {

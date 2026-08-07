@@ -165,15 +165,18 @@ function ProgressBar({ percent, color }: { percent: number; color: string }) {
 type UploadStage = 'validating' | 'compressing' | 'uploading' | 'error' | null;
 
 export function MediaInputNode({ data, selected, id }: NodeProps & { data: MediaInputNodeData }) {
+  const uploadPreviewUrl = typeof data.uploadPreviewUrl === 'string' ? data.uploadPreviewUrl : null;
   const [stage, setStage]             = useState<UploadStage>(null);
   const [progress, setProgress]       = useState(0);
   const [error, setError]             = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl]   = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl]   = useState<string | null>(() => uploadPreviewUrl);
+  const [previewAspectRatio, setPreviewAspectRatio] = useState<number | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showGallery, setShowGallery] = useState(false);
 
   const storeEdges = useFlowStore(state => state.edges);
   const pendingDropRef = useRef<File | null>(null);
+  const initialPreviewUrlRef = useRef<string | null>(uploadPreviewUrl);
 
   // Keep a ref so async callbacks always see the latest mediaType without needing
   // it as a useCallback dependency (avoids re-creating closures on every render).
@@ -200,7 +203,10 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
     setPendingFile(file);
     setError(null);
 
-    const preview = URL.createObjectURL(file);
+    const initialPreview = initialPreviewUrlRef.current;
+    const preview = initialPreview ?? URL.createObjectURL(file);
+    initialPreviewUrlRef.current = null;
+    if (!initialPreview) setPreviewAspectRatio(null);
     setPreviewUrl(preview);
 
     let processed: File;
@@ -212,6 +218,8 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
     } catch (err) {
       URL.revokeObjectURL(preview);
       setPreviewUrl(null);
+      setPreviewAspectRatio(null);
+      dispatchUpdate({ uploadPreviewUrl: undefined });
       setStage('error');
       setError(err instanceof Error ? err.message : 'Failed to process image.');
       return;
@@ -226,6 +234,7 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
         uploadStatus: undefined,
         uploadProgress: undefined,
         uploadError: undefined,
+        uploadPreviewUrl: undefined,
       });
       document.dispatchEvent(new CustomEvent('node:image-propagate', {
         detail: { sourceNodeId: id, imageUrl: url },
@@ -233,11 +242,13 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
       setStage(null);
       setError(null);
     } catch (err) {
+      dispatchUpdate({ uploadPreviewUrl: undefined });
       setStage('error');
       setError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
       URL.revokeObjectURL(preview);
       setPreviewUrl(null);
+      setPreviewAspectRatio(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -320,6 +331,7 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
         uploadStatus: undefined,
         uploadProgress: undefined,
         uploadError: undefined,
+        uploadPreviewUrl: undefined,
       });
       document.dispatchEvent(new CustomEvent('node:video-propagate', {
         detail: { sourceNodeId: id, videoUrl: readUrl },
@@ -400,6 +412,13 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
     dispatchUpdate({ naturalWidth, naturalHeight });
   }
 
+  function handleUploadPreviewLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    if (naturalWidth > 0 && naturalHeight > 0) {
+      setPreviewAspectRatio(naturalWidth / naturalHeight);
+    }
+  }
+
   function handleGallerySelect(url: string) {
     setShowGallery(false);
     maybeRemoveOldEdges('image');
@@ -438,6 +457,7 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
   const hasImage     = data.mediaType === 'image' && !!data.imageUrl;
   const hasVideo     = data.mediaType === 'video' && !!data.videoUrl;
   const hasMedia     = hasImage || hasVideo;
+  const previewIsCard = hasMedia || (isProcessing && data.mediaType === 'image');
 
   // Output handle type and accent color follow the loaded media type.
   const handlePortType = data.mediaType === 'video' ? 'video' : 'image';
@@ -461,11 +481,14 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
       accentColor={accentColor}
       titlePosition="outside"
       appearance="imageGenerationGlass"
-      mediaOnly={hasMedia}
+      mediaOnly={previewIsCard}
     >
       {/* Processing */}
       {isProcessing && (
-        <div className={glassStyles.mediaFrame}>
+        <div
+          className={glassStyles.mediaFrame}
+          style={{ aspectRatio: previewAspectRatio ?? undefined }}
+        >
           {previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -473,6 +496,7 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
               alt=""
               className="absolute inset-0 w-full h-full object-cover"
               style={{ filter: 'blur(8px)', transform: 'scale(1.1)' }}
+              onLoad={handleUploadPreviewLoad}
             />
           )}
           <div

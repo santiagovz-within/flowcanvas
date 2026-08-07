@@ -1118,6 +1118,7 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
     files.forEach((file, i) => {
       const position = { x: canvasPos.x + i * 280, y: canvasPos.y };
       const nodeId = `mediaInputNode-${Date.now()}-${i}`;
+      const isImage = file.type.startsWith('image/');
 
       // Seed the complete uploading state before adding the node. The node then
       // consumes the file after it mounts, so every dropped file follows one
@@ -1128,7 +1129,10 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
         position,
         data: {
           uploadStatus: 'uploading',
-          mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+          mediaType: isImage ? 'image' : 'video',
+          // This browser-local URL lets the blurred preview render in the very
+          // first node frame, before the upload pipeline starts.
+          uploadPreviewUrl: isImage ? URL.createObjectURL(file) : undefined,
         } as MediaInputNodeData,
       } as Node<NodeData>);
 
