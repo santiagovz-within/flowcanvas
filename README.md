@@ -55,7 +55,7 @@ All generation runs through the [FAL AI](https://fal.ai) platform.
 | FLUX 2 Pro | Image generation |
 | Google Omni Flash | Image-to-video generation |
 | Kling 3 Pro | Video generation |
-| Seedance 2.0 (ByteDance) | Video generation |
+| Seedance 2.0 / 2.5 (ByteDance) | Video generation |
 | SeedVR2 | Image / video upscale |
 | Topaz | Image upscale |
 | Ideogram Remove Background | Background removal |

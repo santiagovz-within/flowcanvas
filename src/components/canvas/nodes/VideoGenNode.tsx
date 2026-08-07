@@ -24,12 +24,14 @@ type VideoResolution = NonNullable<VideoGenNodeData['videoResolution']>;
 
 const LOCKED_RESOLUTIONS: Partial<Record<string, VideoResolution>> = {
   'google-omni-flash': '720p',
+  'seedance-2-5': '720p',
   'seedance-2-mini': '720p',
   'kling-3-pro': '1080p',
 };
 
 const DURATION_OPTIONS = ['3s', '5s', '8s', '10s'];
 const SEEDANCE_DURATION_OPTIONS = ['4s', '5s', '8s', '10s', '15s'];
+const SEEDANCE_2_5_DURATION_OPTIONS = ['4s', '5s', '8s', '10s', '15s', '20s', '25s', '30s'];
 const SEEDANCE_MINI_DURATION_OPTIONS = ['4s', '5s', '8s', '10s'];
 const FLUX_DURATION_OPTIONS = ['5s', '8s', '10s', '15s', '20s'];
 const MINIMAX_DURATION_OPTIONS = ['5s', '8s', '10s', '15s'];
@@ -76,8 +78,9 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   const isKling     = data.model === 'kling-3-pro';
   const isOmni      = data.model === 'google-omni-flash';
   const isSeedanceFull = data.model === 'seedance-2';
+  const isSeedance25 = data.model === 'seedance-2-5';
   const isSeedanceMini = data.model === 'seedance-2-mini';
-  const isSeedance  = isSeedanceFull || isSeedanceMini;
+  const isSeedance  = isSeedanceFull || isSeedance25 || isSeedanceMini;
   const isFlux3     = data.model === 'flux-3';
   const isMinimaxH3 = data.model === 'minimax-h3';
   const hasImage    = !!data.startFrameUrl;
@@ -90,8 +93,10 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     : modelConfig.supportedResolutions) as VideoResolution[];
   const durationOptions = isSeedanceFull
     ? SEEDANCE_DURATION_OPTIONS
-    : isSeedanceMini
-      ? SEEDANCE_MINI_DURATION_OPTIONS
+    : isSeedance25
+      ? SEEDANCE_2_5_DURATION_OPTIONS
+      : isSeedanceMini
+        ? SEEDANCE_MINI_DURATION_OPTIONS
       : isFlux3
         ? FLUX_DURATION_OPTIONS
         : isMinimaxH3
@@ -177,8 +182,10 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     const supportedResolutions = modelConfig?.supportedResolutions as VideoResolution[] | undefined;
     const nextDurationOptions = model === 'seedance-2'
       ? SEEDANCE_DURATION_OPTIONS
-      : model === 'seedance-2-mini'
-        ? SEEDANCE_MINI_DURATION_OPTIONS
+      : model === 'seedance-2-5'
+        ? SEEDANCE_2_5_DURATION_OPTIONS
+        : model === 'seedance-2-mini'
+          ? SEEDANCE_MINI_DURATION_OPTIONS
         : model === 'flux-3'
           ? FLUX_DURATION_OPTIONS
           : model === 'minimax-h3'

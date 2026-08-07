@@ -54,6 +54,7 @@ const MODEL_COLOR_MAP: Record<string, string> = {
   'google-omni-flash': '#f87171',
   'kling-3-pro':     '#34d399',
   'seedance-2':      '#60a5fa',
+  'seedance-2-5':    '#818cf8',
   'seedance-2-mini': '#38bdf8',
   'seedvr2':         '#fb923c',
   'topaz':           '#f472b6',

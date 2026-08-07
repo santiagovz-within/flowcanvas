@@ -45,6 +45,7 @@ const MODEL_SUBTITLES: Record<string, string> = {
   'gpt-image-2': 'GOOD FOR TEXT & BRANDING DESIGN',
   'flux-2-pro': 'DRAFT QUALITY',
   'seedance-2': 'THE BEST VIDEO MODEL',
+  'seedance-2-5': 'NEW BEST VIDEO MODEL (720p)',
   'flux-3': 'EXCELLENT ALL-AROUND VIDEO MODEL',
   'kling-3-pro': 'VERY GOOD & FAST VIDEO MODEL',
   'minimax-h3': 'HIGH QUALITY AND FAST',
@@ -82,6 +83,7 @@ function ModelIcon({
     case 'minimax-h3':
       return <Minimax.Color size={size} />;
     case 'seedance-2':
+    case 'seedance-2-5':
     case 'seedance-2-mini':
       return <ByteDance.Color size={size} />;
     case 'seedvr2':

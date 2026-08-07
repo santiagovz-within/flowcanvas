@@ -66,6 +66,11 @@ export const FAL_MODELS = {
     imageToVideoEndpoint: 'bytedance/seedance-2.0/image-to-video',
     type: 'video' as const,
   },
+  'seedance-2-5': {
+    endpoint: 'bytedance/seedance-2.5/text-to-video',
+    imageToVideoEndpoint: 'bytedance/seedance-2.5/image-to-video',
+    type: 'video' as const,
+  },
   'seedance-2-mini': {
     endpoint: 'bytedance/seedance-2.0/mini/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.0/mini/image-to-video',
@@ -214,6 +219,18 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 90,
   },
+  'seedance-2-5': {
+    id: 'seedance-2-5',
+    name: 'Seedance 2.5',
+    provider: 'fal',
+    type: 'video',
+    supportedAspectRatios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
+    supportedResolutions: ['720p'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: false,
+    estimatedTimeSeconds: 90,
+  },
   'seedance-2-mini': {
     id: 'seedance-2-mini',
     name: 'Seedance 2.0 Mini',
@@ -261,6 +278,7 @@ export const IMAGE_MODELS = [
 ];
 export const VIDEO_MODELS = [
   MODELS['seedance-2'],
+  MODELS['seedance-2-5'],
   MODELS['flux-3'],
   MODELS['kling-3-pro'],
   MODELS['minimax-h3'],
@@ -269,7 +287,7 @@ export const VIDEO_MODELS = [
 ];
 // The new endpoint-specific controls are currently implemented on the canvas node.
 export const CHAT_VIDEO_MODELS = VIDEO_MODELS.filter(
-  m => !['google-omni-flash', 'flux-3', 'minimax-h3'].includes(m.id),
+  m => !['google-omni-flash', 'flux-3', 'minimax-h3', 'seedance-2-5'].includes(m.id),
 );
 export const UPSCALE_MODELS = Object.values(MODELS).filter(m => m.type === 'upscale');
 

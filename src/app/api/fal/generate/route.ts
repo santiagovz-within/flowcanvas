@@ -81,8 +81,9 @@ export async function POST(request: NextRequest) {
       // Video generation — submit async job
       const { startFrameUrl, endFrameUrl, generateAudio } = body;
       const hasImage = !!startFrameUrl;
+      const isSeedance25 = model === 'seedance-2-5';
       const isSeedanceMini = model === 'seedance-2-mini';
-      const isSeedance = model === 'seedance-2' || isSeedanceMini;
+      const isSeedance = model === 'seedance-2' || isSeedance25 || isSeedanceMini;
       const isOmni = model === 'google-omni-flash';
       const isKling = model === 'kling-3-pro';
       const isFlux3 = model === 'flux-3';
@@ -91,12 +92,12 @@ export async function POST(request: NextRequest) {
       const requestedVideoResolution = body.videoResolution
         ?? body.seedanceResolution
         ?? defaultVideoResolution;
-      const videoResolution = isSeedanceMini && requestedVideoResolution !== '720p'
+      const videoResolution = (isSeedance25 || isSeedanceMini) && requestedVideoResolution !== '720p'
         ? '720p'
         : requestedVideoResolution;
       const requestedDuration = body.duration ?? 5;
       const duration = isSeedance
-        ? Math.min(15, requestedDuration < 4 ? 5 : requestedDuration)
+        ? Math.min(isSeedance25 ? 30 : 15, requestedDuration < 4 ? 5 : requestedDuration)
         : requestedDuration;
 
       if (isOmni && !startFrameUrl) {
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
         ? ['720p', '1080p']
         : isMinimaxH3
           ? ['768P', '2K']
-          : isSeedanceMini
+          : isSeedance25 || isSeedanceMini
             ? ['720p']
             : isSeedance
               ? ['720p', '1080p', '4k']
