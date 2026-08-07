@@ -48,8 +48,6 @@ import {
 } from './mediaOutputs';
 import type { NodeType, NodeData, ImageGenNodeData, ImageToPromptNodeData, MediaInputNodeData } from '@/types';
 import { getImageReferenceLimit } from '@/lib/api/models';
-import { processImageFile } from '@/lib/utils/imageProcessing';
-import { uploadImageToStorage } from '@/lib/utils/uploadImage';
 import { setPendingFile } from '@/lib/utils/pendingFiles';
 
 const nodeTypes = {
@@ -1121,58 +1119,23 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
       const position = { x: canvasPos.x + i * 280, y: canvasPos.y };
       const nodeId = `mediaInputNode-${Date.now()}-${i}`;
 
-      // Create the node immediately so the user sees the processing state right away.
+      // Seed the complete uploading state before adding the node. The node then
+      // consumes the file after it mounts, so every dropped file follows one
+      // rendering and upload path instead of briefly mounting as an empty card.
       addNode({
         id: nodeId,
         type: 'mediaInputNode',
         position,
-        data: { uploadStatus: 'validating' } as MediaInputNodeData,
+        data: {
+          uploadStatus: 'uploading',
+          mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+        } as MediaInputNodeData,
       } as Node<NodeData>);
 
-      function setStatus(updates: Partial<MediaInputNodeData>) {
-        document.dispatchEvent(new CustomEvent('node:update', { detail: { nodeId, data: updates } }));
-      }
-
-      if (file.type.startsWith('image/')) {
-        (async () => {
-          let processed: File;
-          try {
-            processed = await processImageFile(file, (stage, percent) => {
-              if (stage === 'compressing') {
-                setStatus({ uploadStatus: 'compressing', uploadProgress: percent ?? 0 });
-              } else {
-                setStatus({ uploadStatus: stage });
-              }
-            });
-          } catch (err) {
-            setStatus({
-              uploadStatus: 'error',
-              uploadError: err instanceof Error ? err.message : 'Failed to process image.',
-              uploadProgress: undefined,
-            });
-            return;
-          }
-          setStatus({ uploadStatus: 'uploading', uploadProgress: undefined });
-          try {
-            const url = await uploadImageToStorage(processed);
-            setStatus({ mediaType: 'image', imageUrl: url, uploadStatus: undefined, uploadProgress: undefined, uploadError: undefined });
-            document.dispatchEvent(new CustomEvent('node:image-propagate', {
-              detail: { sourceNodeId: nodeId, imageUrl: url },
-            }));
-          } catch (err) {
-            setStatus({
-              uploadStatus: 'error',
-              uploadError: err instanceof Error ? err.message : 'Upload failed.',
-              uploadProgress: undefined,
-            });
-          }
-        })();
-      } else {
-        // Video — store in the module-level map so MediaInputNode can consume
-        // it on mount (dispatching an event here would race against mount).
-        setStatus({ uploadStatus: undefined });
-        setPendingFile(nodeId, file);
-      }
+      // Store the file until MediaInputNode mounts. Dispatching the file to an
+      // unmounted node races its event listeners, while this lets the uploading
+      // shell and the pipeline begin as a single visual state.
+      setPendingFile(nodeId, file);
     });
   }
 

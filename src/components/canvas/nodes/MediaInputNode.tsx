@@ -173,6 +173,7 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
   const [showGallery, setShowGallery] = useState(false);
 
   const storeEdges = useFlowStore(state => state.edges);
+  const pendingDropRef = useRef<File | null>(null);
 
   // Keep a ref so async callbacks always see the latest mediaType without needing
   // it as a useCallback dependency (avoids re-creating closures on every render).
@@ -219,7 +220,13 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
     setStage('uploading');
     try {
       const url = await uploadImageToStorage(processed);
-      dispatchUpdate({ mediaType: 'image', imageUrl: url });
+      dispatchUpdate({
+        mediaType: 'image',
+        imageUrl: url,
+        uploadStatus: undefined,
+        uploadProgress: undefined,
+        uploadError: undefined,
+      });
       document.dispatchEvent(new CustomEvent('node:image-propagate', {
         detail: { sourceNodeId: id, imageUrl: url },
       }));
@@ -307,7 +314,13 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
         console.warn('[MediaInputNode] Upload succeeded without a generated poster');
       }
 
-      dispatchUpdate({ mediaType: 'video', videoUrl: readUrl });
+      dispatchUpdate({
+        mediaType: 'video',
+        videoUrl: readUrl,
+        uploadStatus: undefined,
+        uploadProgress: undefined,
+        uploadError: undefined,
+      });
       document.dispatchEvent(new CustomEvent('node:video-propagate', {
         detail: { sourceNodeId: id, videoUrl: readUrl },
       }));
@@ -334,14 +347,22 @@ export function MediaInputNode({ data, selected, id }: NodeProps & { data: Media
     }
   }, [processImage, processVideo]);
 
-  // Consume any file queued by FlowCanvas before this node mounted.
-  // The map write happens synchronously in onDrop; this effect runs after mount,
-  // so the file is guaranteed to be present by the time we read it.
+  // Consume any file queued by FlowCanvas before this node mounted. Deferring the
+  // pipeline one frame lets the fully populated Uploading shell paint first.
+  // Keep the file in a ref so React Strict Mode's effect replay cannot lose it.
   useEffect(() => {
-    const file = consumePendingFile(id);
-    if (file) handleFile(file);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally runs only on mount
+    const queuedFile = consumePendingFile(id);
+    if (queuedFile) pendingDropRef.current = queuedFile;
+
+    const file = pendingDropRef.current;
+    if (!file) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      pendingDropRef.current = null;
+      handleFile(file);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [handleFile, id]);
 
   // ── Dropzone ────────────────────────────────────────────────────────────────
 
