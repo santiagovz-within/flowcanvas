@@ -277,8 +277,8 @@ export const IMAGE_MODELS = [
   MODELS['flux-2-pro'],
 ];
 export const VIDEO_MODELS = [
-  MODELS['seedance-2'],
   MODELS['seedance-2-5'],
+  MODELS['seedance-2'],
   MODELS['flux-3'],
   MODELS['kling-3-pro'],
   MODELS['minimax-h3'],
