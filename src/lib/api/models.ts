@@ -127,7 +127,7 @@ export const MODELS: Record<string, ModelConfig> = {
     provider: 'fal',
     type: 'image',
     supportedAspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '4:5', '21:9'],
-    supportedResolutions: ['1K', '2K', '4K'],
+    supportedResolutions: ['1K', '2K'],
     maxBatchSize: 1,
     supportsImageInput: true,
     supportsNegativePrompt: false,
