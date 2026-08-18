@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       const requestedVideoResolution = body.videoResolution
         ?? body.seedanceResolution
         ?? defaultVideoResolution;
-      const videoResolution = (isSeedance25 || isSeedanceMini) && requestedVideoResolution !== '720p'
+      const videoResolution = isSeedanceMini && requestedVideoResolution !== '720p'
         ? '720p'
         : requestedVideoResolution;
       const requestedDuration = body.duration ?? 5;
@@ -139,8 +139,10 @@ export async function POST(request: NextRequest) {
         ? ['720p', '1080p']
         : isMinimaxH3
           ? ['768P', '2K']
-          : isSeedance25 || isSeedanceMini
-            ? ['720p']
+          : isSeedance25
+            ? ['720p', '1080p']
+            : isSeedanceMini
+              ? ['720p']
             : isSeedance
               ? ['720p', '1080p', '4k']
               : isKling

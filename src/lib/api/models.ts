@@ -225,7 +225,7 @@ export const MODELS: Record<string, ModelConfig> = {
     provider: 'fal',
     type: 'video',
     supportedAspectRatios: ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'],
-    supportedResolutions: ['720p'],
+    supportedResolutions: ['720p', '1080p'],
     maxBatchSize: 1,
     supportsImageInput: true,
     supportsNegativePrompt: false,

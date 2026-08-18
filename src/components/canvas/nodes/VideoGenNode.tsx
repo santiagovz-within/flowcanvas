@@ -24,7 +24,6 @@ type VideoResolution = NonNullable<VideoGenNodeData['videoResolution']>;
 
 const LOCKED_RESOLUTIONS: Partial<Record<string, VideoResolution>> = {
   'google-omni-flash': '720p',
-  'seedance-2-5': '720p',
   'seedance-2-mini': '720p',
   'kling-3-pro': '1080p',
 };
