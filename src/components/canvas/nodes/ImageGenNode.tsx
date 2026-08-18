@@ -365,6 +365,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           glassStyles.glassSurface,
           glassStyles.promptSection,
           glassStyles.promptSurface,
+          data.promptConnected && glassStyles.connectedTextPrompt,
         )}
       >
         {data.promptConnected ? (

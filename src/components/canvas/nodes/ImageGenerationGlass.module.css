@@ -236,6 +236,15 @@ textarea.promptContent {
   align-items: center;
 }
 
+.connectedTextPrompt {
+  background: linear-gradient(
+    79.79deg,
+    #3b9eff 0%,
+    rgba(35, 93, 150, 0.2) 74.13%,
+    rgba(16, 43, 69, 0.42) 100%
+  );
+}
+
 .modelTrigger {
   --glass-fill: rgba(99, 99, 99, 0.2);
 

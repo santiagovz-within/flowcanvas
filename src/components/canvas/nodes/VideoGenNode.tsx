@@ -374,10 +374,18 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
       {/* Prompt */}
       <div
         ref={promptSectionRef}
-        className={cn(glassStyles.glassSurface, glassStyles.promptSection, glassStyles.promptSurface)}
+        className={cn(
+          glassStyles.glassSurface,
+          glassStyles.promptSection,
+          glassStyles.promptSurface,
+          data.promptConnected && glassStyles.connectedTextPrompt,
+        )}
       >
         {data.promptConnected ? (
-          <div className={cn(glassStyles.glassContent, glassStyles.connectedPrompt)}>
+          <div className={cn(
+            glassStyles.glassContent,
+            glassStyles.connectedPrompt,
+          )}>
             Prompt connected
           </div>
         ) : (
