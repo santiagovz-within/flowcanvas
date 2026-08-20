@@ -408,17 +408,24 @@ export function TopBar({
         </button>
 
         <div
-          className="min-w-[58px] px-3 py-1.5 rounded-lg text-xs font-medium text-right tabular-nums"
-          style={{
-            color: falBalanceUnavailable ? 'var(--color-white-muted)' : 'var(--color-white)',
-            border: 'var(--border-default)',
-          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs tabular-nums"
+          style={{ border: 'var(--border-default)' }}
           title={falBalanceUnavailable ? 'Fal credits unavailable' : 'Fal credits remaining'}
           aria-label={falBalance
             ? `${formatFalBalance(falBalance)} in Fal credits remaining`
             : 'Fal credits unavailable'}
         >
-          {falBalance ? formatFalBalance(falBalance) : '$—'}
+          <span style={{ color: 'var(--color-white-muted)' }}>Credits:</span>
+          <span
+            className="font-bold"
+            style={{
+              color: falBalance
+                ? falBalance.amount < 0 ? 'var(--color-error)' : 'var(--color-success)'
+                : 'var(--color-white-muted)',
+            }}
+          >
+            {falBalance ? formatFalBalance(falBalance) : '$—'}
+          </span>
         </div>
       </div>
       </div>
