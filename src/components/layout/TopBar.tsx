@@ -19,6 +19,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { createClient } from '@/lib/supabase/client';
 
+const FAL_BALANCE_REFRESH_MS = 60_000;
+
+interface FalBalance {
+  amount: number;
+  currency: string;
+}
+
+function formatFalBalance({ amount, currency }: FalBalance): string {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
+  }
+}
+
 interface TopBarProps {
   flowId: string;
   isOwner?: boolean;
@@ -46,6 +66,8 @@ export function TopBar({
   const [gcsOnlyError, setGcsOnlyError] = useState<string | null>(null);
   const [showGcsOnlyConfirm, setShowGcsOnlyConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [falBalance, setFalBalance] = useState<FalBalance | null>(null);
+  const [falBalanceUnavailable, setFalBalanceUnavailable] = useState(false);
   const isBaseFlow = currentFlow?.is_template ?? false;
   const isGcsOnly = currentFlow?.is_gcs_only ?? false;
   const canEnableGcsOnly = currentFlow?.gcs_only_eligible ?? false;
@@ -65,6 +87,47 @@ export function TopBar({
     }
     checkAdmin();
   }, [supabase]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFalBalance() {
+      try {
+        const response = await fetch('/api/fal/balance', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Balance request failed with status ${response.status}`);
+
+        const payload = await response.json() as { balance?: unknown; currency?: unknown };
+        if (
+          typeof payload.balance !== 'number'
+          || !Number.isFinite(payload.balance)
+          || typeof payload.currency !== 'string'
+        ) {
+          throw new Error('Balance response was invalid');
+        }
+
+        if (!cancelled) {
+          setFalBalance({ amount: payload.balance, currency: payload.currency });
+          setFalBalanceUnavailable(false);
+        }
+      } catch {
+        if (!cancelled) setFalBalanceUnavailable(true);
+      }
+    }
+
+    function handleWindowFocus() {
+      void loadFalBalance();
+    }
+
+    void loadFalBalance();
+    const intervalId = window.setInterval(loadFalBalance, FAL_BALANCE_REFRESH_MS);
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, []);
 
   function startEditTitle() {
     setTitleValue(currentFlow?.title ?? '');
@@ -343,6 +406,20 @@ export function TopBar({
           {copied ? <Check size={12} /> : <Share2 size={12} />}
           {copied ? 'Copied!' : isShared ? 'Shared' : 'Share'}
         </button>
+
+        <div
+          className="min-w-[58px] px-3 py-1.5 rounded-lg text-xs font-medium text-right tabular-nums"
+          style={{
+            color: falBalanceUnavailable ? 'var(--color-white-muted)' : 'var(--color-white)',
+            border: 'var(--border-default)',
+          }}
+          title={falBalanceUnavailable ? 'Fal credits unavailable' : 'Fal credits remaining'}
+          aria-label={falBalance
+            ? `${formatFalBalance(falBalance)} in Fal credits remaining`
+            : 'Fal credits unavailable'}
+        >
+          {falBalance ? formatFalBalance(falBalance) : '$—'}
+        </div>
       </div>
       </div>
 
