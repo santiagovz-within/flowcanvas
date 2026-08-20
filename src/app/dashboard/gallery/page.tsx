@@ -290,7 +290,7 @@ function GenerationModal({
     { label: 'Model',  value: generation.model },
     { label: 'Type',   value: generation.media_type },
     { label: 'Date',   value: formatDate(generation.created_at) },
-    ...(falCost ? [{ label: 'fal billed', value: falCost }] : []),
+    ...(falCost ? [{ label: 'Final cost', value: falCost, icon: '$' }] : []),
     ...(generation.width && generation.height
       ? [{ label: 'Size', value: `${generation.width} × ${generation.height}` }]
       : []),
@@ -400,13 +400,13 @@ function GenerationModal({
               {String(details.length).padStart(2, '0')} Details
             </p>
             <div className="space-y-3">
-              {details.map(({ label, value }) => (
+              {details.map(({ label, value, icon }) => (
                 <div key={label} className="flex items-center gap-3">
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold"
                     style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-white-muted)' }}
                   >
-                    {label[0]}
+                    {icon ?? label[0]}
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-medium truncate" style={{ color: 'var(--color-white)' }}>{value}</p>
