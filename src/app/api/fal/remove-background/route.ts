@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { fal } from '@fal-ai/client';
 import { getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
-
-fal.config({ credentials: process.env.FAL_KEY });
+import { FAL_MODELS } from '@/lib/api/models';
+import { getFalBillingColumns, subscribeToFalWithBilling } from '@/lib/falResult';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,12 +21,16 @@ export async function POST(request: NextRequest) {
       sourceId,
     });
 
-    const result = await fal.subscribe('fal-ai/ideogram/remove-background', {
-      input: { image_url: imageUrl },
-      headers: falHeaders,
-    });
+    const endpoint = FAL_MODELS['ideogram-remove-bg'].endpoint;
+    const result = await subscribeToFalWithBilling<{ image?: { url: string } }>(
+      endpoint,
+      {
+        input: { image_url: imageUrl },
+        headers: falHeaders,
+      },
+    );
 
-    const falResult = result.data as { image?: { url: string } };
+    const falResult = result.data;
     const outputUrl = falResult.image?.url;
     if (!outputUrl) return NextResponse.json({ error: 'No output image returned' }, { status: 500 });
 
@@ -40,6 +43,7 @@ export async function POST(request: NextRequest) {
     const objectPath = `${user.id}/${genId}.${ext}`;
     const gcsRef = await uploadMediaToGCS(imageBuffer, objectPath, contentType);
     const signedUrl = await getSignedReadUrl(objectPath);
+    const billing = await getFalBillingColumns(endpoint, result.billableUnits);
 
     await supabase.from('generations').insert({
       id: genId,
@@ -48,10 +52,12 @@ export async function POST(request: NextRequest) {
       source_id: sourceId,
       node_id: nodeId,
       model: 'ideogram-remove-bg',
-      parameters: {},
+      parameters: { endpoint },
       media_type: 'image',
       media_url: gcsRef,
       status: 'completed',
+      fal_request_id: result.requestId,
+      ...billing,
     });
 
     return NextResponse.json({ mediaUrls: [signedUrl], status: 'completed' });

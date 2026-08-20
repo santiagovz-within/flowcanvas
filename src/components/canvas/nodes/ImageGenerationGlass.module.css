@@ -532,6 +532,13 @@ textarea.promptContent {
   gap: 4px;
 }
 
+.costEstimate {
+  margin-left: 2px;
+  opacity: 0.62;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .handleContent {
   height: 100%;
 }

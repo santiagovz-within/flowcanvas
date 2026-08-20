@@ -3,10 +3,11 @@ import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
+import { FAL_NODE_ENDPOINTS } from '@/lib/api/models';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
-const FAL_ENDPOINT = 'fal-ai/ltx-2.3-quality/outpaint';
+const FAL_ENDPOINT = FAL_NODE_ENDPOINTS.videoOutpaint.endpoint;
 
 function getOutpaintDimensions(aspectRatio: string, resolution: '720p' | '1080p') {
   const baseHeight = resolution === '1080p' ? 1080 : 720;
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
       node_id: nodeId ?? null,
       model: FAL_ENDPOINT,
       prompt: prompt.trim(),
-      parameters: { aspectRatio, resolution, fps },
+      parameters: { aspectRatio, resolution, fps, endpoint: FAL_ENDPOINT },
       media_type: 'video',
       media_url: '',
       status: 'processing',

@@ -24,6 +24,8 @@ import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { CanvasNodeFocusContext } from '@/components/canvas/mediaFocus';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { FAL_MODELS, FAL_NODE_ENDPOINTS } from '@/lib/api/models';
+import FalCostEstimate from './FalCostEstimate';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -957,6 +959,26 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
   const hasOutpaintPrompt  = !!(data.outpaintPrompt?.trim() ?? VIDEO_OUTPAINT_DEFAULT_PROMPT);
   const hasVideoOutput     = inputMediaType === 'video' && !!data.outputVideoUrl;
   const hasPendingEditRequest = !!data.pendingRequestId && !!data.pendingEndpoint;
+  const promptModelConfig = FAL_MODELS[data.model as keyof typeof FAL_MODELS];
+  const promptPricingEndpoint = promptModelConfig && 'editEndpoint' in promptModelConfig
+    ? promptModelConfig.editEndpoint
+    : null;
+  const imagePricingInput = mode === 'prompt'
+    ? promptPricingEndpoint
+      ? {
+          endpoint: promptPricingEndpoint,
+          aspectRatio: data.aspectRatio ?? '1:1',
+          resolution: data.resolution ?? '1K',
+        }
+      : null
+    : resizePlan
+      ? {
+          endpoint: FAL_NODE_ENDPOINTS.imageOutpaint.endpoint,
+          inputMedia: { width: resizePlan.sourceW, height: resizePlan.sourceH },
+          outputWidth: resizePlan.outputW,
+          outputHeight: resizePlan.outputH,
+        }
+      : null;
 
   const nodeTitle = inputMediaType === 'video' ? 'Modify (Video Expand)' : 'Modify';
 
@@ -979,6 +1001,13 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
               <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {isGenerating ? 'Outpainting…' : 'Outpaint Video'}
+              <FalCostEstimate input={videoDuration ? {
+                endpoint: FAL_NODE_ENDPOINTS.videoOutpaint.endpoint,
+                aspectRatio: outpaintAspect,
+                resolution: outpaintResolution,
+                duration: videoDuration,
+                fps: outpaintFps,
+              } : null} />
             </span>
           </button>
           {hasVideoOutput && (
@@ -1016,6 +1045,7 @@ export function ModifyNode({ data, selected, id }: NodeProps & { data: ModifyNod
                 ? (isGenerating ? 'Modifying…' : 'Modify')
                 : (isGenerating ? 'Expanding…' : 'Expand')
               }
+              <FalCostEstimate input={imagePricingInput} />
             </span>
           </button>
           {hasPendingEditRequest && !isGenerating && (

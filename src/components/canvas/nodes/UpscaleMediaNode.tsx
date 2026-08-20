@@ -12,13 +12,15 @@ import { TypedHandle, PORT_COLORS } from './TypedHandle';
 import type {
   UpscaleMediaNodeData, BulkItemResult,
 } from '@/types';
-import { UPSCALE_MODELS, FAL_MODELS } from '@/lib/api/models';
+import { UPSCALE_MODELS, FAL_MODELS, FAL_NODE_ENDPOINTS } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { getNodeMediaUrls, getSourceMediaType } from '../mediaOutputs';
 import { CanvasImage, CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { useMediaMetadata } from '@/lib/useMediaMetadata';
+import FalCostEstimate from './FalCostEstimate';
 
 type Dims = { w: number; h: number };
 
@@ -307,6 +309,10 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
 
   const inputImageUrl = !isBulk && inputMediaType === 'image' ? inputItems[0]?.url : undefined;
   const inputVideoUrl = !isBulk && inputMediaType === 'video' ? inputItems[0]?.url : undefined;
+  const inputMetadata = useMediaMetadata(
+    inputItems.flatMap(item => item.url ? [item.url] : []),
+    inputMediaType,
+  );
 
   // ── Clear stale output when media type switches ─────────────────────────────
 
@@ -633,6 +639,21 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
   const accentColor    = inputMediaType === 'video' ? PORT_COLORS.video : inputMediaType === 'image' ? PORT_COLORS.image : PORT_COLORS.neutral;
 
   const upscaleFactor  = data.upscaleFactor ?? 2;
+  const pricingEndpoint = inputMediaType === 'video'
+    ? FAL_NODE_ENDPOINTS.videoUpscale.endpoint
+    : (falModelConfig as { endpoint?: string } | undefined)?.endpoint;
+  const pricingJobs = pricingEndpoint
+    ? inputItems.flatMap((item) => {
+        if (!item.url) return [];
+        const metadata = inputMetadata.get(item.url);
+        return [{
+          endpoint: pricingEndpoint,
+          inputMedia: metadata ?? undefined,
+          scaleFactor: inputMediaType === 'video' ? upscaleFactor : validScaleFactor,
+          targetFps: inputMediaType === 'video' ? data.targetFps ?? null : null,
+        }];
+      })
+    : [];
   const hasImageOutput = !isBulk && inputMediaType === 'image' && !!data.outputImageUrl;
   const hasVideoOutput = !isBulk && inputMediaType === 'video' && !!data.outputVideoUrl;
 
@@ -659,6 +680,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
               <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {isRunning ? 'Upscaling…' : 'Upscale'}
+              <FalCostEstimate input={pricingJobs.length === 1 ? pricingJobs : null} />
             </span>
           </button>
           {hasImageOutput && (
@@ -700,6 +722,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
               <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {isRunning ? 'Upscaling…' : 'Upscale Video'}
+              <FalCostEstimate input={pricingJobs.length === 1 ? pricingJobs : null} />
             </span>
           </button>
           {hasVideoOutput && (
@@ -738,6 +761,7 @@ export function UpscaleMediaNode({ data, selected, id }: NodeProps & { data: Ups
             {isRunning
               ? `Upscaling ${bulkDoneCount + 1} of ${itemCount}…`
               : `Upscale all ${itemCount}`}
+            <FalCostEstimate input={pricingJobs.length > 0 ? pricingJobs : null} />
           </span>
         </button>
       )}

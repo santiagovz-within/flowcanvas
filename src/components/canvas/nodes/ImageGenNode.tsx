@@ -26,6 +26,7 @@ import { startTrackedImageGeneration } from '@/lib/generationTracker';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
 import { AspectRatioGlyph } from './AspectRatioGlyph';
+import FalCostEstimate from './FalCostEstimate';
 
 const REF_ROW_HEIGHT = 29;
 const ROW_GAP = 10;
@@ -100,6 +101,12 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   const hasEditVariant = !!falConfig && 'editEndpoint' in falConfig;
   const hasImageInput = (data.inputImageUrls ?? []).some(Boolean);
   const isEditMode = hasEditVariant && hasImageInput;
+  const requestedImageCount = Math.min(4, Math.max(1, Math.round(data.numImages)));
+  const pricingEndpoint = falConfig
+    ? isEditMode && 'editEndpoint' in falConfig
+      ? falConfig.editEndpoint
+      : falConfig.endpoint
+    : null;
 
   useLayoutEffect(() => {
     if (!promptSectionRef.current) return;
@@ -176,7 +183,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
 
   function handleGenerate() {
     if (isGenerating || !currentFlow) return;
-    const slotCount = Math.min(4, Math.max(1, Math.round(data.numImages)));
+    const slotCount = requestedImageCount;
     const endpoint = modelConfig?.provider === 'google' ? '/api/google/generate' : '/api/fal/generate';
     const inputImageUrls = (data.inputImageUrls ?? []).filter(Boolean);
     if (endpoint === '/api/fal/generate') {
@@ -270,6 +277,12 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
         <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
           <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
           {isGenerating ? 'Generating…' : 'Generate'}
+          <FalCostEstimate input={pricingEndpoint ? {
+            endpoint: pricingEndpoint,
+            aspectRatio: selectedAspectRatio,
+            resolution: selectedResolution,
+            outputCount: requestedImageCount,
+          } : null} />
         </span>
       </button>
       {hasFailure && <RegenerateGate onChangesApplied={acknowledgeFailure} />}

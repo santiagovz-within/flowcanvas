@@ -1,4 +1,5 @@
 import type { ModelConfig } from '@/types';
+import type { FalPricingRule } from '@/lib/falPricing';
 
 // Google Gemini image generation model IDs — keyed by our internal model ID
 export const GOOGLE_IMAGE_MODELS: Record<string, string> = {};
@@ -10,6 +11,7 @@ export const FAL_MODELS = {
     usesAspectRatio: true,
     supportsResolution: true,
     editImageParam: 'image_urls',
+    pricing: { kind: 'image-resolution', resolutionMultipliers: { '1K': 1, '2K': 1.5, '4K': 2 } },
     type: 'image' as const,
   },
   'nano-banana-pro': {
@@ -18,6 +20,7 @@ export const FAL_MODELS = {
     usesAspectRatio: true,
     supportsResolution: true,
     editImageParam: 'image_urls',
+    pricing: { kind: 'image-resolution', resolutionMultipliers: { '1K': 1, '2K': 1, '4K': 2 } },
     type: 'image' as const,
   },
   'seedream-5': {
@@ -27,6 +30,7 @@ export const FAL_MODELS = {
     usesImageSize: true,
     usesQueue: true,
     maxReferenceImages: 10,
+    pricing: { kind: 'seedream-image' },
     type: 'image' as const,
   },
   'gpt-image-2': {
@@ -34,65 +38,120 @@ export const FAL_MODELS = {
     editEndpoint: 'openai/gpt-image-2/edit',
     editImageParam: 'image_urls',
     hasOwnQuality: true,
+    pricing: { kind: 'image-resolution', resolutionMultipliers: { '1K': 1, '2K': 1.53, '4K': 2.77 } },
     type: 'image' as const,
   },
   'flux-2-pro': {
     endpoint: 'fal-ai/flux-pro/v1.1-ultra',
     usesAspectRatio: true,
+    pricing: { kind: 'fixed' },
     type: 'image' as const,
   },
   'google-omni-flash': {
     endpoint: 'google/gemini-omni-flash/image-to-video',
     requiresImageInput: true,
+    pricing: { kind: 'video-seconds' },
     type: 'video' as const,
   },
   'kling-3-pro': {
     endpoint: 'fal-ai/kling-video/v3/pro/text-to-video',
     imageToVideoEndpoint: 'fal-ai/kling-video/v3/pro/image-to-video',
+    pricing: { kind: 'video-seconds', audioMultiplier: 1.5 },
     type: 'video' as const,
   },
   'flux-3': {
     endpoint: 'blackforestlabs/flux-3/text-to-video',
     imageToVideoEndpoint: 'blackforestlabs/flux-3/image-to-video',
+    pricing: { kind: 'video-seconds', resolutionMultipliers: { '720p': 1, '1080p': 29 / 17 } },
     type: 'video' as const,
   },
   'minimax-h3': {
     endpoint: 'minimax/h3/text-to-video',
     imageToVideoEndpoint: 'minimax/h3/image-to-video',
+    pricing: { kind: 'video-seconds', resolutionMultipliers: { '768P': 8 / 13, '2K': 1 } },
     type: 'video' as const,
   },
   'seedance-2': {
     endpoint: 'bytedance/seedance-2.0/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.0/image-to-video',
+    pricing: { kind: 'video-seconds', resolutionMultipliers: { '720p': 1, '1080p': 0.682 / 0.3034, '4k': 36 / 7 } },
     type: 'video' as const,
   },
   'seedance-2-5': {
     endpoint: 'bytedance/seedance-2.5/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.5/image-to-video',
+    // Fal does not expose this conditional rate in the pricing API yet.
+    pricing: { kind: 'video-seconds', resolutionMultipliers: { '720p': 1, '1080p': 2.25 } },
     type: 'video' as const,
   },
   'seedance-2-mini': {
     endpoint: 'bytedance/seedance-2.0/mini/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.0/mini/image-to-video',
+    pricing: { kind: 'video-seconds', resolutionMultipliers: { '720p': 1 } },
     type: 'video' as const,
   },
   'seedvr2': {
     endpoint: 'fal-ai/seedvr/upscale/image',
     scaleParam: 'upscale_factor',
     scaleOptions: [2, 4, 8, 10],
+    pricing: { kind: 'output-megapixels' },
     type: 'upscale' as const,
   },
   'topaz': {
     endpoint: 'fal-ai/topaz/upscale/image',
     scaleParam: 'upscale_factor',
     scaleOptions: [2, 4],
+    pricing: { kind: 'topaz-image' },
     type: 'upscale' as const,
   },
   'ideogram-remove-bg': {
     endpoint: 'fal-ai/ideogram/remove-background',
+    pricing: { kind: 'fixed' },
     type: 'remove-bg' as const,
   },
 } as const;
+
+/** Fal endpoints used by nodes that do not expose a selectable model. */
+export const FAL_NODE_ENDPOINTS = {
+  imageOutpaint: {
+    endpoint: 'fal-ai/flux-2-pro/outpaint',
+    pricing: { kind: 'flux-outpaint' },
+  },
+  videoOutpaint: {
+    endpoint: 'fal-ai/ltx-2.3-quality/outpaint',
+    pricing: { kind: 'video-frame-megapixels' },
+  },
+  videoUpscale: {
+    endpoint: 'fal-ai/topaz/upscale/video',
+    pricing: { kind: 'topaz-video' },
+  },
+} as const;
+
+export function getFalPricingRule(endpoint: string): FalPricingRule | undefined {
+  for (const config of Object.values(FAL_MODELS)) {
+    if (
+      config.endpoint === endpoint
+      || ('editEndpoint' in config && config.editEndpoint === endpoint)
+      || ('imageToVideoEndpoint' in config && config.imageToVideoEndpoint === endpoint)
+    ) {
+      return config.pricing as FalPricingRule;
+    }
+  }
+
+  return Object.values(FAL_NODE_ENDPOINTS)
+    .find(config => config.endpoint === endpoint)?.pricing as FalPricingRule | undefined;
+}
+
+export function getFalPricingEndpointIds(): string[] {
+  const endpoints = new Set<string>();
+  for (const config of Object.values(FAL_MODELS)) {
+    endpoints.add(config.endpoint);
+    if ('editEndpoint' in config) endpoints.add(config.editEndpoint);
+    if ('imageToVideoEndpoint' in config) endpoints.add(config.imageToVideoEndpoint);
+  }
+  for (const config of Object.values(FAL_NODE_ENDPOINTS)) endpoints.add(config.endpoint);
+  return [...endpoints];
+}
 
 export const MODELS: Record<string, ModelConfig> = {
   'nano-banana-2': {

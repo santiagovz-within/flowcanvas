@@ -12,6 +12,16 @@ import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
 
 const PAGE_SIZE = 42; // 7 rows × 6 columns (xl breakpoint)
 
+function formatFalCostUsd(value: number | null | undefined): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: value < 0.01 ? 4 : 2,
+  }).format(value);
+}
+
 export default function GalleryPage() {
   const { generations, setGenerations, removeGeneration, filter, setFilter, sort, setSort, isLoading, setIsLoading } = useGalleryStore();
   const [selectedGen, setSelectedGen] = useState<Generation | null>(null);
@@ -262,11 +272,13 @@ function GenerationModal({
   const fullPrompt = generation.prompt ?? '';
   const isLong = fullPrompt.length > PROMPT_LIMIT;
   const shownPrompt = isLong && !expanded ? fullPrompt.slice(0, PROMPT_LIMIT) + '…' : fullPrompt;
+  const falCost = formatFalCostUsd(generation.fal_cost_usd);
 
   const details = [
     { label: 'Model',  value: generation.model },
     { label: 'Type',   value: generation.media_type },
     { label: 'Date',   value: formatDate(generation.created_at) },
+    ...(falCost ? [{ label: 'fal billed', value: falCost }] : []),
     ...(generation.width && generation.height
       ? [{ label: 'Size', value: `${generation.width} × ${generation.height}` }]
       : []),

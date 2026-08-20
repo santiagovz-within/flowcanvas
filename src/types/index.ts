@@ -50,6 +50,9 @@ export interface Generation {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error_message: string | null;
   fal_request_id: string | null;
+  fal_billable_units: number | null;
+  fal_unit_price_usd: number | null;
+  fal_cost_usd: number | null;
   created_at: string;
   expires_at: string;
 }

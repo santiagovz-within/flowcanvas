@@ -16,6 +16,8 @@ import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { useMediaMetadata } from '@/lib/useMediaMetadata';
+import FalCostEstimate from './FalCostEstimate';
 
 type Dims = { w: number; h: number };
 
@@ -128,6 +130,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps & { data: UpscaleN
   const validScaleFactor = scaleOptions.includes(data.scaleFactor)
     ? data.scaleFactor
     : scaleOptions[scaleOptions.length - 1];
+  const inputMetadata = useMediaMetadata(inputImageUrl ? [inputImageUrl] : [], 'image').get(inputImageUrl ?? '');
 
   function updateData(updates: Partial<UpscaleNodeData>) {
     document.dispatchEvent(new CustomEvent('node:update', {
@@ -196,6 +199,11 @@ export function UpscaleNode({ data, selected, id }: NodeProps & { data: UpscaleN
         <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
           <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
           {isUpscaling ? 'Upscaling…' : 'Upscale'}
+          <FalCostEstimate input={inputImageUrl && inputMetadata && falModelConfig ? {
+            endpoint: (falModelConfig as { endpoint: string }).endpoint,
+            inputMedia: inputMetadata,
+            scaleFactor: validScaleFactor,
+          } : null} />
         </span>
       </button>
 

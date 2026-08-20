@@ -6,6 +6,7 @@ import { getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
+import { getFalBillingColumns, subscribeToFalWithBilling } from '@/lib/falResult';
 import type { GenerateImageRequest } from '@/types';
 
 fal.config({ credentials: process.env.FAL_KEY });
@@ -343,12 +344,15 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < numImages; i++) {
       console.log(`[fal/generate] image ${i + 1}/${numImages} input:`, JSON.stringify(baseInput));
-      const result = await fal.subscribe(endpoint as string, {
+      const result = await subscribeToFalWithBilling<{
+        images?: Array<{ url: string }>;
+        image?: { url: string };
+      }>(endpoint as string, {
         input: baseInput,
         headers: falHeaders,
       });
 
-      const falResult = result.data as { images?: Array<{ url: string }>; image?: { url: string } };
+      const falResult = result.data;
       const imageUrl = falResult.images?.[0]?.url ?? falResult.image?.url;
       if (!imageUrl) continue;
 
@@ -361,6 +365,7 @@ export async function POST(request: NextRequest) {
       const objectPath = `${user.id}/${genId}.${ext}`;
       const gcsRef = await uploadMediaToGCS(imageBuffer, objectPath, contentType);
       const signedUrl = await getSignedReadUrl(objectPath);
+      const billing = await getFalBillingColumns(endpoint as string, result.billableUnits);
 
       await supabase
         .from('generations')
@@ -372,13 +377,15 @@ export async function POST(request: NextRequest) {
           node_id: nodeId,
           model,
           prompt,
-          parameters: { aspectRatio, resolution },
+          parameters: { aspectRatio, resolution, endpoint },
           reference_image_urls: referenceImageUrls,
           media_type: 'image',
           media_url: gcsRef,
           width,
           height,
           status: 'completed',
+          fal_request_id: result.requestId,
+          ...billing,
         });
 
       results.push(signedUrl);

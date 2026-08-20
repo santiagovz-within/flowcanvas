@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { fal } from '@fal-ai/client';
 import { uploadToGCS, getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
-
-fal.config({ credentials: process.env.FAL_KEY });
+import { FAL_NODE_ENDPOINTS } from '@/lib/api/models';
+import { getFalBillingColumns, subscribeToFalWithBilling } from '@/lib/falResult';
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,18 +51,21 @@ export async function POST(request: NextRequest) {
       console.log('[fal/outpaint] resized source:', targetW, 'x', targetH);
     }
 
-    const result = await fal.subscribe('fal-ai/flux-2-pro/outpaint', {
-      input: {
-        image_url:        falImageUrl,
-        ...(expandTop    > 0 ? { expand_top:    expandTop    } : {}),
-        ...(expandRight  > 0 ? { expand_right:  expandRight  } : {}),
-        ...(expandBottom > 0 ? { expand_bottom: expandBottom } : {}),
-        ...(expandLeft   > 0 ? { expand_left:   expandLeft   } : {}),
+    const result = await subscribeToFalWithBilling<Record<string, unknown>>(
+      FAL_NODE_ENDPOINTS.imageOutpaint.endpoint,
+      {
+        input: {
+          image_url:        falImageUrl,
+          ...(expandTop    > 0 ? { expand_top:    expandTop    } : {}),
+          ...(expandRight  > 0 ? { expand_right:  expandRight  } : {}),
+          ...(expandBottom > 0 ? { expand_bottom: expandBottom } : {}),
+          ...(expandLeft   > 0 ? { expand_left:   expandLeft   } : {}),
+        },
+        headers: falHeaders,
       },
-      headers: falHeaders,
-    });
+    );
 
-    const d = result.data as Record<string, unknown>;
+    const d = result.data;
     console.log('[fal/outpaint] response keys:', Object.keys(d));
 
     const outputUrl =
@@ -84,6 +86,10 @@ export async function POST(request: NextRequest) {
     const objectPath = `${user.id}/${genId}.${ext}`;
     const gcsRef     = await uploadMediaToGCS(imageBuffer, objectPath, contentType);
     const signedUrl  = await getSignedReadUrl(objectPath);
+    const billing = await getFalBillingColumns(
+      FAL_NODE_ENDPOINTS.imageOutpaint.endpoint,
+      result.billableUnits,
+    );
 
     await supabase.from('generations').insert({
       id:          genId,
@@ -92,10 +98,18 @@ export async function POST(request: NextRequest) {
       source_id:   sourceId,
       node_id:     nodeId,
       model:       'flux-2-pro-outpaint',
-      parameters:  { expandTop, expandRight, expandBottom, expandLeft },
+      parameters:  {
+        expandTop,
+        expandRight,
+        expandBottom,
+        expandLeft,
+        endpoint: FAL_NODE_ENDPOINTS.imageOutpaint.endpoint,
+      },
       media_type:  'image',
       media_url:   gcsRef,
       status:      'completed',
+      fal_request_id: result.requestId,
+      ...billing,
     });
 
     return NextResponse.json({ mediaUrls: [signedUrl], status: 'completed' });

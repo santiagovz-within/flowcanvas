@@ -5,10 +5,12 @@ import { getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { describeFalError, isTerminalFalError } from '@/lib/falErrors';
 import { failGeneration } from '@/lib/generationFailures';
+import { FAL_NODE_ENDPOINTS } from '@/lib/api/models';
+import { fetchFalQueueResult, getFalBillingColumns } from '@/lib/falResult';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
-const FAL_ENDPOINT = 'fal-ai/ltx-2.3-quality/outpaint';
+const FAL_ENDPOINT = FAL_NODE_ENDPOINTS.videoOutpaint.endpoint;
 
 export async function GET(
   _request: NextRequest,
@@ -26,9 +28,9 @@ export async function GET(
     if (status.status === 'COMPLETED') {
       // A failed run is also reported COMPLETED — fetching the result is what
       // surfaces FAL's reason for the failure.
-      let result: Awaited<ReturnType<typeof fal.queue.result>>;
+      let result;
       try {
-        result = await fal.queue.result(FAL_ENDPOINT, { requestId });
+        result = await fetchFalQueueResult<Record<string, unknown>>(status.response_url, requestId);
       } catch (err) {
         if (!isTerminalFalError(err)) throw err;
         const message = describeFalError(err);
@@ -54,10 +56,11 @@ export async function GET(
       const objectPath = `${user.id}/${genId}.mp4`;
       const gcsRef = await uploadMediaToGCS(videoBuffer, objectPath, 'video/mp4');
       const signedUrl = await getSignedReadUrl(objectPath);
+      const billing = await getFalBillingColumns(FAL_ENDPOINT, result.billableUnits);
 
       await supabase
         .from('generations')
-        .update({ media_url: gcsRef, status: 'completed' })
+        .update({ media_url: gcsRef, status: 'completed', ...billing })
         .eq('fal_request_id', requestId)
         .eq('user_id', user.id);
 

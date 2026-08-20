@@ -3,10 +3,11 @@ import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
+import { FAL_NODE_ENDPOINTS } from '@/lib/api/models';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
-const FAL_ENDPOINT = 'fal-ai/topaz/upscale/video';
+const FAL_ENDPOINT = FAL_NODE_ENDPOINTS.videoUpscale.endpoint;
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       source_id: sourceId,
       node_id: nodeId,
       model: FAL_ENDPOINT,
-      parameters: { upscaleFactor, targetFps, h264Output },
+      parameters: { upscaleFactor, targetFps, h264Output, endpoint: FAL_ENDPOINT },
       media_type: 'video',
       media_url: '',
       status: 'processing',

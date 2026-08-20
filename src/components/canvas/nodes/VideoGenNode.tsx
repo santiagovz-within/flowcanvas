@@ -19,6 +19,7 @@ import { startTrackedVideoGeneration } from '@/lib/generationTracker';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
 import { AspectRatioGlyph } from './AspectRatioGlyph';
+import FalCostEstimate from './FalCostEstimate';
 
 type VideoResolution = NonNullable<VideoGenNodeData['videoResolution']>;
 
@@ -305,6 +306,13 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
           <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
           {isGenerating ? 'Generating…' : 'Generate'}
+          <FalCostEstimate input={{
+            endpoint: getFalEndpoint(),
+            aspectRatio: data.aspectRatio,
+            resolution: selectedResolution,
+            duration: selectedDuration,
+            generateAudio: data.generateAudio ?? true,
+          }} />
         </span>
       </button>
 

@@ -12,6 +12,9 @@ import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasVideo } from '@/components/canvas/CanvasMedia';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { FAL_NODE_ENDPOINTS } from '@/lib/api/models';
+import { useMediaMetadata } from '@/lib/useMediaMetadata';
+import FalCostEstimate from './FalCostEstimate';
 
 const SCALE_OPTIONS = [2, 3, 4];
 
@@ -34,6 +37,7 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
   }
 
   const upscaleFactor = data.upscaleFactor ?? 2;
+  const inputMetadata = useMediaMetadata(inputVideoUrl ? [inputVideoUrl] : [], 'video').get(inputVideoUrl ?? '');
 
   function updateData(updates: Partial<VideoUpscaleNodeData>) {
     document.dispatchEvent(new CustomEvent('node:update', {
@@ -124,6 +128,11 @@ export function VideoUpscaleNode({ data, selected, id }: NodeProps & { data: Vid
         <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
           <Play size={12} />
           {isProcessing ? 'Upscaling…' : 'Upscale Video'}
+          <FalCostEstimate input={inputVideoUrl && inputMetadata ? {
+            endpoint: FAL_NODE_ENDPOINTS.videoUpscale.endpoint,
+            inputMedia: inputMetadata,
+            scaleFactor: upscaleFactor,
+          } : null} />
         </span>
       </button>
 

@@ -5,6 +5,7 @@ import { getSignedReadUrl, isGcsRef, signGcsRef } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { describeFalError, isTerminalFalError } from '@/lib/falErrors';
 import { failGeneration } from '@/lib/generationFailures';
+import { fetchFalQueueResult, getFalBillingColumns } from '@/lib/falResult';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -24,12 +25,11 @@ export async function GET(
 
     // The endpoint must match whatever was used to submit the job.
     // The client passes it as a query param so we don't have to hardcode a model.
-    const endpoint = request.nextUrl.searchParams.get('endpoint')
-      ?? 'fal-ai/kling-video/v3/pro/text-to-video';
+    const requestedEndpoint = request.nextUrl.searchParams.get('endpoint');
 
     const { data: existingGeneration, error: lookupError } = await supabase
       .from('generations')
-      .select('id, media_url, status, error_message')
+      .select('id, media_url, status, error_message, parameters')
       .eq('fal_request_id', requestId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -37,6 +37,16 @@ export async function GET(
     if (lookupError) {
       throw new Error(`Could not load queued generation: ${lookupError.message}`);
     }
+
+    const storedParameters = existingGeneration?.parameters;
+    const storedEndpoint = storedParameters
+      && typeof storedParameters === 'object'
+      && typeof (storedParameters as { endpoint?: unknown }).endpoint === 'string'
+      ? (storedParameters as { endpoint: string }).endpoint
+      : null;
+    const endpoint = storedEndpoint
+      ?? requestedEndpoint
+      ?? 'fal-ai/kling-video/v3/pro/text-to-video';
 
     if (existingGeneration?.status === 'completed' && existingGeneration.media_url) {
       const mediaUrl = isGcsRef(existingGeneration.media_url)
@@ -65,9 +75,9 @@ export async function GET(
     if (status.status === 'COMPLETED') {
       // FAL marks a failed run COMPLETED and only reveals why when the result is
       // fetched: it answers 422/500 with the reason in `detail`.
-      let result: Awaited<ReturnType<typeof fal.queue.result>>;
+      let result;
       try {
-        result = await fal.queue.result(endpoint, { requestId });
+        result = await fetchFalQueueResult<Record<string, unknown>>(status.response_url, requestId);
       } catch (err) {
         if (!isTerminalFalError(err)) throw err;
         const message = describeFalError(err);
@@ -100,6 +110,7 @@ export async function GET(
         const objectPath = `${user.id}/${existingGeneration.id}.${ext}`;
         const gcsRef = await uploadMediaToGCS(imageBuffer, objectPath, contentType);
         const signedUrl = await getSignedReadUrl(objectPath);
+        const billing = await getFalBillingColumns(endpoint, result.billableUnits);
 
         const { error: updateError } = await supabase
           .from('generations')
@@ -107,6 +118,7 @@ export async function GET(
             media_url: gcsRef,
             status: 'completed',
             fal_request_id: requestId,
+            ...billing,
           })
           .eq('id', existingGeneration.id)
           .eq('user_id', user.id);
@@ -135,6 +147,7 @@ export async function GET(
       const objectPath = `${user.id}/${genId}.mp4`;
       const gcsRef = await uploadMediaToGCS(videoBuffer, objectPath, 'video/mp4');
       const signedUrl = await getSignedReadUrl(objectPath);
+      const billing = await getFalBillingColumns(endpoint, result.billableUnits);
 
       await supabase
         .from('generations')
@@ -142,6 +155,7 @@ export async function GET(
           media_url: gcsRef,
           status: 'completed',
           fal_request_id: requestId,
+          ...billing,
         })
         .eq('fal_request_id', requestId)
         .eq('user_id', user.id);

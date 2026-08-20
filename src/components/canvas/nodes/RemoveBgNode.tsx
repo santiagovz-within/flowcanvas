@@ -14,6 +14,8 @@ import { useFlowStore } from '@/lib/stores/flowStore';
 import { CanvasImage } from '@/components/canvas/CanvasMedia';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { FAL_MODELS } from '@/lib/api/models';
+import FalCostEstimate from './FalCostEstimate';
 
 export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveBgNodeData }) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -100,6 +102,7 @@ export function RemoveBgNode({ data, selected, id }: NodeProps & { data: RemoveB
             <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
               <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
               {isProcessing ? 'Processing…' : 'Remove Background'}
+              <FalCostEstimate input={{ endpoint: FAL_MODELS['ideogram-remove-bg'].endpoint }} />
             </span>
           </button>
 
