@@ -5,7 +5,12 @@ import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
 import { FAL_MODELS } from '@/lib/api/models';
-import { getFalBillingColumns, subscribeToFalWithBilling } from '@/lib/falResult';
+import {
+  getFalBillingColumns,
+  mergeFalBillingParameters,
+  persistFalBillingBestEffort,
+  subscribeToFalWithBilling,
+} from '@/lib/falResult';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,20 +50,33 @@ export async function POST(request: NextRequest) {
     const signedUrl = await getSignedReadUrl(objectPath);
     const billing = await getFalBillingColumns(endpoint, result.billableUnits);
 
-    await supabase.from('generations').insert({
+    const { error: insertError } = await supabase.from('generations').insert({
       id: genId,
       user_id: user.id,
       source_type: sourceType,
       source_id: sourceId,
       node_id: nodeId,
       model: 'ideogram-remove-bg',
-      parameters: { endpoint },
+      parameters: mergeFalBillingParameters({ endpoint }, billing),
       media_type: 'image',
       media_url: gcsRef,
       status: 'completed',
       fal_request_id: result.requestId,
-      ...billing,
     });
+
+    if (insertError) {
+      throw new Error(`Could not save completed background removal: ${insertError.message}`);
+    }
+
+    await persistFalBillingBestEffort(
+      billing,
+      columns => supabase
+        .from('generations')
+        .update(columns)
+        .eq('id', genId)
+        .eq('user_id', user.id),
+      `background removal ${genId}`,
+    );
 
     return NextResponse.json({ mediaUrls: [signedUrl], status: 'completed' });
   } catch (err) {

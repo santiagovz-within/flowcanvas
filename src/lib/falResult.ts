@@ -22,6 +22,16 @@ export interface FalBillingColumns {
   fal_cost_usd?: number;
 }
 
+interface FalBillingParameterMetadata {
+  billableUnits?: number;
+  unitPriceUsd?: number;
+  costUsd?: number;
+}
+
+interface FalBillingPersistenceResult {
+  error: unknown | null;
+}
+
 interface FalSubscribeOptions {
   input: Record<string, unknown>;
   headers?: Record<string, string>;
@@ -133,4 +143,51 @@ export async function getFalBillingColumns(
     console.error(`[fal/billing] Could not price ${endpoint}:`, error);
   }
   return billing;
+}
+
+/**
+ * Persists optional billing metadata without putting the generation record at
+ * risk. In particular, deployments where the billing migration has not run
+ * yet must still save completed generations for the Gallery.
+ */
+export async function persistFalBillingBestEffort(
+  billing: FalBillingColumns,
+  persist: (columns: FalBillingColumns) => PromiseLike<FalBillingPersistenceResult>,
+  context: string,
+): Promise<void> {
+  if (Object.keys(billing).length === 0) return;
+
+  try {
+    const { error } = await persist(billing);
+    if (error) {
+      console.error(`[fal/billing] Could not persist billing for ${context}:`, error);
+    }
+  } catch (error) {
+    console.error(`[fal/billing] Could not persist billing for ${context}:`, error);
+  }
+}
+
+/** Keeps measured billing data available even before the optional columns exist. */
+export function mergeFalBillingParameters(
+  parameters: unknown,
+  billing: FalBillingColumns,
+): Record<string, unknown> {
+  const base = parameters && typeof parameters === 'object' && !Array.isArray(parameters)
+    ? { ...parameters as Record<string, unknown> }
+    : {};
+  const falBilling: FalBillingParameterMetadata = {};
+
+  if (billing.fal_billable_units !== undefined) {
+    falBilling.billableUnits = billing.fal_billable_units;
+  }
+  if (billing.fal_unit_price_usd !== undefined) {
+    falBilling.unitPriceUsd = billing.fal_unit_price_usd;
+  }
+  if (billing.fal_cost_usd !== undefined) {
+    falBilling.costUsd = billing.fal_cost_usd;
+  }
+
+  return Object.keys(falBilling).length > 0
+    ? { ...base, falBilling }
+    : base;
 }

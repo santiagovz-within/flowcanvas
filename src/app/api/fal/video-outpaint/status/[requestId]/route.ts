@@ -6,7 +6,12 @@ import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { describeFalError, isTerminalFalError } from '@/lib/falErrors';
 import { failGeneration } from '@/lib/generationFailures';
 import { FAL_NODE_ENDPOINTS } from '@/lib/api/models';
-import { fetchFalQueueResult, getFalBillingColumns } from '@/lib/falResult';
+import {
+  fetchFalQueueResult,
+  getFalBillingColumns,
+  mergeFalBillingParameters,
+  persistFalBillingBestEffort,
+} from '@/lib/falResult';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -22,6 +27,20 @@ export async function GET(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { requestId } = await params;
+
+    const { data: existingGeneration, error: lookupError } = await supabase
+      .from('generations')
+      .select('id, parameters')
+      .eq('fal_request_id', requestId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (lookupError) {
+      throw new Error(`Could not load queued video outpaint: ${lookupError.message}`);
+    }
+    if (!existingGeneration) {
+      throw new Error('Queued video outpaint record was not found.');
+    }
 
     const status = await fal.queue.status(FAL_ENDPOINT, { requestId, logs: false });
 
@@ -52,17 +71,35 @@ export async function GET(
 
       const videoRes = await fetch(videoUrl);
       const videoBuffer = await videoRes.arrayBuffer();
-      const genId = crypto.randomUUID();
+      const genId = existingGeneration.id;
       const objectPath = `${user.id}/${genId}.mp4`;
       const gcsRef = await uploadMediaToGCS(videoBuffer, objectPath, 'video/mp4');
       const signedUrl = await getSignedReadUrl(objectPath);
       const billing = await getFalBillingColumns(FAL_ENDPOINT, result.billableUnits);
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('generations')
-        .update({ media_url: gcsRef, status: 'completed', ...billing })
-        .eq('fal_request_id', requestId)
+        .update({
+          media_url: gcsRef,
+          status: 'completed',
+          parameters: mergeFalBillingParameters(existingGeneration.parameters, billing),
+        })
+        .eq('id', existingGeneration.id)
         .eq('user_id', user.id);
+
+      if (updateError) {
+        throw new Error(`Could not save completed video outpaint: ${updateError.message}`);
+      }
+
+      await persistFalBillingBestEffort(
+        billing,
+        columns => supabase
+          .from('generations')
+          .update(columns)
+          .eq('id', existingGeneration.id)
+          .eq('user_id', user.id),
+        `video outpaint request ${requestId}`,
+      );
 
       return NextResponse.json({ status: 'completed', mediaUrls: [signedUrl] });
     }

@@ -5,7 +5,12 @@ import { getSignedReadUrl, isGcsRef, signGcsRef } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { describeFalError, isTerminalFalError } from '@/lib/falErrors';
 import { failGeneration } from '@/lib/generationFailures';
-import { fetchFalQueueResult, getFalBillingColumns } from '@/lib/falResult';
+import {
+  fetchFalQueueResult,
+  getFalBillingColumns,
+  mergeFalBillingParameters,
+  persistFalBillingBestEffort,
+} from '@/lib/falResult';
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -118,7 +123,7 @@ export async function GET(
             media_url: gcsRef,
             status: 'completed',
             fal_request_id: requestId,
-            ...billing,
+            parameters: mergeFalBillingParameters(storedParameters, billing),
           })
           .eq('id', existingGeneration.id)
           .eq('user_id', user.id);
@@ -126,6 +131,16 @@ export async function GET(
         if (updateError) {
           throw new Error(`Could not save completed generation: ${updateError.message}`);
         }
+
+        await persistFalBillingBestEffort(
+          billing,
+          columns => supabase
+            .from('generations')
+            .update(columns)
+            .eq('id', existingGeneration.id)
+            .eq('user_id', user.id),
+          `generation ${existingGeneration.id}`,
+        );
 
         return NextResponse.json({
           status: 'completed',
@@ -149,16 +164,30 @@ export async function GET(
       const signedUrl = await getSignedReadUrl(objectPath);
       const billing = await getFalBillingColumns(endpoint, result.billableUnits);
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('generations')
         .update({
           media_url: gcsRef,
           status: 'completed',
           fal_request_id: requestId,
-          ...billing,
+          parameters: mergeFalBillingParameters(storedParameters, billing),
         })
         .eq('fal_request_id', requestId)
         .eq('user_id', user.id);
+
+      if (updateError) {
+        throw new Error(`Could not save completed generation: ${updateError.message}`);
+      }
+
+      await persistFalBillingBestEffort(
+        billing,
+        columns => supabase
+          .from('generations')
+          .update(columns)
+          .eq('fal_request_id', requestId)
+          .eq('user_id', user.id),
+        `request ${requestId}`,
+      );
 
       const { data: gen } = await supabase
         .from('generations')

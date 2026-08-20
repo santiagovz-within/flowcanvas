@@ -22,6 +22,18 @@ function formatFalCostUsd(value: number | null | undefined): string | null {
   }).format(value);
 }
 
+function getFalCostUsd(generation: Generation): number | null | undefined {
+  if (generation.fal_cost_usd !== null && generation.fal_cost_usd !== undefined) {
+    return generation.fal_cost_usd;
+  }
+
+  const falBilling = generation.parameters?.falBilling;
+  if (!falBilling || typeof falBilling !== 'object' || Array.isArray(falBilling)) return null;
+
+  const costUsd = (falBilling as { costUsd?: unknown }).costUsd;
+  return typeof costUsd === 'number' ? costUsd : null;
+}
+
 export default function GalleryPage() {
   const { generations, setGenerations, removeGeneration, filter, setFilter, sort, setSort, isLoading, setIsLoading } = useGalleryStore();
   const [selectedGen, setSelectedGen] = useState<Generation | null>(null);
@@ -272,7 +284,7 @@ function GenerationModal({
   const fullPrompt = generation.prompt ?? '';
   const isLong = fullPrompt.length > PROMPT_LIMIT;
   const shownPrompt = isLong && !expanded ? fullPrompt.slice(0, PROMPT_LIMIT) + '…' : fullPrompt;
-  const falCost = formatFalCostUsd(generation.fal_cost_usd);
+  const falCost = formatFalCostUsd(getFalCostUsd(generation));
 
   const details = [
     { label: 'Model',  value: generation.model },

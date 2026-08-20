@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       headers: falHeaders,
     });
 
-    await supabase.from('generations').insert({
+    const { error: insertError } = await supabase.from('generations').insert({
       user_id: user.id,
       source_type: 'canvas',
       source_id: sourceId,
@@ -78,6 +78,10 @@ export async function POST(request: NextRequest) {
       status: 'processing',
       fal_request_id: request_id,
     });
+
+    if (insertError) {
+      throw new Error(`Could not save queued video outpaint: ${insertError.message}`);
+    }
 
     return NextResponse.json({ requestId: request_id, status: 'pending' });
   } catch (err) {

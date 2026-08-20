@@ -6,7 +6,12 @@ import { getSignedReadUrl } from '@/lib/gcs';
 import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
-import { getFalBillingColumns, subscribeToFalWithBilling } from '@/lib/falResult';
+import {
+  getFalBillingColumns,
+  mergeFalBillingParameters,
+  persistFalBillingBestEffort,
+  subscribeToFalWithBilling,
+} from '@/lib/falResult';
 import type { GenerateImageRequest } from '@/types';
 
 fal.config({ credentials: process.env.FAL_KEY });
@@ -223,7 +228,7 @@ export async function POST(request: NextRequest) {
         headers: falHeaders,
       });
 
-      const { data: gen } = await supabase
+      const { data: gen, error: insertError } = await supabase
         .from('generations')
         .insert({
           user_id: user.id,
@@ -241,6 +246,10 @@ export async function POST(request: NextRequest) {
         })
         .select()
         .single();
+
+      if (insertError) {
+        throw new Error(`Could not save queued generation: ${insertError.message}`);
+      }
 
       return NextResponse.json({
         generationId: gen?.id,
@@ -266,6 +275,7 @@ export async function POST(request: NextRequest) {
       ? getSeedreamImageSize(aspectRatio, resolution)
       : getImageSize(aspectRatio, resolution);
     const results: string[] = [];
+    let lastGenerationId: string | undefined;
 
     console.log('[fal/generate] endpoint:', endpoint, '| refs:', referenceImageUrls.length, '| usesAspectRatio:', usesAspectRatio, '| editImageParam:', editImageParam);
 
@@ -367,7 +377,7 @@ export async function POST(request: NextRequest) {
       const signedUrl = await getSignedReadUrl(objectPath);
       const billing = await getFalBillingColumns(endpoint as string, result.billableUnits);
 
-      await supabase
+      const { error: insertError } = await supabase
         .from('generations')
         .insert({
           id: genId,
@@ -377,7 +387,10 @@ export async function POST(request: NextRequest) {
           node_id: nodeId,
           model,
           prompt,
-          parameters: { aspectRatio, resolution, endpoint },
+          parameters: mergeFalBillingParameters(
+            { aspectRatio, resolution, endpoint },
+            billing,
+          ),
           reference_image_urls: referenceImageUrls,
           media_type: 'image',
           media_url: gcsRef,
@@ -385,26 +398,31 @@ export async function POST(request: NextRequest) {
           height,
           status: 'completed',
           fal_request_id: result.requestId,
-          ...billing,
         });
 
+      if (insertError) {
+        throw new Error(`Could not save completed generation: ${insertError.message}`);
+      }
+
+      await persistFalBillingBestEffort(
+        billing,
+        columns => supabase
+          .from('generations')
+          .update(columns)
+          .eq('id', genId)
+          .eq('user_id', user.id),
+        `generation ${genId}`,
+      );
+
       results.push(signedUrl);
+      lastGenerationId = genId;
     }
 
     if (results.length === 0) {
       return NextResponse.json({ error: 'Generation failed' }, { status: 500 });
     }
 
-    const { data: lastGen } = await supabase
-      .from('generations')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('source_type', sourceType)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    return NextResponse.json({ generationId: lastGen?.id, mediaUrls: results, status: 'completed' });
+    return NextResponse.json({ generationId: lastGenerationId, mediaUrls: results, status: 'completed' });
   } catch (err) {
     const details = describeFalError(err);
     console.error('Generation error:', details);

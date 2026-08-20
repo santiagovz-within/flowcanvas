@@ -5,7 +5,12 @@ import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
 import { FAL_NODE_ENDPOINTS } from '@/lib/api/models';
-import { getFalBillingColumns, subscribeToFalWithBilling } from '@/lib/falResult';
+import {
+  getFalBillingColumns,
+  mergeFalBillingParameters,
+  persistFalBillingBestEffort,
+  subscribeToFalWithBilling,
+} from '@/lib/falResult';
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,26 +96,42 @@ export async function POST(request: NextRequest) {
       result.billableUnits,
     );
 
-    await supabase.from('generations').insert({
+    const { error: insertError } = await supabase.from('generations').insert({
       id:          genId,
       user_id:     user.id,
       source_type: sourceType,
       source_id:   sourceId,
       node_id:     nodeId,
       model:       'flux-2-pro-outpaint',
-      parameters:  {
-        expandTop,
-        expandRight,
-        expandBottom,
-        expandLeft,
-        endpoint: FAL_NODE_ENDPOINTS.imageOutpaint.endpoint,
-      },
+      parameters: mergeFalBillingParameters(
+        {
+          expandTop,
+          expandRight,
+          expandBottom,
+          expandLeft,
+          endpoint: FAL_NODE_ENDPOINTS.imageOutpaint.endpoint,
+        },
+        billing,
+      ),
       media_type:  'image',
       media_url:   gcsRef,
       status:      'completed',
       fal_request_id: result.requestId,
-      ...billing,
     });
+
+    if (insertError) {
+      throw new Error(`Could not save completed outpaint: ${insertError.message}`);
+    }
+
+    await persistFalBillingBestEffort(
+      billing,
+      columns => supabase
+        .from('generations')
+        .update(columns)
+        .eq('id', genId)
+        .eq('user_id', user.id),
+      `outpaint ${genId}`,
+    );
 
     return NextResponse.json({ mediaUrls: [signedUrl], status: 'completed' });
   } catch (err) {
