@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    const { prompt, geminiModel = 'gemini-3-flash-preview', length = 'auto' } = await request.json();
+    const { prompt, geminiModel = 'gemini-3.7-flash', length = 'auto' } = await request.json();
     if (!prompt?.trim()) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }

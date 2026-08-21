@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const imagePart = await fetchAsInlineData(imageUrl);
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite',
+      model: 'gemini-3.7-flash',
       contents: [{
         role: 'user',
         parts: [

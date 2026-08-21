@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
 
 const GEMINI_MODELS = [
-  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
-  { id: 'gemini-3.1-flash-lite',  label: 'Gemini 3.1 Flash Lite' },
+  { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash' },
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite' },
 ];
 
 const LENGTH_OPTIONS = [
@@ -125,7 +125,7 @@ function ColorTextOverlay({ text, palette }: { text: string; palette: PaletteCol
 export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNodeData }) {
   const storeEdges = useFlowStore(state => state.edges);
   const [enhancing, setEnhancing] = useState(false);
-  const [geminiModel, setGeminiModel] = useState('gemini-3-flash-preview');
+  const [geminiModel, setGeminiModel] = useState('gemini-3.7-flash');
   const [length, setLength] = useState('auto');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
