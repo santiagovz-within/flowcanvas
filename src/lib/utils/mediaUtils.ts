@@ -42,6 +42,12 @@ function isFreshSignedUrl(url: string): boolean {
   return expiresAtMs !== null && expiresAtMs > Date.now() + SIGNED_URL_REFRESH_BUFFER_MS;
 }
 
+/** Returns true when a signed URL's expiry is known and already in the past. */
+export function isExpiredSignedUrl(url: string): boolean {
+  const expiresAtMs = signedUrlExpiryMs(url);
+  return expiresAtMs !== null && expiresAtMs <= Date.now();
+}
+
 /** Returns true when `url` is a GCS canonical reference (`gcs:<objectPath>`). */
 export function isGcsRef(url: string | null | undefined): url is string {
   return typeof url === 'string' && url.startsWith('gcs:');

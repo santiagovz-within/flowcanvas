@@ -1,5 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { isGcsRef, signGcsRef, getSignedReadUrl } from '@/lib/gcs';
+import { isSignedGcsUrl, extractGcsPathFromSignedUrl } from '@/lib/utils/mediaUtils';
+
+/**
+ * Base flows are public, but their thumbnails live under their author's GCS
+ * prefix, so `/api/media/sign` refuses to sign them for other users. Sign
+ * them here instead — this route is the shared, admin-scoped read path.
+ * Signed URLs are epoch-pinned (see getSignedReadUrl), so they stay
+ * browser-cacheable across users and visits.
+ */
+async function signThumbnail(stored: string | null): Promise<string | null> {
+  if (!stored) return null;
+  try {
+    if (isGcsRef(stored)) return await signGcsRef(stored);
+    if (isSignedGcsUrl(stored)) {
+      const path = extractGcsPathFromSignedUrl(stored);
+      return path ? await getSignedReadUrl(path) : null;
+    }
+    return stored;
+  } catch {
+    return null;
+  }
+}
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -43,10 +66,11 @@ export async function GET() {
       for (const p of profiles ?? []) nameById.set(p.id, p.display_name || p.username);
     }
 
-    const baseFlows = rows.map(({ user_id, ...rest }) => ({
+    const baseFlows = await Promise.all(rows.map(async ({ user_id, ...rest }) => ({
       ...rest,
       author_username: nameById.get(user_id) ?? null,
-    }));
+      thumbnail_signed_url: await signThumbnail(rest.thumbnail_url),
+    })));
 
     return NextResponse.json({ baseFlows });
   } catch {

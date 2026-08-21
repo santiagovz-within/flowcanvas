@@ -24,6 +24,8 @@ type FlowCardSummary = Pick<
 > & {
   base_flow_order?: number | null;
   author_username?: string | null;
+  /** Ready-to-use signed URL minted by /api/flows/base for public base flows. */
+  thumbnail_signed_url?: string | null;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -238,6 +240,10 @@ export default function CanvasFlowPage() {
   const [savingBaseOrder, setSavingBaseOrder] = useState(false);
   const [baseOrderError, setBaseOrderError] = useState<string | null>(null);
   const [resolvedThumbs, setResolvedThumbs] = useState<Map<string, string>>(new Map());
+  // Thumbnails whose batch resolution has completed (successfully or not).
+  // Cards only show a skeleton until their URL settles; anything still
+  // unresolved after that falls back to an icon instead of pulsing forever.
+  const [settledThumbs, setSettledThumbs] = useState<Set<string>>(new Set());
   const baseOrderBeforeEdit = useRef<FlowCardSummary[] | null>(null);
   const draggedBaseIdRef = useRef<string | null>(null);
 
@@ -288,17 +294,24 @@ export default function CanvasFlowPage() {
   }, [loadFlows]);
 
   // Batch-resolve all thumbnail URLs (both gcs: refs and old stored signed URLs).
+  // Base flows arrive pre-signed from /api/flows/base and are skipped here.
   useEffect(() => {
-    const allUrls = [...flows, ...baseFlows]
-      .map(f => f.thumbnail_url)
-      .filter(Boolean) as string[];
+    const allUrls = [
+      ...flows.map(f => f.thumbnail_url),
+      ...baseFlows.filter(f => !f.thumbnail_signed_url).map(f => f.thumbnail_url),
+    ].filter(Boolean) as string[];
     if (allUrls.length === 0) return;
     let cancelled = false;
-    resolveGcsRefs(allUrls).then((resolved) => {
-      if (!cancelled) setResolvedThumbs(resolved);
-    }).catch((error) => {
-      console.error('[CanvasFlow] Failed to resolve thumbnails:', error);
-    });
+    resolveGcsRefs(allUrls)
+      .then((resolved) => {
+        if (!cancelled) setResolvedThumbs(resolved);
+      })
+      .catch((error) => {
+        console.error('[CanvasFlow] Failed to resolve thumbnails:', error);
+      })
+      .finally(() => {
+        if (!cancelled) setSettledThumbs(new Set(allUrls));
+      });
     return () => { cancelled = true; };
   }, [flows, baseFlows]);
 
@@ -377,8 +390,10 @@ export default function CanvasFlowPage() {
       thumbnail_url: updates.thumbnail_url,
       updated_at: new Date().toISOString(),
     }).eq('id', id);
+    // Drop the server-minted signed URL so the resolve effect re-signs the
+    // new ref (the editing admin owns it, so /api/media/sign accepts it).
     setBaseFlows(baseFlows.map((f) =>
-      f.id === id ? { ...f, ...updates } : f
+      f.id === id ? { ...f, ...updates, thumbnail_signed_url: null } : f
     ));
     setEditingBaseId(null);
   }
@@ -601,7 +616,11 @@ export default function CanvasFlowPage() {
                   >
                     <FlowThumbnail
                       flow={bf}
-                      resolvedThumbnailUrl={bf.thumbnail_url ? resolvedThumbs.get(bf.thumbnail_url) : undefined}
+                      resolvedThumbnailUrl={
+                        bf.thumbnail_signed_url
+                        ?? (bf.thumbnail_url ? resolvedThumbs.get(bf.thumbnail_url) : undefined)
+                      }
+                      resolutionPending={!!bf.thumbnail_url && !settledThumbs.has(bf.thumbnail_url)}
                       fallbackIcon={icon}
                     />
                   </div>
@@ -811,6 +830,7 @@ export default function CanvasFlowPage() {
                 flow={flow}
                 revealIndex={index}
                 resolvedThumbnailUrl={flow.thumbnail_url ? resolvedThumbs.get(flow.thumbnail_url) : undefined}
+                resolutionPending={!!flow.thumbnail_url && !settledThumbs.has(flow.thumbnail_url)}
                 menuOpen={menuOpenId === flow.id}
                 onMenuToggle={(e) => {
                   e.stopPropagation();
@@ -870,10 +890,12 @@ function FlowCardSkeletonGrid({
 function FlowThumbnail({
   flow,
   resolvedThumbnailUrl,
+  resolutionPending = false,
   fallbackIcon,
 }: {
   flow: FlowCardSummary;
   resolvedThumbnailUrl?: string;
+  resolutionPending?: boolean;
   fallbackIcon?: string | null;
 }) {
   const storedThumbnail = flow.thumbnail_url;
@@ -893,7 +915,9 @@ function FlowThumbnail({
     );
   }
 
-  if (storedThumbnail) {
+  // Only pulse while resolution is actually in flight; a ref that failed to
+  // resolve falls through to the icon instead of skeleton-loading forever.
+  if (storedThumbnail && resolutionPending) {
     return (
       <div className="h-full w-full animate-pulse" style={{ background: 'var(--color-bg-elevated)' }} />
     );
@@ -910,6 +934,7 @@ function FlowCard({
   flow,
   revealIndex,
   resolvedThumbnailUrl,
+  resolutionPending,
   menuOpen,
   onMenuToggle,
   onOpen,
@@ -919,6 +944,7 @@ function FlowCard({
   flow: FlowCardSummary;
   revealIndex: number;
   resolvedThumbnailUrl?: string;
+  resolutionPending?: boolean;
   menuOpen: boolean;
   onMenuToggle: (e: React.MouseEvent) => void;
   onOpen: () => void;
@@ -932,7 +958,7 @@ function FlowCard({
         className="m-1 aspect-video flex items-center justify-center rounded-lg overflow-hidden"
         style={{ background: 'var(--color-bg-surface)' }}
       >
-        <FlowThumbnail flow={flow} resolvedThumbnailUrl={resolvedThumbnailUrl} />
+        <FlowThumbnail flow={flow} resolvedThumbnailUrl={resolvedThumbnailUrl} resolutionPending={resolutionPending} />
       </div>
 
       {/* Footer */}

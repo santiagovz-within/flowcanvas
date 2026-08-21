@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { signGcsRef, isGcsRef, getSignedReadUrl } from '@/lib/gcs';
-import { isSignedGcsUrl, extractGcsPathFromSignedUrl } from '@/lib/utils/mediaUtils';
+import { isSignedGcsUrl, isExpiredSignedUrl, extractGcsPathFromSignedUrl } from '@/lib/utils/mediaUtils';
 import { mediaDerivativePaths, type MediaKind } from '@/lib/mediaDerivativePaths';
 
 const MEDIA_BUCKET = process.env.GCS_BUCKET_NAME ?? 'within-glide';
@@ -40,6 +40,8 @@ function isUserOwnedPath(path: string, userId: string): boolean {
  */
 async function hasReadableCapability(source: string): Promise<boolean> {
   if (!isSignedGcsUrl(source)) return false;
+  // An expired signature can never pass the probe — skip the network round trip.
+  if (isExpiredSignedUrl(source)) return false;
   try {
     const response = await fetch(source, {
       headers: { Range: 'bytes=0-0' },
@@ -87,38 +89,48 @@ export async function POST(request: NextRequest) {
 
   const signable = paths.filter(p => isGcsRef(p) || isSignedGcsUrl(p));
 
+  // Per-entry try/catch so one bad ref degrades to a missing thumbnail
+  // instead of failing the entire batch.
   const entries = await Promise.all(
     signable.map(async (ref) => {
-      const path = sourcePath(ref);
-      if (!path || !await canSign(ref, path)) return null;
-      let url: string;
-      if (isGcsRef(ref)) {
-        url = await signGcsRef(ref);
-      } else {
-        url = await getSignedReadUrl(path);
+      try {
+        const path = sourcePath(ref);
+        if (!path || !await canSign(ref, path)) return null;
+        let url: string;
+        if (isGcsRef(ref)) {
+          url = await signGcsRef(ref);
+        } else {
+          url = await getSignedReadUrl(path);
+        }
+        return [ref, url] as [string, string];
+      } catch {
+        return null;
       }
-      return [ref, url] as [string, string];
     })
   );
 
   const assetEntries = await Promise.all(
     assets.map(async ({ key, source, kind }) => {
       if (!key || (kind !== 'image' && kind !== 'video')) return null;
-      const path = sourcePath(source);
-      if (!path) return [key, { original: source }] as const;
-      if (!await canSign(source, path)) {
+      try {
+        const path = sourcePath(source);
+        if (!path) return [key, { original: source }] as const;
+        if (!await canSign(source, path)) {
+          return [key, { original: source }] as const;
+        }
+
+        const derivativePaths = mediaDerivativePaths(path, kind);
+        const [original, thumbnail, poster] = await Promise.all([
+          getSignedReadUrl(path),
+          getSignedReadUrl(derivativePaths.thumbnailPath),
+          derivativePaths.posterPath
+            ? getSignedReadUrl(derivativePaths.posterPath)
+            : Promise.resolve(undefined),
+        ]);
+        return [key, { original, thumbnail, ...(poster ? { poster } : {}) }] as const;
+      } catch {
         return [key, { original: source }] as const;
       }
-
-      const derivativePaths = mediaDerivativePaths(path, kind);
-      const [original, thumbnail, poster] = await Promise.all([
-        getSignedReadUrl(path),
-        getSignedReadUrl(derivativePaths.thumbnailPath),
-        derivativePaths.posterPath
-          ? getSignedReadUrl(derivativePaths.posterPath)
-          : Promise.resolve(undefined),
-      ]);
-      return [key, { original, thumbnail, ...(poster ? { poster } : {}) }] as const;
     }),
   );
 
