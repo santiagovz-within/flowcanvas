@@ -192,6 +192,53 @@ body {
   animation: flow-card-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
+/* Auto-generated flow titles: shimmer while the characters reconfigure,
+   then a soft settle pop once the real title locks in. */
+@keyframes title-reconfigure-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.title-reconfigure {
+  background: linear-gradient(
+    90deg,
+    var(--color-white) 25%,
+    #c8f24a 50%,
+    var(--color-white) 75%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: title-reconfigure-shimmer 750ms linear infinite;
+}
+
+@keyframes title-reconfigure-settle {
+  0% {
+    transform: scale(0.94);
+    opacity: 0.5;
+    filter: blur(2px);
+  }
+  55% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.title-reconfigure-settle {
+  display: inline-block;
+  transform-origin: left center;
+  animation: title-reconfigure-settle 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 @keyframes new-flow-gradient-flow {
   0%,
   100% {
@@ -356,6 +403,14 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .flow-card-enter {
     animation: none;
+  }
+
+  .title-reconfigure,
+  .title-reconfigure-settle {
+    animation: none;
+    background: none;
+    color: inherit;
+    filter: none;
   }
 
   .new-flow-button,
