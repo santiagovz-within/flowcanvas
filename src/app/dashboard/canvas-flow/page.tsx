@@ -24,7 +24,7 @@ type FlowCardSummary = Pick<
 > & {
   base_flow_order?: number | null;
   author_username?: string | null;
-  /** Ready-to-use signed URL minted by /api/flows/base for public base flows. */
+  /** Ready-to-use signed URL minted server-side by /api/flows/base and /api/flows/recent. */
   thumbnail_signed_url?: string | null;
 };
 
@@ -250,42 +250,37 @@ export default function CanvasFlowPage() {
   const supabase = useMemo(() => createClient(), []);
 
   const loadFlows = useCallback(async () => {
+    // Both routes authenticate from the session cookie and return thumbnails
+    // already signed, so nothing here waits on a client-side auth round trip.
     const baseFlowsPromise = fetch('/api/flows/base')
       .then((r) => r.json())
       .catch(() => ({ baseFlows: [] }));
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    const userFlowsPromise = fetch('/api/flows/recent')
+      .then((r) => (r.ok ? r.json() : { flows: [] }))
+      .catch(() => ({ flows: [] }));
 
     // Opportunistic safety net for browser/tab exits that could not complete
-    // their draft deletion request. Drafts are filtered below regardless.
+    // their draft deletion request. Drafts are filtered server-side regardless.
     void fetch('/api/flows/drafts/cleanup', { method: 'POST' }).catch(() => {});
 
-    const userFlowsPromise = supabase
-      .from('flows')
-      .select('id, title, description, thumbnail_url, created_at, updated_at')
-      .eq('user_id', user.id)
-      .eq('is_template', false)
-      .eq('lifecycle_state', 'active')
-      .order('updated_at', { ascending: false });
-    const profilePromise = supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single();
     const [userFlowsResult, baseFlowsResult] = await Promise.all([
       userFlowsPromise,
       baseFlowsPromise,
     ]);
 
-    setFlows(userFlowsResult.data ?? []);
+    setFlows(userFlowsResult.flows ?? []);
     setBaseFlows(baseFlowsResult.baseFlows ?? []);
     setLoading(false);
 
-    const profileResult = await profilePromise;
-    setIsAdmin(profileResult.data?.is_admin ?? false);
+    // The admin flag only gates edit affordances — resolve it off the critical path.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+    setIsAdmin(profile?.is_admin ?? false);
   }, [supabase]);
 
   useEffect(() => {
@@ -293,13 +288,13 @@ export default function CanvasFlowPage() {
     return () => window.clearTimeout(timeoutId);
   }, [loadFlows]);
 
-  // Batch-resolve all thumbnail URLs (both gcs: refs and old stored signed URLs).
-  // Base flows arrive pre-signed from /api/flows/base and are skipped here.
+  // Fallback resolution for thumbnails that did not arrive pre-signed from
+  // /api/flows/recent or /api/flows/base (e.g. a server-side signing failure).
   useEffect(() => {
-    const allUrls = [
-      ...flows.map(f => f.thumbnail_url),
-      ...baseFlows.filter(f => !f.thumbnail_signed_url).map(f => f.thumbnail_url),
-    ].filter(Boolean) as string[];
+    const allUrls = [...flows, ...baseFlows]
+      .filter(f => !f.thumbnail_signed_url)
+      .map(f => f.thumbnail_url)
+      .filter(Boolean) as string[];
     if (allUrls.length === 0) return;
     let cancelled = false;
     resolveGcsRefs(allUrls)
@@ -829,7 +824,10 @@ export default function CanvasFlowPage() {
                 key={flow.id}
                 flow={flow}
                 revealIndex={index}
-                resolvedThumbnailUrl={flow.thumbnail_url ? resolvedThumbs.get(flow.thumbnail_url) : undefined}
+                resolvedThumbnailUrl={
+                  flow.thumbnail_signed_url
+                  ?? (flow.thumbnail_url ? resolvedThumbs.get(flow.thumbnail_url) : undefined)
+                }
                 resolutionPending={!!flow.thumbnail_url && !settledThumbs.has(flow.thumbnail_url)}
                 menuOpen={menuOpenId === flow.id}
                 onMenuToggle={(e) => {

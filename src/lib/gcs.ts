@@ -1,4 +1,5 @@
 import { Storage } from '@google-cloud/storage';
+import { isSignedGcsUrl, extractGcsPathFromSignedUrl } from '@/lib/utils/mediaUtils';
 
 // Server-only module — never import from client components.
 
@@ -96,6 +97,26 @@ export async function getFreshSignedReadUrl(objectPath: string): Promise<string>
  */
 export async function signGcsRef(ref: string): Promise<string> {
   return getSignedReadUrl(gcsPathFromRef(ref));
+}
+
+/**
+ * Signs a stored thumbnail value for direct client use: canonical `gcs:` refs
+ * and legacy stored signed URLs get a fresh epoch-pinned signed URL, other
+ * values pass through unchanged. Returns null when signing fails so a single
+ * bad value degrades to a missing thumbnail instead of failing the caller.
+ */
+export async function signStoredThumbnail(stored: string | null): Promise<string | null> {
+  if (!stored) return null;
+  try {
+    if (isGcsRef(stored)) return await signGcsRef(stored);
+    if (isSignedGcsUrl(stored)) {
+      const path = extractGcsPathFromSignedUrl(stored);
+      return path ? await getSignedReadUrl(path) : null;
+    }
+    return stored;
+  } catch {
+    return null;
+  }
 }
 
 // ── Signed upload URL ─────────────────────────────────────────────────────────
