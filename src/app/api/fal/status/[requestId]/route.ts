@@ -91,8 +91,11 @@ export async function GET(
       }
 
       if (mediaType === 'image') {
-        const falResult = result.data as { images?: Array<{ url: string }> };
-        const imageUrl = falResult.images?.[0]?.url;
+        const falResult = result.data as {
+          images?: Array<{ url: string }>;
+          image?: { url: string };
+        };
+        const imageUrl = falResult.images?.[0]?.url ?? falResult.image?.url;
 
         if (!imageUrl) {
           return failGeneration(supabase, user.id, requestId, 'FAL returned no image URL in the result.');

@@ -2,16 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { fal } from '@fal-ai/client';
 import { FAL_MODELS } from '@/lib/api/models';
-import { getSignedReadUrl } from '@/lib/gcs';
-import { uploadMediaToGCS } from '@/lib/mediaDerivatives';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
-import {
-  getFalBillingColumns,
-  mergeFalBillingParameters,
-  persistFalBillingBestEffort,
-  subscribeToFalWithBilling,
-} from '@/lib/falResult';
 import type { GenerateImageRequest } from '@/types';
 
 fal.config({ credentials: process.env.FAL_KEY });
@@ -265,7 +257,6 @@ export async function POST(request: NextRequest) {
     const usesAspectRatio = 'usesAspectRatio' in modelConfig && modelConfig.usesAspectRatio;
     const supportsResolution = 'supportsResolution' in modelConfig && (modelConfig as { supportsResolution: boolean }).supportsResolution;
     const usesImageSize = 'usesImageSize' in modelConfig && modelConfig.usesImageSize;
-    const usesQueue = 'usesQueue' in modelConfig && modelConfig.usesQueue;
     const editImageParam = 'editImageParam' in modelConfig ? (modelConfig as { editImageParam: string }).editImageParam : null;
     const hasOwnQuality = 'hasOwnQuality' in modelConfig && (modelConfig as { hasOwnQuality: boolean }).hasOwnQuality;
     const maxReferenceImages = 'maxReferenceImages' in modelConfig
@@ -274,8 +265,6 @@ export async function POST(request: NextRequest) {
     const { width, height } = usesImageSize
       ? getSeedreamImageSize(aspectRatio, resolution)
       : getImageSize(aspectRatio, resolution);
-    const results: string[] = [];
-    let lastGenerationId: string | undefined;
 
     console.log('[fal/generate] endpoint:', endpoint, '| refs:', referenceImageUrls.length, '| usesAspectRatio:', usesAspectRatio, '| editImageParam:', editImageParam);
 
@@ -302,127 +291,56 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (usesQueue) {
-      const pendingRequests: Array<{ requestId: string; generationId?: string; endpoint: string }> = [];
-
-      for (let i = 0; i < numImages; i++) {
-        console.log(`[fal/generate] queue image ${i + 1}/${numImages} input:`, JSON.stringify(baseInput));
-        const { request_id } = await fal.queue.submit(endpoint as string, {
-          input: baseInput,
-          headers: falHeaders,
-        });
-        const { data: gen, error: insertError } = await supabase
-          .from('generations')
-          .insert({
-            user_id: user.id,
-            source_type: sourceType,
-            source_id: sourceId,
-            node_id: nodeId,
-            model,
-            prompt,
-            parameters: { aspectRatio, resolution, endpoint, slotIndex: body.slotIndex },
-            reference_image_urls: referenceImageUrls,
-            media_type: 'image',
-            media_url: '',
-            width,
-            height,
-            status: 'processing',
-            fal_request_id: request_id,
-          })
-          .select('id')
-          .single();
-
-        if (insertError) {
-          throw new Error(`Could not save queued generation: ${insertError.message}`);
-        }
-
-        pendingRequests.push({
-          requestId: request_id,
-          generationId: gen?.id,
-          endpoint: endpoint as string,
-        });
-      }
-
-      return NextResponse.json({
-        generationId: pendingRequests[0]?.generationId,
-        requestId: pendingRequests[0]?.requestId,
-        endpoint,
-        requests: pendingRequests,
-        status: 'pending',
-      });
-    }
+    // Always submit image work asynchronously. Keeping this route open until
+    // Fal finishes lets the deployment or browser time out even though the
+    // queued job is still healthy (and may later complete successfully).
+    const pendingRequests: Array<{ requestId: string; generationId?: string; endpoint: string }> = [];
 
     for (let i = 0; i < numImages; i++) {
-      console.log(`[fal/generate] image ${i + 1}/${numImages} input:`, JSON.stringify(baseInput));
-      const result = await subscribeToFalWithBilling<{
-        images?: Array<{ url: string }>;
-        image?: { url: string };
-      }>(endpoint as string, {
+      console.log(`[fal/generate] queue image ${i + 1}/${numImages} input:`, JSON.stringify(baseInput));
+      const { request_id } = await fal.queue.submit(endpoint as string, {
         input: baseInput,
         headers: falHeaders,
       });
-
-      const falResult = result.data;
-      const imageUrl = falResult.images?.[0]?.url ?? falResult.image?.url;
-      if (!imageUrl) continue;
-
-      const imageRes = await fetch(imageUrl);
-      const imageBuffer = await imageRes.arrayBuffer();
-      const contentType = imageRes.headers.get('content-type') ?? 'image/webp';
-      const ext = contentType.split('/')[1] ?? 'webp';
-
-      const genId = crypto.randomUUID();
-      const objectPath = `${user.id}/${genId}.${ext}`;
-      const gcsRef = await uploadMediaToGCS(imageBuffer, objectPath, contentType);
-      const signedUrl = await getSignedReadUrl(objectPath);
-      const billing = await getFalBillingColumns(endpoint as string, result.billableUnits);
-
-      const { error: insertError } = await supabase
+      const { data: gen, error: insertError } = await supabase
         .from('generations')
         .insert({
-          id: genId,
           user_id: user.id,
           source_type: sourceType,
           source_id: sourceId,
           node_id: nodeId,
           model,
           prompt,
-          parameters: mergeFalBillingParameters(
-            { aspectRatio, resolution, endpoint },
-            billing,
-          ),
+          parameters: { aspectRatio, resolution, endpoint, slotIndex: body.slotIndex },
           reference_image_urls: referenceImageUrls,
           media_type: 'image',
-          media_url: gcsRef,
+          media_url: '',
           width,
           height,
-          status: 'completed',
-          fal_request_id: result.requestId,
-        });
+          status: 'processing',
+          fal_request_id: request_id,
+        })
+        .select('id')
+        .single();
 
       if (insertError) {
-        throw new Error(`Could not save completed generation: ${insertError.message}`);
+        throw new Error(`Could not save queued generation: ${insertError.message}`);
       }
 
-      await persistFalBillingBestEffort(
-        billing,
-        columns => supabase
-          .from('generations')
-          .update(columns)
-          .eq('id', genId)
-          .eq('user_id', user.id),
-        `generation ${genId}`,
-      );
-
-      results.push(signedUrl);
-      lastGenerationId = genId;
+      pendingRequests.push({
+        requestId: request_id,
+        generationId: gen?.id,
+        endpoint: endpoint as string,
+      });
     }
 
-    if (results.length === 0) {
-      return NextResponse.json({ error: 'Generation failed' }, { status: 500 });
-    }
-
-    return NextResponse.json({ generationId: lastGenerationId, mediaUrls: results, status: 'completed' });
+    return NextResponse.json({
+      generationId: pendingRequests[0]?.generationId,
+      requestId: pendingRequests[0]?.requestId,
+      endpoint,
+      requests: pendingRequests,
+      status: 'pending',
+    });
   } catch (err) {
     const details = describeFalError(err);
     console.error('Generation error:', details);

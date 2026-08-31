@@ -48,7 +48,6 @@ interface RecoveredGeneration {
 const inFlightRequests = new Set<string>();
 const inFlightSaves = new Set<string>();
 let isRecovering = false;
-const MAX_CONSECUTIVE_POLL_ERRORS = 10;
 const ORPHANED_SUBMISSION_TIMEOUT_MS = 10 * 60 * 1000;
 const INCOMPLETE_RECOVERY_GRACE_MS = 60 * 1000;
 
@@ -332,17 +331,15 @@ function recordPollError(jobId: string, requestId: string, message: string) {
   const request = job?.requests.find((candidate) => candidate.requestId === requestId);
   if (!request || request.status !== 'pending') return;
   const pollErrorCount = (request.pollErrorCount ?? 0) + 1;
-  if (pollErrorCount < MAX_CONSECUTIVE_POLL_ERRORS) {
-    useGenerationStore.getState().patchRequest(jobId, requestId, { pollErrorCount });
-    return;
+  // A polling/network failure says nothing about the Fal job itself. Keep the
+  // request pending until Fal returns an explicit terminal status so a slow or
+  // temporarily unreachable generation is never surfaced as failed.
+  useGenerationStore.getState().patchRequest(jobId, requestId, { pollErrorCount });
+  if (pollErrorCount === 10 || pollErrorCount % 100 === 0) {
+    console.warn(
+      `[BackgroundGeneration] Still waiting to confirm ${requestId} after ${pollErrorCount} status errors: ${message}`,
+    );
   }
-
-  useGenerationStore.getState().patchRequest(jobId, requestId, {
-    status: 'failed',
-    pollErrorCount,
-    errorMessage: `Could not confirm this generation with FAL after repeated attempts. ${message}`,
-  });
-  markSlotFailed(jobId, request.slotIndex);
 }
 
 function failOrphanedJobs() {
