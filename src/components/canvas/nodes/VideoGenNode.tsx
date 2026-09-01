@@ -82,7 +82,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   const isSeedanceMini = data.model === 'seedance-2-mini';
   const isSeedance  = isSeedanceFull || isSeedance25 || isSeedanceMini;
   const isFlux3     = data.model === 'flux-3';
-  const isMinimaxH3 = data.model === 'minimax-h3';
+  const isMinimaxH3 = data.model === 'minimax-h3' || data.model === 'minimax-h3-max';
   const hasImage    = !!data.startFrameUrl;
   const modelConfig = VIDEO_MODELS.find(option => option.id === data.model) ?? VIDEO_MODELS[0];
 
@@ -188,7 +188,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
           ? SEEDANCE_MINI_DURATION_OPTIONS
         : model === 'flux-3'
           ? FLUX_DURATION_OPTIONS
-          : model === 'minimax-h3'
+          : model === 'minimax-h3' || model === 'minimax-h3-max'
             ? MINIMAX_DURATION_OPTIONS
             : DURATION_OPTIONS;
     const nextLockedResolution = LOCKED_RESOLUTIONS[model];

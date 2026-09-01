@@ -85,8 +85,10 @@ export async function POST(request: NextRequest) {
       const isOmni = model === 'google-omni-flash';
       const isKling = model === 'kling-3-pro';
       const isFlux3 = model === 'flux-3';
-      const isMinimaxH3 = model === 'minimax-h3';
-      const defaultVideoResolution = isMinimaxH3 ? '2K' : isKling ? '1080p' : '720p';
+      const isMinimaxH3Max = model === 'minimax-h3-max';
+      const isMinimaxH3 = model === 'minimax-h3' || isMinimaxH3Max;
+      const minimaxName = isMinimaxH3Max ? 'MiniMax H3 Max' : 'MiniMax H3';
+      const defaultVideoResolution = isMinimaxH3Max ? '768P' : isMinimaxH3 ? '2K' : isKling ? '1080p' : '720p';
       const requestedVideoResolution = body.videoResolution
         ?? body.seedanceResolution
         ?? defaultVideoResolution;
@@ -128,13 +130,15 @@ export async function POST(request: NextRequest) {
 
       if (isMinimaxH3 && (!Number.isInteger(duration) || duration < 5 || duration > 15)) {
         return NextResponse.json(
-          { error: 'MiniMax H3 duration must be an integer from 5 to 15 seconds.' },
+          { error: `${minimaxName} duration must be an integer from 5 to 15 seconds.` },
           { status: 400 }
         );
       }
 
       const allowedResolutions = isFlux3
         ? ['720p', '1080p']
+        : isMinimaxH3Max
+          ? ['480P', '768P']
         : isMinimaxH3
           ? ['768P', '2K']
           : isSeedance25
@@ -164,7 +168,7 @@ export async function POST(request: NextRequest) {
       const minimaxAspectRatios = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'];
       if (isMinimaxH3 && !hasImage && !minimaxAspectRatios.includes(aspectRatio)) {
         return NextResponse.json(
-          { error: `MiniMax H3 does not support the ${aspectRatio} aspect ratio.` },
+          { error: `${minimaxName} does not support the ${aspectRatio} aspect ratio.` },
           { status: 400 }
         );
       }

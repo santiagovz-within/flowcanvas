@@ -70,6 +70,12 @@ export const FAL_MODELS = {
     pricing: { kind: 'video-seconds', resolutionMultipliers: { '768P': 8 / 13, '2K': 1 } },
     type: 'video' as const,
   },
+  'minimax-h3-max': {
+    endpoint: 'minimax/h3-max/text-to-video',
+    imageToVideoEndpoint: 'minimax/h3-max/image-to-video',
+    pricing: { kind: 'video-seconds', resolutionMultipliers: { '480P': 5 / 8, '768P': 1 } },
+    type: 'video' as const,
+  },
   'seedance-2': {
     endpoint: 'bytedance/seedance-2.0/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.0/image-to-video',
@@ -265,6 +271,18 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 120,
   },
+  'minimax-h3-max': {
+    id: 'minimax-h3-max',
+    name: 'MiniMax H3 Max',
+    provider: 'fal',
+    type: 'video',
+    supportedAspectRatios: ['16:9', '21:9', '4:3', '1:1', '3:4', '9:16'],
+    supportedResolutions: ['768P', '480P'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: false,
+    estimatedTimeSeconds: 10,
+  },
   'seedance-2': {
     id: 'seedance-2',
     name: 'Seedance 2.0',
@@ -337,6 +355,7 @@ export const IMAGE_MODELS = [
 export const VIDEO_MODELS = [
   MODELS['seedance-2-5'],
   MODELS['seedance-2'],
+  MODELS['minimax-h3-max'],
   MODELS['flux-3'],
   MODELS['kling-3-pro'],
   MODELS['minimax-h3'],
@@ -345,7 +364,7 @@ export const VIDEO_MODELS = [
 ];
 // The new endpoint-specific controls are currently implemented on the canvas node.
 export const CHAT_VIDEO_MODELS = VIDEO_MODELS.filter(
-  m => !['google-omni-flash', 'flux-3', 'minimax-h3', 'seedance-2-5'].includes(m.id),
+  m => !['google-omni-flash', 'flux-3', 'minimax-h3', 'minimax-h3-max', 'seedance-2-5'].includes(m.id),
 );
 export const UPSCALE_MODELS = Object.values(MODELS).filter(m => m.type === 'upscale');
 

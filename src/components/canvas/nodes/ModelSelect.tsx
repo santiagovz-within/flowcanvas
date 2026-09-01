@@ -46,6 +46,7 @@ const MODEL_SUBTITLES: Record<string, string> = {
   'flux-2-pro': 'DRAFT QUALITY',
   'seedance-2': 'THE BEST VIDEO MODEL',
   'seedance-2-5': 'NEW BEST VIDEO MODEL (UP TO 1080p)',
+  'minimax-h3-max': 'ULTRA FAST (VIDEOS IN AS LITTLE AS 3s)',
   'flux-3': 'EXCELLENT ALL-AROUND VIDEO MODEL',
   'kling-3-pro': 'VERY GOOD & FAST VIDEO MODEL',
   'minimax-h3': 'HIGH QUALITY AND FAST',
@@ -81,6 +82,7 @@ function ModelIcon({
     case 'flux-3':
       return <Bfl size={size} />;
     case 'minimax-h3':
+    case 'minimax-h3-max':
       return <Minimax.Color size={size} />;
     case 'seedance-2':
     case 'seedance-2-5':
