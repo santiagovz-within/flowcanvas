@@ -24,7 +24,6 @@ import FalCostEstimate from './FalCostEstimate';
 type VideoResolution = NonNullable<VideoGenNodeData['videoResolution']>;
 
 const LOCKED_RESOLUTIONS: Partial<Record<string, VideoResolution>> = {
-  'google-omni-flash': '720p',
   'seedance-2-mini': '720p',
   'kling-3-pro': '1080p',
 };
@@ -76,7 +75,6 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   }, [localPrompt]);
 
   const isKling     = data.model === 'kling-3-pro';
-  const isOmni      = data.model === 'google-omni-flash';
   const isSeedanceFull = data.model === 'seedance-2';
   const isSeedance25 = data.model === 'seedance-2-5';
   const isSeedanceMini = data.model === 'seedance-2-mini';
@@ -113,7 +111,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
       ? storedResolution as VideoResolution
       : resolutionOptions[0]) ?? '720p';
   const followsInputAspect = hasImage && (isKling || isMinimaxH3);
-  const supportsEndFrame = !isOmni && !isFlux3;
+  const supportsEndFrame = !isFlux3;
   const supportsAudio = isSeedance || isFlux3 || isKling;
 
   // Read start-frame source node directly from store (reactive, zero-latency)
@@ -232,10 +230,6 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
 
   function handleGenerate() {
     if (isGenerating || !currentFlow) return;
-    if (isOmni && !hasImage) {
-      updateData({ status: 'error', errorMessage: 'Google Omni Flash requires a start frame.' });
-      return;
-    }
 
     const endpoint = getFalEndpoint();
     useFlowStore.getState().consumeGcsOnlyEligibility();
@@ -288,13 +282,11 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     <div className={glassStyles.footerStack}>
       <button
         onClick={handleGenerate}
-        disabled={isGenerating || hasFailure || (isOmni && !hasImage)}
+        disabled={isGenerating || hasFailure}
         title={
           hasFailure
             ? 'Change the prompt or inputs, then confirm below to regenerate'
-            : isOmni && !hasImage
-              ? 'Connect a start frame to generate with Google Omni Flash'
-              : undefined
+            : undefined
         }
         className={cn(
           glassStyles.glassSurface,
@@ -482,7 +474,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
             )}
           >
             <span className={glassStyles.glassContent}>
-              Start Frame{isOmni ? ' (Required)' : ''}
+              Start Frame
             </span>
           </div>
           {supportsEndFrame && (

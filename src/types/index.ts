@@ -185,7 +185,7 @@ export interface VideoGenNodeData extends Record<string, unknown> {
   imageAspectRatio?: string;
   duration?: number;
   generateAudio?: boolean;
-  videoResolution?: '720p' | '1080p' | '4k' | '480P' | '768P' | '2K';
+  videoResolution?: '360p' | '720p' | '1080p' | '4k' | '480P' | '768P' | '2K';
   /** @deprecated Read only as a fallback for videos saved before videoResolution was introduced. */
   seedanceResolution?: '480p' | '720p' | '1080p' | '4k';
   prompt?: string;

@@ -47,9 +47,9 @@ export const FAL_MODELS = {
     type: 'image' as const,
   },
   'google-omni-flash': {
-    endpoint: 'google/gemini-omni-flash/image-to-video',
-    requiresImageInput: true,
-    pricing: { kind: 'video-seconds' },
+    endpoint: 'google/gemini-omni-flash/v1.1/text-to-video',
+    imageToVideoEndpoint: 'google/gemini-omni-flash/v1.1/image-to-video',
+    pricing: { kind: 'video-seconds', resolutionMultipliers: { '360p': 0.3, '720p': 1, '1080p': 1.5, '4k': 3 } },
     type: 'video' as const,
   },
   'kling-3-pro': {
@@ -225,11 +225,11 @@ export const MODELS: Record<string, ModelConfig> = {
   },
   'google-omni-flash': {
     id: 'google-omni-flash',
-    name: 'Google Omni Flash',
+    name: 'Google Omni Flash 1.1',
     provider: 'fal',
     type: 'video',
     supportedAspectRatios: ['16:9', '9:16'],
-    supportedResolutions: ['720p'],
+    supportedResolutions: ['720p', '1080p', '4k', '360p'],
     maxBatchSize: 1,
     supportsImageInput: true,
     supportsNegativePrompt: false,

@@ -100,13 +100,6 @@ export async function POST(request: NextRequest) {
         ? Math.min(isSeedance25 ? 30 : 15, requestedDuration < 4 ? 5 : requestedDuration)
         : requestedDuration;
 
-      if (isOmni && !startFrameUrl) {
-        return NextResponse.json(
-          { error: 'Google Omni Flash requires a start frame.' },
-          { status: 400 }
-        );
-      }
-
       if (isOmni && !['16:9', '9:16'].includes(aspectRatio)) {
         return NextResponse.json(
           { error: 'Google Omni Flash supports only 16:9 and 9:16 aspect ratios.' },
@@ -149,7 +142,9 @@ export async function POST(request: NextRequest) {
               ? ['720p', '1080p', '4k']
               : isKling
                 ? ['1080p']
-                : ['720p'];
+                : isOmni
+                  ? ['360p', '720p', '1080p', '4k']
+                  : ['720p'];
       if (!allowedResolutions.includes(videoResolution)) {
         return NextResponse.json(
           { error: `${modelConfig.type === 'video' ? model : 'Video model'} does not support ${videoResolution} resolution.` },
@@ -182,7 +177,9 @@ export async function POST(request: NextRequest) {
         Object.assign(videoInput, {
           aspect_ratio: aspectRatio,
           duration,
-          image_url: startFrameUrl,
+          resolution: videoResolution,
+          ...(startFrameUrl ? { image_url: startFrameUrl } : {}),
+          ...(endFrameUrl ? { end_image_url: endFrameUrl } : {}),
         });
       } else if (isKling) {
         Object.assign(videoInput, {
