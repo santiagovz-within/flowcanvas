@@ -17,6 +17,19 @@ export type FalPricingRule =
       resolutionMultipliers?: Record<string, number>;
       audioMultiplier?: number;
     }
+  | {
+      /**
+       * Token-billed video (Seedance). Fal counts
+       * `width * height * duration * fps / 1024` tokens and prices them per
+       * `tokensPerUnit`; the pricing API's unit price is for the base
+       * resolution, so `resolutionRateMultipliers` scales the per-token rate
+       * (not the pixel count, which the dimensions already capture).
+       */
+      kind: 'video-tokens';
+      fps: number;
+      tokensPerUnit: number;
+      resolutionRateMultipliers?: Record<string, number>;
+    }
   | { kind: 'video-frame-megapixels' }
   | { kind: 'topaz-video' };
 
@@ -208,6 +221,19 @@ export function estimateFalCost(
         ? rule.audioMultiplier
         : 1;
       billableUnits = input.duration * resolutionMultiplier * audioMultiplier * outputCount;
+      break;
+    }
+
+    case 'video-tokens': {
+      if (!positive(input.duration)) break;
+      const dimensions = getVideoDimensions(input.aspectRatio, input.resolution);
+      if (!dimensions) break;
+      const rateMultiplier = rule.resolutionRateMultipliers
+        ? rule.resolutionRateMultipliers[input.resolution ?? '']
+        : 1;
+      if (!positive(rateMultiplier)) break;
+      const tokens = dimensions.width * dimensions.height * input.duration * rule.fps / 1024;
+      billableUnits = (tokens / rule.tokensPerUnit) * rateMultiplier * outputCount;
       break;
     }
 

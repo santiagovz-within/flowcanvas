@@ -79,20 +79,23 @@ export const FAL_MODELS = {
   'seedance-2': {
     endpoint: 'bytedance/seedance-2.0/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.0/image-to-video',
-    pricing: { kind: 'video-seconds', resolutionMultipliers: { '720p': 1, '1080p': 0.682 / 0.3034, '4k': 36 / 7 } },
+    // Fal bills Seedance per 1000 video tokens ($0.014 at 480p-1080p, $0.008 at 4K).
+    pricing: { kind: 'video-tokens', fps: 24, tokensPerUnit: 1000, resolutionRateMultipliers: { '720p': 1, '1080p': 1, '4k': 0.008 / 0.014 } },
     type: 'video' as const,
   },
   'seedance-2-5': {
     endpoint: 'bytedance/seedance-2.5/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.5/image-to-video',
-    // Fal does not expose this conditional rate in the pricing API yet.
-    pricing: { kind: 'video-seconds', resolutionMultipliers: { '720p': 1, '1080p': 2.25 } },
+    // Fal bills Seedance per 1000 video tokens ($0.0214 at 480p/720p, $0.0234 at
+    // 1080p). The pricing API only exposes the base rate, so scale 1080p here.
+    pricing: { kind: 'video-tokens', fps: 24, tokensPerUnit: 1000, resolutionRateMultipliers: { '720p': 1, '1080p': 0.0234 / 0.0214 } },
     type: 'video' as const,
   },
   'seedance-2-mini': {
     endpoint: 'bytedance/seedance-2.0/mini/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.0/mini/image-to-video',
-    pricing: { kind: 'video-seconds', resolutionMultipliers: { '720p': 1 } },
+    // Fal bills Seedance Mini per 1000 video tokens ($0.007 at 480p/720p).
+    pricing: { kind: 'video-tokens', fps: 24, tokensPerUnit: 1000 },
     type: 'video' as const,
   },
   'seedvr2': {
