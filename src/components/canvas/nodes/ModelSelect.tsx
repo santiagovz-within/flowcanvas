@@ -50,7 +50,7 @@ const MODEL_SUBTITLES: Record<string, string> = {
   'flux-3': 'EXCELLENT ALL-AROUND VIDEO MODEL',
   'kling-3-pro': 'VERY GOOD & FAST VIDEO MODEL',
   'minimax-h3': 'HIGH QUALITY AND FAST',
-  'google-omni-flash': 'GOOD & FAST (UP TO 4k)',
+  'google-omni-flash': 'EXCELLENT & FASTEST (UP TO 4K)',
   'seedance-2-mini': 'DRAFT QUALITY (720p)',
 };
 

@@ -358,11 +358,11 @@ export const IMAGE_MODELS = [
 export const VIDEO_MODELS = [
   MODELS['seedance-2-5'],
   MODELS['seedance-2'],
+  MODELS['google-omni-flash'],
   MODELS['minimax-h3-max'],
   MODELS['flux-3'],
   MODELS['kling-3-pro'],
   MODELS['minimax-h3'],
-  MODELS['google-omni-flash'],
   MODELS['seedance-2-mini'],
 ];
 // The new endpoint-specific controls are currently implemented on the canvas node.
