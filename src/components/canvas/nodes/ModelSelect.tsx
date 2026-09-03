@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStoreApi } from '@xyflow/react';
-import { Bfl, ByteDance, Fal, Flux, Gemini, Google, Kling, Minimax, NanoBanana, OpenAI, TopazLabs } from '@lobehub/icons';
+import { Alibaba, Bfl, ByteDance, Fal, Flux, Gemini, Google, Kling, Minimax, NanoBanana, OpenAI, TopazLabs } from '@lobehub/icons';
 import { Box, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
@@ -50,6 +50,7 @@ const MODEL_SUBTITLES: Record<string, string> = {
   'flux-3': 'EXCELLENT ALL-AROUND VIDEO MODEL',
   'kling-3-pro': 'VERY GOOD & FAST VIDEO MODEL',
   'minimax-h3': 'HIGH QUALITY AND FAST',
+  'wan-3-prime': 'HIGH QUALITY WITH AUDIO (UP TO 1080p)',
   'google-omni-flash': 'EXCELLENT & FASTEST (UP TO 4K)',
   'seedance-2-mini': 'DRAFT QUALITY (720p)',
 };
@@ -84,6 +85,8 @@ function ModelIcon({
     case 'minimax-h3':
     case 'minimax-h3-max':
       return <Minimax.Color size={size} />;
+    case 'wan-3-prime':
+      return <Alibaba.Color size={size} />;
     case 'seedance-2':
     case 'seedance-2-5':
     case 'seedance-2-mini':

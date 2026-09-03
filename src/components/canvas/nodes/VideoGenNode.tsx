@@ -36,6 +36,7 @@ const SEEDANCE_2_5_DURATION_OPTIONS = ['4s', '5s', '8s', '10s', '15s', '20s', '2
 const SEEDANCE_MINI_DURATION_OPTIONS = ['4s', '5s', '8s', '10s'];
 const FLUX_DURATION_OPTIONS = ['5s', '8s', '10s', '15s', '20s'];
 const MINIMAX_DURATION_OPTIONS = ['5s', '8s', '10s', '15s'];
+const WAN_DURATION_OPTIONS = ['3s', '5s', '8s', '10s', '15s', '20s', '25s', '30s'];
 
 /** Seedance 2.0 / 2.5 runs estimated above this get a warning and a confirm step. */
 const EXPENSIVE_VIDEO_COST_USD = 8;
@@ -86,6 +87,7 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   const isSeedance  = isSeedanceFull || isSeedance25 || isSeedanceMini;
   const isFlux3     = data.model === 'flux-3';
   const isMinimaxH3 = data.model === 'minimax-h3' || data.model === 'minimax-h3-max';
+  const isWan       = data.model === 'wan-3-prime';
   const hasImage    = !!data.startFrameUrl;
   const modelConfig = VIDEO_MODELS.find(option => option.id === data.model) ?? VIDEO_MODELS[0];
 
@@ -104,7 +106,9 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         ? FLUX_DURATION_OPTIONS
         : isMinimaxH3
           ? MINIMAX_DURATION_OPTIONS
-          : DURATION_OPTIONS;
+          : isWan
+            ? WAN_DURATION_OPTIONS
+            : DURATION_OPTIONS;
   const requestedDuration = `${data.duration ?? 5}s`;
   const selectedDuration = Number.parseInt(
     durationOptions.includes(requestedDuration) ? requestedDuration : durationOptions[0],
@@ -115,9 +119,9 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
     ?? (storedResolution && resolutionOptions.includes(storedResolution as VideoResolution)
       ? storedResolution as VideoResolution
       : resolutionOptions[0]) ?? '720p';
-  const followsInputAspect = hasImage && (isKling || isMinimaxH3);
+  const followsInputAspect = hasImage && (isKling || isMinimaxH3 || isWan);
   const supportsEndFrame = !isFlux3;
-  const supportsAudio = isSeedance || isFlux3 || isKling;
+  const supportsAudio = isSeedance || isFlux3 || isKling || isWan;
 
   const costEstimateInput = {
     endpoint: getFalEndpoint(),
@@ -206,7 +210,9 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
           ? FLUX_DURATION_OPTIONS
           : model === 'minimax-h3' || model === 'minimax-h3-max'
             ? MINIMAX_DURATION_OPTIONS
-            : DURATION_OPTIONS;
+            : model === 'wan-3-prime'
+              ? WAN_DURATION_OPTIONS
+              : DURATION_OPTIONS;
     const nextLockedResolution = LOCKED_RESOLUTIONS[model];
     const nextResolution = nextLockedResolution
       ?? (storedResolution && supportedResolutions?.includes(storedResolution as VideoResolution)

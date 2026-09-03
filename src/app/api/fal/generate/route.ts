@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
       const isFlux3 = model === 'flux-3';
       const isMinimaxH3Max = model === 'minimax-h3-max';
       const isMinimaxH3 = model === 'minimax-h3' || isMinimaxH3Max;
+      const isWan = model === 'wan-3-prime';
       const minimaxName = isMinimaxH3Max ? 'MiniMax H3 Max' : 'MiniMax H3';
       const defaultVideoResolution = isMinimaxH3Max ? '768P' : isMinimaxH3 ? '2K' : isKling ? '1080p' : '720p';
       const requestedVideoResolution = body.videoResolution
@@ -128,7 +129,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const allowedResolutions = isFlux3
+      if (isWan && (!Number.isInteger(duration) || duration < 2 || duration > 30)) {
+        return NextResponse.json(
+          { error: 'Wan 3.0 Prime duration must be an integer from 2 to 30 seconds.' },
+          { status: 400 }
+        );
+      }
+
+      const allowedResolutions = isFlux3 || isWan
         ? ['720p', '1080p']
         : isMinimaxH3Max
           ? ['480P', '768P']
@@ -164,6 +172,14 @@ export async function POST(request: NextRequest) {
       if (isMinimaxH3 && !hasImage && !minimaxAspectRatios.includes(aspectRatio)) {
         return NextResponse.json(
           { error: `${minimaxName} does not support the ${aspectRatio} aspect ratio.` },
+          { status: 400 }
+        );
+      }
+
+      const wanAspectRatios = ['16:9', '4:3', '1:1', '3:4', '9:16'];
+      if (isWan && !hasImage && !wanAspectRatios.includes(aspectRatio)) {
+        return NextResponse.json(
+          { error: `Wan 3.0 Prime does not support the ${aspectRatio} aspect ratio.` },
           { status: 400 }
         );
       }
@@ -212,6 +228,17 @@ export async function POST(request: NextRequest) {
           duration,
           resolution: videoResolution,
           ...(startFrameUrl ? { image_url: startFrameUrl } : {}),
+          ...(endFrameUrl ? { end_image_url: endFrameUrl } : {}),
+        });
+      } else if (isWan) {
+        // With a start frame the aspect ratio is left at Fal's "adaptive"
+        // default so the video follows the input image.
+        Object.assign(videoInput, {
+          ...(!hasImage ? { aspect_ratio: aspectRatio } : {}),
+          duration,
+          resolution: videoResolution,
+          audio: generateAudio !== false,
+          ...(startFrameUrl ? { start_image_url: startFrameUrl } : {}),
           ...(endFrameUrl ? { end_image_url: endFrameUrl } : {}),
         });
       }

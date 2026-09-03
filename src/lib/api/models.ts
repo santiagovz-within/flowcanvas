@@ -76,6 +76,14 @@ export const FAL_MODELS = {
     pricing: { kind: 'video-seconds', resolutionMultipliers: { '480P': 5 / 8, '768P': 1 } },
     type: 'video' as const,
   },
+  'wan-3-prime': {
+    endpoint: 'alibaba/wan-3.0-prime/text-to-video',
+    imageToVideoEndpoint: 'alibaba/wan-3.0-prime/image-to-video',
+    // Fal charges $0.14/s at 720p and $0.28/s at 1080p; the pricing API is
+    // assumed to report the default 1080p rate.
+    pricing: { kind: 'video-seconds', resolutionMultipliers: { '720p': 0.14 / 0.28, '1080p': 1 } },
+    type: 'video' as const,
+  },
   'seedance-2': {
     endpoint: 'bytedance/seedance-2.0/text-to-video',
     imageToVideoEndpoint: 'bytedance/seedance-2.0/image-to-video',
@@ -286,6 +294,18 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 10,
   },
+  'wan-3-prime': {
+    id: 'wan-3-prime',
+    name: 'Wan 3.0 Prime',
+    provider: 'fal',
+    type: 'video',
+    supportedAspectRatios: ['16:9', '4:3', '1:1', '3:4', '9:16'],
+    supportedResolutions: ['720p', '1080p'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: false,
+    estimatedTimeSeconds: 120,
+  },
   'seedance-2': {
     id: 'seedance-2',
     name: 'Seedance 2.0',
@@ -363,11 +383,12 @@ export const VIDEO_MODELS = [
   MODELS['flux-3'],
   MODELS['kling-3-pro'],
   MODELS['minimax-h3'],
+  MODELS['wan-3-prime'],
   MODELS['seedance-2-mini'],
 ];
 // The new endpoint-specific controls are currently implemented on the canvas node.
 export const CHAT_VIDEO_MODELS = VIDEO_MODELS.filter(
-  m => !['google-omni-flash', 'flux-3', 'minimax-h3', 'minimax-h3-max', 'seedance-2-5'].includes(m.id),
+  m => !['google-omni-flash', 'flux-3', 'minimax-h3', 'minimax-h3-max', 'seedance-2-5', 'wan-3-prime'].includes(m.id),
 );
 export const UPSCALE_MODELS = Object.values(MODELS).filter(m => m.type === 'upscale');
 
