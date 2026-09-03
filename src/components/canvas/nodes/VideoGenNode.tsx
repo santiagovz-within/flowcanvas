@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
 import { AspectRatioGlyph } from './AspectRatioGlyph';
 import FalCostEstimate from './FalCostEstimate';
+import { ExpensiveGenerationDialog } from './ExpensiveGenerationDialog';
+import { useFalCostEstimateValue } from '@/lib/useFalCostEstimate';
 
 type VideoResolution = NonNullable<VideoGenNodeData['videoResolution']>;
 
@@ -34,6 +36,9 @@ const SEEDANCE_2_5_DURATION_OPTIONS = ['4s', '5s', '8s', '10s', '15s', '20s', '2
 const SEEDANCE_MINI_DURATION_OPTIONS = ['4s', '5s', '8s', '10s'];
 const FLUX_DURATION_OPTIONS = ['5s', '8s', '10s', '15s', '20s'];
 const MINIMAX_DURATION_OPTIONS = ['5s', '8s', '10s', '15s'];
+
+/** Seedance 2.0 / 2.5 runs estimated above this get a warning and a confirm step. */
+const EXPENSIVE_VIDEO_COST_USD = 8;
 
 function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
@@ -113,6 +118,19 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
   const followsInputAspect = hasImage && (isKling || isMinimaxH3);
   const supportsEndFrame = !isFlux3;
   const supportsAudio = isSeedance || isFlux3 || isKling;
+
+  const costEstimateInput = {
+    endpoint: getFalEndpoint(),
+    aspectRatio: data.aspectRatio,
+    resolution: selectedResolution,
+    duration: selectedDuration,
+    generateAudio: data.generateAudio ?? true,
+  };
+  const estimatedCostUsd = useFalCostEstimateValue(costEstimateInput);
+  const needsCostConfirmation = (isSeedanceFull || isSeedance25)
+    && estimatedCostUsd !== null
+    && estimatedCostUsd > EXPENSIVE_VIDEO_COST_USD;
+  const [confirmingCost, setConfirmingCost] = useState(false);
 
   // Read start-frame source node directly from store (reactive, zero-latency)
   const storeEdges = useFlowStore(state => state.edges);
@@ -230,6 +248,20 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
 
   function handleGenerate() {
     if (isGenerating || !currentFlow) return;
+    if (needsCostConfirmation) {
+      setConfirmingCost(true);
+      return;
+    }
+    startGeneration();
+  }
+
+  function confirmExpensiveGeneration() {
+    setConfirmingCost(false);
+    startGeneration();
+  }
+
+  function startGeneration() {
+    if (isGenerating || !currentFlow) return;
 
     const endpoint = getFalEndpoint();
     useFlowStore.getState().consumeGcsOnlyEligibility();
@@ -298,15 +330,17 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
         <span className={cn(glassStyles.glassContent, glassStyles.buttonContent)}>
           <Image src="/node-icons/icon-generate.svg" alt="" width={11} height={11} aria-hidden />
           {isGenerating ? 'Generating…' : 'Generate'}
-          <FalCostEstimate input={{
-            endpoint: getFalEndpoint(),
-            aspectRatio: data.aspectRatio,
-            resolution: selectedResolution,
-            duration: selectedDuration,
-            generateAudio: data.generateAudio ?? true,
-          }} />
+          <FalCostEstimate input={costEstimateInput} />
         </span>
       </button>
+
+      {confirmingCost && estimatedCostUsd !== null && (
+        <ExpensiveGenerationDialog
+          estimatedCostUsd={estimatedCostUsd}
+          onConfirm={confirmExpensiveGeneration}
+          onCancel={() => setConfirmingCost(false)}
+        />
+      )}
 
       {hasFailure && <RegenerateGate onChangesApplied={acknowledgeFailure} />}
 
@@ -405,10 +439,11 @@ export function VideoGenNode({ data, selected, id }: NodeProps & { data: VideoGe
       {/* Model selector */}
       <ModelSelect options={VIDEO_MODELS} value={data.model} onChange={handleModelChange} />
 
-      {isSeedanceFull && (
-        <div className={cn(glassStyles.notice, glassStyles.noticeWarning, 'nodrag')}>
+      {needsCostConfirmation && (
+        <div className={cn(glassStyles.notice, glassStyles.noticeExpensive, 'nodrag')}>
           <AlertTriangle size={11} className="shrink-0 mt-0.5" />
-          Expensive model, please use carefully.
+          You&apos;re about to spend ${estimatedCostUsd.toFixed(2)} on this generation, please
+          review it and make sure your prompt and configuration is correct
         </div>
       )}
 

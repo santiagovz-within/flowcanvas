@@ -5,9 +5,10 @@ import { estimateFalCost, formatFalCostEstimate, type FalCostEstimateInput } fro
 import { getFalPricingRule } from '@/lib/api/models';
 import { useFalPricingStore } from '@/lib/stores/falPricingStore';
 
-export function useFalCostEstimate(
+/** Estimated USD cost of the given Fal job(s), or null while unknown. */
+export function useFalCostEstimateValue(
   input: FalCostEstimateInput | FalCostEstimateInput[] | null,
-): string | null {
+): number | null {
   const prices = useFalPricingStore(state => state.prices);
   const status = useFalPricingStore(state => state.status);
   const load = useFalPricingStore(state => state.load);
@@ -31,5 +32,11 @@ export function useFalCostEstimate(
     total += estimate;
   }
 
-  return formatFalCostEstimate(total);
+  return total;
+}
+
+export function useFalCostEstimate(
+  input: FalCostEstimateInput | FalCostEstimateInput[] | null,
+): string | null {
+  return formatFalCostEstimate(useFalCostEstimateValue(input));
 }
