@@ -65,9 +65,11 @@ const CHIP_STYLE: React.CSSProperties = {
   color: 'var(--tag-image-text)',
   background: 'var(--tag-image-bg)',
   borderRadius: 4,
-  // Fake padding with a shadow so the chip doesn't alter text metrics and
-  // drift away from the invisible text underneath.
-  boxShadow: '0 0 0 2px var(--tag-image-bg)',
+  // Fake vertical padding with offset shadows so the chip doesn't alter text
+  // metrics and drift from the invisible text underneath. The spread must not
+  // extend horizontally: a single space next to a chip is only ~3px wide and a
+  // 2px side spread would paint over it, hiding the word gap.
+  boxShadow: '0 2px 0 var(--tag-image-bg), 0 -2px 0 var(--tag-image-bg)',
   pointerEvents: 'auto',
   cursor: 'default',
 };
