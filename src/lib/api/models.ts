@@ -29,7 +29,32 @@ export const FAL_MODELS = {
     editImageParam: 'image_urls',
     usesImageSize: true,
     maxReferenceImages: 10,
-    pricing: { kind: 'seedream-image' },
+    // Seedream accepts custom sizes from 1 MP to 4 MP and bills 2x above 1536².
+    pricing: {
+      kind: 'custom-image-size',
+      minPixels: 1024 * 1024,
+      maxPixels: 2048 * 2048,
+      tierThresholdPixels: 1536 * 1536,
+      tierMultiplier: 2,
+    },
+    type: 'image' as const,
+  },
+  'qwen-image-3': {
+    endpoint: 'alibaba/qwen-image-3/text-to-image',
+    editEndpoint: 'alibaba/qwen-image-3/edit',
+    editImageParam: 'image_urls',
+    usesImageSize: true,
+    maxReferenceImages: 3,
+    // Qwen accepts custom sizes whose total pixels fall between 512² and
+    // 2048² (its 2048×2048 ceiling). Fal bills $0.04/image at 1K and
+    // $0.075/image at 2K (above 2.25 MP); the pricing API reports the 1K rate.
+    pricing: {
+      kind: 'custom-image-size',
+      minPixels: 512 * 512,
+      maxPixels: 2048 * 2048,
+      tierThresholdPixels: 1500 * 1500,
+      tierMultiplier: 0.075 / 0.04,
+    },
     type: 'image' as const,
   },
   'gpt-image-2': {
@@ -209,6 +234,19 @@ export const MODELS: Record<string, ModelConfig> = {
     estimatedTimeSeconds: 20,
     maxReferenceImages: 10,
   },
+  'qwen-image-3': {
+    id: 'qwen-image-3',
+    name: 'Qwen Image 3.0',
+    provider: 'fal',
+    type: 'image',
+    supportedAspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '4:5', '21:9'],
+    supportedResolutions: ['1K', '2K'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: true,
+    estimatedTimeSeconds: 15,
+    maxReferenceImages: 3,
+  },
   'gpt-image-2': {
     id: 'gpt-image-2',
     name: 'GPT Image 2',
@@ -373,6 +411,7 @@ export const IMAGE_MODELS = [
   MODELS['nano-banana-2'],
   MODELS['nano-banana-pro'],
   MODELS['gpt-image-2'],
+  MODELS['qwen-image-3'],
   MODELS['flux-2-pro'],
 ];
 export const VIDEO_MODELS = [

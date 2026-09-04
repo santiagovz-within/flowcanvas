@@ -4,6 +4,7 @@ import { fal } from '@fal-ai/client';
 import { FAL_MODELS } from '@/lib/api/models';
 import { getFalStorageHeaders } from '@/lib/falStorage';
 import { describeFalError } from '@/lib/falErrors';
+import { getCustomImageSize, type FalPricingRule } from '@/lib/falPricing';
 import type { GenerateImageRequest } from '@/types';
 
 fal.config({ credentials: process.env.FAL_KEY });
@@ -23,10 +24,6 @@ interface GenerateRequestBody extends GenerateImageRequest {
   slotIndex?: number;
 }
 
-const SEEDREAM_MIN_PIXELS = 1024 * 1024;
-const SEEDREAM_MAX_PIXELS = 2048 * 2048;
-const IMAGE_SIZE_MULTIPLE = 8;
-
 function getImageSize(aspectRatio: string, resolution: string): { width: number; height: number } {
   const baseSize = resolution === '4K' ? 3840 : resolution === '2K' ? 2048 : 1024;
   const [w, h] = aspectRatio.split(':').map(Number);
@@ -37,24 +34,6 @@ function getImageSize(aspectRatio: string, resolution: string): { width: number;
   } else {
     return { width: Math.round(baseSize * ratio), height: baseSize };
   }
-}
-
-function getSeedreamImageSize(aspectRatio: string, resolution: string): { width: number; height: number } {
-  // Preserve the shared UI tiers while respecting Seedream's 1–4 MP custom-size contract.
-  const nominal = getImageSize(aspectRatio, resolution);
-  const nominalPixels = nominal.width * nominal.height;
-  const targetPixels = Math.min(SEEDREAM_MAX_PIXELS, Math.max(SEEDREAM_MIN_PIXELS, nominalPixels));
-  const scale = Math.sqrt(targetPixels / nominalPixels);
-  const roundDimension = nominalPixels < SEEDREAM_MIN_PIXELS
-    ? Math.ceil
-    : nominalPixels > SEEDREAM_MAX_PIXELS
-      ? Math.floor
-      : Math.round;
-
-  return {
-    width: roundDimension((nominal.width * scale) / IMAGE_SIZE_MULTIPLE) * IMAGE_SIZE_MULTIPLE,
-    height: roundDimension((nominal.height * scale) / IMAGE_SIZE_MULTIPLE) * IMAGE_SIZE_MULTIPLE,
-  };
 }
 
 export async function POST(request: NextRequest) {
@@ -290,9 +269,12 @@ export async function POST(request: NextRequest) {
     const maxReferenceImages = 'maxReferenceImages' in modelConfig
       ? modelConfig.maxReferenceImages
       : undefined;
-    const { width, height } = usesImageSize
-      ? getSeedreamImageSize(aspectRatio, resolution)
-      : getImageSize(aspectRatio, resolution);
+    // Models with a custom `image_size` (Seedream, Qwen) scale the shared UI
+    // tiers into their own total-pixel range, which lives on the pricing rule.
+    const pricingRule = modelConfig.pricing as FalPricingRule;
+    const { width, height } = (usesImageSize && pricingRule.kind === 'custom-image-size'
+      ? getCustomImageSize(aspectRatio, resolution, pricingRule)
+      : null) ?? getImageSize(aspectRatio, resolution);
 
     console.log('[fal/generate] endpoint:', endpoint, '| refs:', referenceImageUrls.length, '| usesAspectRatio:', usesAspectRatio, '| editImageParam:', editImageParam);
 

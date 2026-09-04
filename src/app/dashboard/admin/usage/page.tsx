@@ -50,6 +50,7 @@ const MODEL_COLOR_MAP: Record<string, string> = {
   'nano-banana-pro': '#c084fc',
   'seedream-5':      '#fb7185',
   'gpt-image-2':     '#22d3ee',
+  'qwen-image-3':    '#a3e635',
   'flux-2-pro':      '#f59e0b',
   'google-omni-flash': '#f87171',
   'kling-3-pro':     '#34d399',

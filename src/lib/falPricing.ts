@@ -8,7 +8,16 @@ export interface FalEndpointPrice {
 export type FalPricingRule =
   | { kind: 'fixed' }
   | { kind: 'image-resolution'; resolutionMultipliers: Record<string, number> }
-  | { kind: 'seedream-image' }
+  | ({
+      /**
+       * Image models that take a custom `image_size` (Seedream, Qwen). The UI
+       * tiers are scaled into the endpoint's pixel range and Fal bills
+       * `tierMultiplier` times the base rate above `tierThresholdPixels`.
+       */
+      kind: 'custom-image-size';
+      tierThresholdPixels: number;
+      tierMultiplier: number;
+    } & CustomImageSizeBounds)
   | { kind: 'output-megapixels' }
   | { kind: 'topaz-image' }
   | { kind: 'flux-outpaint' }
@@ -55,8 +64,13 @@ export interface FalCostEstimateInput {
   outputHeight?: number;
 }
 
-const SEEDREAM_MIN_PIXELS = 1024 * 1024;
-const SEEDREAM_MAX_PIXELS = 2048 * 2048;
+export interface CustomImageSizeBounds {
+  /** Smallest total pixel count the endpoint accepts. */
+  minPixels: number;
+  /** Largest total pixel count the endpoint accepts. */
+  maxPixels: number;
+}
+
 const IMAGE_SIZE_MULTIPLE = 8;
 
 function positive(value: number | null | undefined): value is number {
@@ -86,18 +100,24 @@ export function getTieredImageSize(
     : { width: Math.round(baseSize * ratio), height: baseSize };
 }
 
-export function getSeedreamImageSize(
-  aspectRatio = '1:1',
-  resolution = '1K',
+/**
+ * Custom `image_size` for endpoints that accept arbitrary dimensions within a
+ * total-pixel range. Preserves the shared UI tiers and aspect ratio while
+ * scaling the pixel count into `bounds`, rounded to multiples of 8.
+ */
+export function getCustomImageSize(
+  aspectRatio: string | undefined,
+  resolution: string | undefined,
+  bounds: CustomImageSizeBounds,
 ): FalMediaMetadata | null {
   const nominal = getTieredImageSize(aspectRatio, resolution);
   if (!nominal) return null;
   const nominalPixels = nominal.width * nominal.height;
-  const targetPixels = Math.min(SEEDREAM_MAX_PIXELS, Math.max(SEEDREAM_MIN_PIXELS, nominalPixels));
+  const targetPixels = Math.min(bounds.maxPixels, Math.max(bounds.minPixels, nominalPixels));
   const scale = Math.sqrt(targetPixels / nominalPixels);
-  const roundDimension = nominalPixels < SEEDREAM_MIN_PIXELS
+  const roundDimension = nominalPixels < bounds.minPixels
     ? Math.ceil
-    : nominalPixels > SEEDREAM_MAX_PIXELS
+    : nominalPixels > bounds.maxPixels
       ? Math.floor
       : Math.round;
 
@@ -178,10 +198,12 @@ export function estimateFalCost(
       break;
     }
 
-    case 'seedream-image': {
-      const dimensions = getSeedreamImageSize(input.aspectRatio, input.resolution);
+    case 'custom-image-size': {
+      const dimensions = getCustomImageSize(input.aspectRatio, input.resolution, rule);
       if (!dimensions) break;
-      const multiplier = dimensions.width * dimensions.height <= 1536 * 1536 ? 1 : 2;
+      const multiplier = dimensions.width * dimensions.height <= rule.tierThresholdPixels
+        ? 1
+        : rule.tierMultiplier;
       billableUnits = outputCount * multiplier;
       break;
     }

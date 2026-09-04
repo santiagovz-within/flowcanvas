@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStoreApi } from '@xyflow/react';
-import { Alibaba, Bfl, ByteDance, Fal, Flux, Gemini, Google, Kling, Minimax, NanoBanana, OpenAI, TopazLabs } from '@lobehub/icons';
+import { Alibaba, Bfl, ByteDance, Fal, Flux, Gemini, Google, Kling, Minimax, NanoBanana, OpenAI, Qwen, TopazLabs } from '@lobehub/icons';
 import { Box, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
@@ -43,6 +43,7 @@ const MODEL_SUBTITLES: Record<string, string> = {
   'nano-banana-2': 'EXCELLENT ALL-AROUND MODEL',
   'nano-banana-pro': 'VERY GOOD ALL-AROUND MODEL',
   'gpt-image-2': 'GOOD FOR TEXT & BRANDING DESIGN',
+  'qwen-image-3': 'GREAT TEXT RENDERING & PROMPT ADHERENCE (UP TO 2K)',
   'flux-2-pro': 'DRAFT QUALITY',
   'seedance-2': 'THE BEST VIDEO MODEL',
   'seedance-2-5': 'NEW BEST VIDEO MODEL (UP TO 1080p)',
@@ -74,6 +75,8 @@ function ModelIcon({
       return <ByteDance.Color size={size} />;
     case 'gpt-image-2':
       return <OpenAI size={size} />;
+    case 'qwen-image-3':
+      return <Qwen.Color size={size} />;
     case 'flux-2-pro':
       return <Flux size={size} />;
     case 'google-omni-flash':
