@@ -144,7 +144,7 @@ export async function notifyAdminsOfAccessRequest(input: NotifyInput): Promise<N
       return { status: 'send_failed', detail: sent.error };
     }
 
-    console.log(`[access-requests] notified ${recipients.length} admin(s) about ${input.email} (resend id ${sent.id})`);
+    console.log(`[access-requests] notified ${recipients.length} admin(s) about ${input.email} (message id ${sent.id})`);
     return { status: 'sent', recipients };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);

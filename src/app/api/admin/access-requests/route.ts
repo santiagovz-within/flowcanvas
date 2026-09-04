@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getAdminEmails, getAppUrl } from '@/lib/access-requests';
-import { isEmailConfigured } from '@/lib/email';
+import { getEmailFrom, isEmailConfigured } from '@/lib/email';
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -33,8 +33,9 @@ export async function GET() {
   return NextResponse.json({
     email: {
       configured:  isEmailConfigured(),
-      hasApiKey:   Boolean(process.env.RESEND_API_KEY),
-      from:        process.env.EMAIL_FROM ?? null,
+      hasUser:     Boolean(process.env.GMAIL_USER),
+      hasPassword: Boolean(process.env.GMAIL_APP_PASSWORD),
+      from:        getEmailFrom(),
       appUrl:      getAppUrl() || null,
     },
     table: {

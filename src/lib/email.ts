@@ -1,12 +1,17 @@
-// Minimal transactional email sender backed by the Resend HTTP API.
-// Uses fetch directly so no SDK dependency is needed.
+// Transactional email via Gmail SMTP using a Google Workspace account and an
+// app password. No third-party email provider involved: mail goes out through
+// Google exactly as if sent from that mailbox.
 //
 // Required env:
-//   RESEND_API_KEY  — API key from https://resend.com
-//   EMAIL_FROM      — verified sender, e.g. "WITHIN Glide <glide@within.co>"
+//   GMAIL_USER          — the Google account that sends, e.g. santiago.vazquez@within.co
+//   GMAIL_APP_PASSWORD  — 16-char app password for that account (needs 2-Step Verification)
+// Optional:
+//   EMAIL_FROM_NAME     — display name shown to recipients (default "WITHIN Glide")
 //
-// When RESEND_API_KEY is missing, sendEmail() logs and returns false instead
-// of throwing, so features that send email never break core flows like login.
+// When credentials are missing, sendEmail() logs and returns an error result
+// instead of throwing, so features that send email never break core flows.
+
+import nodemailer from 'nodemailer';
 
 export interface SendEmailInput {
   to: string[];
@@ -16,58 +21,55 @@ export interface SendEmailInput {
   replyTo?: string;
 }
 
-export function isEmailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
-}
-
 export type SendEmailResult = { ok: true; id: string | null } | { ok: false; error: string };
 
-export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from   = process.env.EMAIL_FROM;
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+}
 
-  if (!apiKey || !from) {
-    console.warn('[email] RESEND_API_KEY or EMAIL_FROM not set — skipping email:', input.subject);
-    return { ok: false, error: 'RESEND_API_KEY or EMAIL_FROM is not set' };
+/** The From header recipients will see, e.g. "WITHIN Glide <santiago.vazquez@within.co>". */
+export function getEmailFrom(): string | null {
+  const user = process.env.GMAIL_USER;
+  if (!user) return null;
+  const name = process.env.EMAIL_FROM_NAME?.trim() || 'WITHIN Glide';
+  return `${name} <${user}>`;
+}
+
+export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+
+  if (!user || !pass) {
+    console.warn('[email] GMAIL_USER or GMAIL_APP_PASSWORD not set — skipping email:', input.subject);
+    return { ok: false, error: 'GMAIL_USER or GMAIL_APP_PASSWORD is not set' };
   }
   if (input.to.length === 0) {
     console.warn('[email] no recipients — skipping email:', input.subject);
     return { ok: false, error: 'No recipients' };
   }
 
-  let res: Response;
+  const transport = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user, pass },
+  });
+
   try {
-    res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from,
-        to: input.to,
-        subject: input.subject,
-        html: input.html,
-        text: input.text,
-        ...(input.replyTo ? { reply_to: input.replyTo } : {}),
-      }),
+    const info = await transport.sendMail({
+      from: getEmailFrom() ?? user,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+      ...(input.replyTo ? { replyTo: input.replyTo } : {}),
     });
+    return { ok: true, id: info.messageId ?? null };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[email] Resend request failed:', msg);
-    return { ok: false, error: `Network error reaching Resend: ${msg}` };
+    console.error('[email] Gmail SMTP send failed:', msg);
+    return { ok: false, error: `Gmail SMTP: ${msg}` };
   }
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error(`[email] Resend responded ${res.status}:`, body);
-    let detail = body;
-    try { detail = (JSON.parse(body) as { message?: string }).message ?? body; } catch { /* keep raw */ }
-    return { ok: false, error: `Resend ${res.status}: ${detail}` };
-  }
-
-  const data = await res.json().catch(() => null) as { id?: string } | null;
-  return { ok: true, id: data?.id ?? null };
 }
 
 export function escapeHtml(value: string): string {

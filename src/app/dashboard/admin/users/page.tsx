@@ -20,7 +20,7 @@ interface AdminUser {
 }
 
 interface EmailDiagnostics {
-  email: { configured: boolean; hasApiKey: boolean; from: string | null; appUrl: string | null };
+  email: { configured: boolean; hasUser: boolean; hasPassword: boolean; from: string | null; appUrl: string | null };
   table: { ok: boolean; error: string | null };
   recipients: string[];
   requests: { id: string; email: string; created_at: string; expires_at: string; approved_at: string | null }[];
@@ -56,15 +56,15 @@ function AccessRequestEmailsCard() {
     const res = await fetch('/api/admin/access-requests/test', { method: 'POST' });
     const d = await res.json().catch(() => ({}));
     setTestMsg(res.ok
-      ? { ok: true,  text: `Test email sent to ${d.to}. Check your inbox and spam folder.` }
+      ? { ok: true,  text: `Test email sent to ${d.to} via Gmail. Check your inbox and spam folder.` }
       : { ok: false, text: d.error ?? 'Failed to send test email' });
     setSending(false);
   }
 
   const problems: string[] = [];
   if (diag) {
-    if (!diag.email.hasApiKey) problems.push('RESEND_API_KEY is not set on the server.');
-    if (!diag.email.from)      problems.push('EMAIL_FROM is not set on the server.');
+    if (!diag.email.hasUser)     problems.push('GMAIL_USER is not set on the server.');
+    if (!diag.email.hasPassword) problems.push('GMAIL_APP_PASSWORD is not set on the server.');
     if (!diag.table.ok)        problems.push(`access_requests table: ${diag.table.error ?? 'unavailable'} — run supabase/migrations/015_access_requests.sql.`);
     if (diag.recipients.length === 0) problems.push('No admin has an email address to notify.');
   }
@@ -117,7 +117,7 @@ function AccessRequestEmailsCard() {
 
       {diag && (
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs" style={{ color: 'var(--color-white-muted)' }}>
-          <p>From: <span style={{ color: 'var(--color-white)' }}>{diag.email.from ?? '—'}</span></p>
+          <p>Sent from: <span style={{ color: 'var(--color-white)' }}>{diag.email.from ?? '—'}</span></p>
           <p>Links use: <span style={{ color: 'var(--color-white)' }}>{diag.email.appUrl ?? 'request origin'}</span></p>
           <p className="col-span-2">
             Notifies: <span style={{ color: 'var(--color-white)' }}>{diag.recipients.length ? diag.recipients.join(', ') : '—'}</span>

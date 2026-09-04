@@ -4,7 +4,7 @@ import { getAppUrl, __test__ } from '@/lib/access-requests';
 import { sendEmail } from '@/lib/email';
 
 // POST /api/admin/access-requests/test — send a sample admin-notification
-// email to the calling admin so the Resend setup can be verified in production.
+// email to the calling admin so the Gmail SMTP setup can be verified in production.
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

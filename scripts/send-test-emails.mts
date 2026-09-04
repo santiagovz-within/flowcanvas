@@ -1,10 +1,10 @@
 // Renders both access-request emails and either sends them to a recipient
-// (when RESEND_API_KEY + EMAIL_FROM are set) or writes HTML previews to
+// (when GMAIL_USER + GMAIL_APP_PASSWORD are set) or writes HTML previews to
 // .context/email-previews/ for review in a browser.
 //
 // Usage:
 //   npx tsx scripts/send-test-emails.mts you@within.co [https://app-url]
-//   RESEND_API_KEY=re_... EMAIL_FROM="WITHIN Glide <glide@within.co>" \
+//   GMAIL_USER=you@within.co GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx \
 //     npx tsx scripts/send-test-emails.mts you@within.co
 //
 // Does not touch the database: it uses a fake token and fake requester.
@@ -57,5 +57,5 @@ if (isEmailConfigured()) {
     writeFileSync(path, e.html);
     console.log(`preview  ${e.subject}\n         ${path}`);
   }
-  console.log('\nRESEND_API_KEY / EMAIL_FROM not set — wrote previews instead of sending.');
+  console.log('\nGMAIL_USER / GMAIL_APP_PASSWORD not set — wrote previews instead of sending.');
 }

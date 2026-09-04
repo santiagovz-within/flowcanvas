@@ -122,8 +122,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 GCS_BUCKET_NAME=
 GCS_CREDENTIALS_JSON=      # full service account JSON, paste as a single line
 FAL_KEY=
-RESEND_API_KEY=            # optional — emails admins when a new user requests access
-EMAIL_FROM=                # e.g. "WITHIN Glide <glide@within.co>", verified in Resend
+GMAIL_USER=                # optional — Google account that sends access-request emails
+GMAIL_APP_PASSWORD=        # app password for that account (not the normal password)
 NEXT_PUBLIC_APP_URL=       # optional — public URL used for links in emails
 ```
 
