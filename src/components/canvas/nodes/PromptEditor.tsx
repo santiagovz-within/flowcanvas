@@ -19,6 +19,7 @@ import {
   activeMentionQuery,
   segmentPrompt,
   syncTagsWithText,
+  tagFromInput,
   type TaggableInput,
 } from '@/lib/promptTags';
 import glassStyles from './ImageGenerationGlass.module.css';
@@ -45,6 +46,12 @@ interface PromptEditorProps {
   /** Ref to the outer surface (used by callers to position handles). */
   containerRef?: RefObject<HTMLDivElement | null>;
   className?: string;
+  /** Custom renderer for plain-text runs (e.g. the Prompt node colours "@colorN"). */
+  renderText?: (text: string) => React.ReactNode;
+  /** Paint the mirror even without chips (when `renderText` has something to show). */
+  alwaysOverlay?: boolean;
+  /** Message shown in the picker when there is nothing to tag. */
+  emptyHint?: string;
 }
 
 interface Anchor {
@@ -85,6 +92,9 @@ export function PromptEditor({
   placeholder = 'Write your prompt here…',
   containerRef,
   className,
+  renderText,
+  alwaysOverlay = false,
+  emptyHint = 'Connect an image to this node to tag it.',
 }: PromptEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -97,6 +107,7 @@ export function PromptEditor({
 
   const segments = useMemo(() => segmentPrompt(value, tags), [value, tags]);
   const hasChips = segments.some((s) => s.kind === 'tag');
+  const showOverlay = hasChips || alwaysOverlay;
   const urlByPort = useMemo(
     () => new Map(taggable.map((i) => [i.portIndex, i.url])),
     [taggable],
@@ -176,9 +187,7 @@ export function PromptEditor({
     const nextText = value.slice(0, mention.start) + insert + value.slice(caret);
     const nextTags = syncTagsWithText(
       nextText,
-      tags.some((t) => t.label === input.label)
-        ? tags
-        : [...tags, { label: input.label, portIndex: input.portIndex, edgeId: input.edgeId, sourceNodeId: input.sourceNodeId }],
+      tags.some((t) => t.label === input.label) ? tags : [...tags, tagFromInput(input)],
       taggable,
     );
     onChange({ prompt: nextText, tags: nextTags });
@@ -219,7 +228,7 @@ export function PromptEditor({
       ref={containerRef}
       className={cn(glassStyles.glassSurface, glassStyles.promptSection, glassStyles.promptSurface, className)}
     >
-      {hasChips && (
+      {showOverlay && (
         <div
           aria-hidden="true"
           className={cn(glassStyles.glassContent, glassStyles.promptContent, 'pointer-events-none')}
@@ -250,7 +259,7 @@ export function PromptEditor({
                 {seg.text}
               </span>
             ) : (
-              <span key={i}>{seg.text}</span>
+              <span key={i}>{renderText ? renderText(seg.text) : seg.text}</span>
             ),
           )}
           {value.endsWith('\n') ? '\u200b' : null}
@@ -271,7 +280,7 @@ export function PromptEditor({
         onKeyUp={(e) => {
           if (e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End') refreshMention(e.currentTarget);
         }}
-        style={{ color: hasChips ? 'transparent' : '#fff', caretColor: '#fff' }}
+        style={{ color: showOverlay ? 'transparent' : '#fff', caretColor: '#fff' }}
       />
 
       {/* ── @ picker ─────────────────────────────────────────── */}
@@ -295,7 +304,7 @@ export function PromptEditor({
           <div className={glassStyles.glassContent} style={{ padding: 4 }}>
             {taggable.length === 0 ? (
               <div className="px-2 py-1.5 text-[10px]" style={{ color: 'var(--color-white-muted)' }}>
-                Connect an image to this node to tag it.
+                {emptyHint}
               </div>
             ) : options.length === 0 ? (
               <div className="px-2 py-1.5 text-[10px]" style={{ color: 'var(--color-white-muted)' }}>

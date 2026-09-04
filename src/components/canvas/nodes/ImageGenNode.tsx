@@ -192,7 +192,11 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     if (isGenerating || !currentFlow) return;
 
     // Refuse to run with a chip that points at nothing the model will receive.
-    const broken = findBrokenTags(id, promptTags, useFlowStore.getState().edges, data.inputImageUrls);
+    // Tags inherited from a connected Prompt node are positional and may refer
+    // to ports this node doesn't fill; those are sent as plain words instead.
+    const broken = data.promptConnected
+      ? []
+      : findBrokenTags(id, promptTags, useFlowStore.getState().edges, data.inputImageUrls);
     if (broken.length > 0) {
       const labels = broken.map((t) => `@${t.label}`).join(', ');
       setTagError(

@@ -10,6 +10,9 @@ import type { PromptNodeData, PaletteColor } from '@/types';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { cn } from '@/lib/utils/cn';
 import glassStyles from './ImageGenerationGlass.module.css';
+import { PromptEditor } from './PromptEditor';
+import { getDownstreamTaggableInputs, syncTagsWithText } from '@/lib/promptTags';
+import type { PromptTag } from '@/types';
 
 const GEMINI_MODELS = [
   { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash' },
@@ -24,11 +27,6 @@ const LENGTH_OPTIONS = [
 ];
 
 const MAX_PALETTE_COLORS = 5;
-
-function autoResize(el: HTMLTextAreaElement) {
-  el.style.height = 'auto';
-  el.style.height = `${el.scrollHeight}px`;
-}
 
 function hexToColorName(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16) || 0;
@@ -124,11 +122,10 @@ function ColorTextOverlay({ text, palette }: { text: string; palette: PaletteCol
 
 export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNodeData }) {
   const storeEdges = useFlowStore(state => state.edges);
+  const storeNodes = useFlowStore(state => state.nodes);
   const [enhancing, setEnhancing] = useState(false);
   const [geminiModel, setGeminiModel] = useState('gemini-3.7-flash');
   const [length, setLength] = useState('auto');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
   const paletteEnabled = data.paletteEnabled ?? false;
   const palette: PaletteColor[] = data.palette ?? [];
   const promptHistory: string[] = data.promptHistory ?? [];
@@ -149,40 +146,50 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
     prevHistoryLen.current = promptHistory.length;
   }, [promptHistory.length]);
 
-  // Sync localPrompt from Zustand when not focused (external changes)
+  // "@imageN" tags are positional here: port N on every Image Generation node
+  // this prompt feeds. The picker lists the union of those nodes' inputs.
+  const promptTags: PromptTag[] = data.promptTags ?? [];
+  const taggableInputs = getDownstreamTaggableInputs(id, storeNodes, storeEdges);
+  const promptTagCount = promptTags.length;
+  const lastTagCount = useRef(promptTagCount);
+
+  // Sync localPrompt from Zustand when not focused (external changes). An
+  // untag (target disconnected) rewrites the text and must win even while
+  // typing; it also has to reach the targets, so re-propagate.
   useEffect(() => {
-    if (!isFocused.current) setLocalPrompt(data.prompt ?? '');
-  }, [data.prompt]);
+    const tagsChanged = lastTagCount.current !== promptTagCount;
+    lastTagCount.current = promptTagCount;
+    if (!isFocused.current || tagsChanged) setLocalPrompt(data.prompt ?? '');
+    if (tagsChanged) propagatePrompt(data.prompt ?? '', data.promptTags ?? []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.prompt, promptTagCount]);
 
   const hasColorRefs = paletteEnabled && palette.some((_, i) => localPrompt.includes(`@color${i + 1}`));
-
-  useEffect(() => {
-    if (textareaRef.current) autoResize(textareaRef.current);
-  }, [localPrompt]);
 
   function dispatchUpdate(updates: Partial<PromptNodeData>) {
     document.dispatchEvent(new CustomEvent('node:update', { detail: { nodeId: id, data: updates } }));
   }
 
-  function propagatePrompt(rawPrompt: string) {
+  function propagatePrompt(rawPrompt: string, tags: PromptTag[] = promptTags) {
     const enriched = paletteEnabled && palette.length
       ? buildEnrichedPrompt(rawPrompt, palette)
       : rawPrompt;
-    document.dispatchEvent(new CustomEvent('node:prompt-propagate', { detail: { sourceNodeId: id, prompt: enriched } }));
+    document.dispatchEvent(new CustomEvent('node:prompt-propagate', {
+      detail: { sourceNodeId: id, prompt: enriched, promptTags: tags },
+    }));
+  }
+
+  /** Apply new prompt text that may have gained or lost "@imageN" chips. */
+  function applyPrompt(nextPrompt: string, nextTags: PromptTag[] = syncTagsWithText(nextPrompt, promptTags, taggableInputs)) {
+    setLocalPrompt(nextPrompt);
+    dispatchUpdate(nextTags === promptTags ? { prompt: nextPrompt } : { prompt: nextPrompt, promptTags: nextTags });
+    propagatePrompt(nextPrompt, nextTags);
   }
 
   function addToHistory(value: string) {
     const history = data.promptHistory ?? [];
     if (history[history.length - 1] === value) return;
     dispatchUpdate({ promptHistory: [...history, value] });
-  }
-
-  function handlePromptChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const v = e.target.value;
-    setLocalPrompt(v);
-    autoResize(e.target);
-    dispatchUpdate({ prompt: v });
-    propagatePrompt(v);
   }
 
   function handleFocus() {
@@ -202,7 +209,9 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
       const enriched = data.paletteEnabled && (data.palette ?? []).length
         ? buildEnrichedPrompt(data.prompt, data.palette ?? [])
         : data.prompt;
-      document.dispatchEvent(new CustomEvent('node:prompt-propagate', { detail: { sourceNodeId: id, prompt: enriched } }));
+      document.dispatchEvent(new CustomEvent('node:prompt-propagate', {
+        detail: { sourceNodeId: id, prompt: enriched, promptTags: data.promptTags ?? [] },
+      }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.paletteEnabled, data.palette]);
@@ -218,9 +227,7 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
       });
       const { enhancedPrompt } = await res.json();
       if (enhancedPrompt) {
-        setLocalPrompt(enhancedPrompt);
-        dispatchUpdate({ prompt: enhancedPrompt });
-        propagatePrompt(enhancedPrompt);
+        applyPrompt(enhancedPrompt);
         addToHistory(enhancedPrompt);
       }
     } finally {
@@ -231,10 +238,8 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
   function navigateHistory(idx: number) {
     setHistoryIdx(idx);
     const entry = promptHistory[idx] ?? '';
-    setLocalPrompt(entry);
     // Restore this version as the active prompt
-    dispatchUpdate({ prompt: entry });
-    propagatePrompt(entry);
+    applyPrompt(entry);
   }
 
   function addColor() {
@@ -246,9 +251,10 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
     const ref = `@color${i + 1}`;
     const newPalette = palette.filter((_, idx) => idx !== i);
     const newPrompt = localPrompt.replaceAll(ref, '').replace(/  +/g, ' ').trim();
+    const newTags = syncTagsWithText(newPrompt, promptTags, taggableInputs);
     setLocalPrompt(newPrompt);
-    dispatchUpdate({ palette: newPalette, prompt: newPrompt });
-    propagatePrompt(newPrompt);
+    dispatchUpdate({ palette: newPalette, prompt: newPrompt, promptTags: newTags });
+    propagatePrompt(newPrompt, newTags);
   }
 
   function updateColorHex(i: number, hex: string) {
@@ -315,39 +321,16 @@ export function PromptNode({ data, selected, id }: NodeProps & { data: PromptNod
       )}
 
       {/* Prompt area */}
-      <div className={cn(glassStyles.glassSurface, glassStyles.promptSection, glassStyles.promptSurface)}>
-        {hasColorRefs && (
-          <div
-            aria-hidden="true"
-            className={cn(glassStyles.glassContent, glassStyles.promptContent, 'pointer-events-none')}
-            // Inline positioning: utility classes and the CSS module both set
-            // `position`, and the module wins — inline keeps the overlay pinned.
-            style={{
-              position: 'absolute',
-              inset: 0,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              overflow: 'hidden',
-            }}
-          >
-            <ColorTextOverlay text={localPrompt} palette={palette} />
-          </div>
-        )}
-        <textarea
-          ref={textareaRef}
-          className={cn(glassStyles.glassContent, glassStyles.promptContent, 'outline-none nodrag')}
-          rows={2}
-          placeholder="Write your prompt here…"
-          value={localPrompt}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          onChange={handlePromptChange}
-          style={{
-            color: hasColorRefs ? 'transparent' : '#fff',
-            caretColor: '#fff',
-          }}
-        />
-      </div>
+      <PromptEditor
+        value={localPrompt}
+        tags={promptTags}
+        taggable={taggableInputs}
+        onChange={({ prompt, tags }) => applyPrompt(prompt, tags)}
+        onFocusChange={(focused) => (focused ? handleFocus() : handleBlur())}
+        alwaysOverlay={hasColorRefs}
+        renderText={hasColorRefs ? (text) => <ColorTextOverlay text={text} palette={palette} /> : undefined}
+        emptyHint="Connect this prompt to an Image Generation node with images to tag them."
+      />
 
       {/* Model + length selectors */}
       <div className={glassStyles.selectRow}>

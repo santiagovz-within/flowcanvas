@@ -46,9 +46,9 @@ import {
   getNodeMediaUrls,
   getSourceMediaType,
 } from './mediaOutputs';
-import type { NodeType, NodeData, ImageGenNodeData, ImageToPromptNodeData, MediaInputNodeData, PromptTag } from '@/types';
+import type { NodeType, NodeData, ImageGenNodeData, ImageToPromptNodeData, MediaInputNodeData, PromptNodeData, PromptTag } from '@/types';
 import { getImageReferenceLimit } from '@/lib/api/models';
-import { reconcilePromptTags, untagLabel } from '@/lib/promptTags';
+import { reconcilePositionalTags, reconcilePromptTags, untagLabel } from '@/lib/promptTags';
 import { setPendingFile } from '@/lib/utils/pendingFiles';
 
 const nodeTypes = {
@@ -253,12 +253,22 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
   // switch, node removal, undo) so a chip never points at different media,
   // and autosave never persists a stale mapping.
   useEffect(() => {
-    for (const node of useFlowStore.getState().nodes) {
-      if (node.type !== 'imageGenNode') continue;
-      const d = node.data as ImageGenNodeData;
-      if (!d.promptTags?.length) continue;
-      const fixed = reconcilePromptTags(node.id, d.prompt ?? '', d.promptTags, edges);
-      if (fixed) updateNodeData(node.id, fixed);
+    const allNodes = useFlowStore.getState().nodes;
+    for (const node of allNodes) {
+      if (node.type === 'imageGenNode') {
+        const d = node.data as ImageGenNodeData;
+        // While a Prompt node feeds this node, the Prompt node owns the text
+        // and its positional tags are validated there.
+        if (d.promptConnected || !d.promptTags?.length) continue;
+        const fixed = reconcilePromptTags(node.id, d.prompt ?? '', d.promptTags, edges);
+        if (fixed) updateNodeData(node.id, fixed);
+      } else if (node.type === 'promptNode') {
+        const d = node.data as PromptNodeData;
+        if (!d.promptTags?.length) continue;
+        const fixed = reconcilePositionalTags(node.id, d.prompt ?? '', d.promptTags, allNodes, edges);
+        // The Prompt node re-propagates to its targets when its tags change.
+        if (fixed) updateNodeData(node.id, fixed);
+      }
     }
   }, [edges, updateNodeData]);
 
@@ -275,12 +285,16 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
   // Live prompt propagation
   useEffect(() => {
     function handlePromptPropagate(e: Event) {
-      const { sourceNodeId, prompt } = (e as CustomEvent).detail as { sourceNodeId: string; prompt: string };
+      const { sourceNodeId, prompt, promptTags } = (e as CustomEvent).detail as {
+        sourceNodeId: string;
+        prompt: string;
+        promptTags?: PromptTag[];
+      };
       const connectedEdges = edges.filter(
         (edge) => edge.source === sourceNodeId && edge.sourceHandle === 'prompt'
       );
       for (const edge of connectedEdges) {
-        updateNodeData(edge.target, { prompt });
+        updateNodeData(edge.target, promptTags ? { prompt, promptTags } : { prompt });
       }
     }
     document.addEventListener('node:prompt-propagate', handlePromptPropagate);
@@ -867,8 +881,8 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
       if (connection.sourceHandle === 'prompt') {
         const sourceNode = useFlowStore.getState().nodes.find((n) => n.id === connection.source);
         if (sourceNode?.type === 'promptNode') {
-          const { prompt } = sourceNode.data as { prompt?: string };
-          updateNodeData(connection.target, { prompt: prompt ?? '', promptConnected: true });
+          const { prompt, promptTags } = sourceNode.data as PromptNodeData;
+          updateNodeData(connection.target, { prompt: prompt ?? '', promptTags: promptTags ?? [], promptConnected: true });
         } else if (sourceNode?.type === 'imageToPromptNode') {
           const { generatedPrompt } = sourceNode.data as ImageToPromptNodeData;
           updateNodeData(connection.target, { prompt: generatedPrompt ?? '', promptConnected: true });

@@ -136,6 +136,8 @@ export interface PaletteColor {
 // Node-specific data types — all extend Record<string, unknown> for React Flow compatibility
 export interface PromptNodeData extends Record<string, unknown> {
   prompt: string;
+  /** Positional `@imageN` references in `prompt`. See PromptTag. */
+  promptTags?: PromptTag[];
   label?: string;
   paletteEnabled?: boolean;
   palette?: PaletteColor[];
@@ -160,16 +162,19 @@ export interface GenerationFailure {
 }
 
 /**
- * An inline `@imageN` reference inside a prompt, pinned to the media the user
- * picked. `label` is the text without the "@" (e.g. "image1"); `portIndex` is
- * the 0-based reference port it was picked from; `edgeId`/`sourceNodeId`
- * identify the connection so the tag can be dropped if that media goes away.
+ * An inline `@imageN` reference inside a prompt. `label` is the text without
+ * the "@" (e.g. "image1"); `portIndex` is the 0-based reference port.
+ *
+ * On an Image Generation node the tag is *pinned*: `edgeId`/`sourceNodeId`
+ * identify the exact connection it was picked from, and the tag is dropped if
+ * that connection changes. On a Prompt node the tag is *positional* (no
+ * edgeId): it means "port N of whichever generation node this prompt feeds".
  */
 export interface PromptTag {
   label: string;
   portIndex: number;
-  edgeId: string;
-  sourceNodeId: string;
+  edgeId?: string;
+  sourceNodeId?: string;
 }
 
 export interface ImageGenNodeData extends Record<string, unknown> {

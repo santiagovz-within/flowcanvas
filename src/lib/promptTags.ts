@@ -5,8 +5,8 @@
 // never trusted: "@image2" only renders as a chip while a matching PromptTag
 // exists, and a PromptTag only survives while its connection does.
 
-import type { Edge } from '@xyflow/react';
-import type { PromptReferenceStyle, PromptTag } from '@/types';
+import type { Edge, Node } from '@xyflow/react';
+import type { ImageGenNodeData, NodeData, PromptReferenceStyle, PromptTag } from '@/types';
 
 export type { PromptReferenceStyle };
 
@@ -35,10 +35,19 @@ export function referenceHandleIndex(handle: string | null | undefined): number 
 export interface TaggableInput {
   label: string;
   portIndex: number;
-  edgeId: string;
-  sourceNodeId: string;
+  /** Present for a generation node's own inputs; absent for positional (Prompt node) inputs. */
+  edgeId?: string;
+  sourceNodeId?: string;
   /** Current media URL on that port; may be empty if the source has no image yet. */
   url: string;
+}
+
+/** Build a PromptTag from a picked input, omitting pin fields when positional. */
+export function tagFromInput(input: TaggableInput): PromptTag {
+  const tag: PromptTag = { label: input.label, portIndex: input.portIndex };
+  if (input.edgeId) tag.edgeId = input.edgeId;
+  if (input.sourceNodeId) tag.sourceNodeId = input.sourceNodeId;
+  return tag;
 }
 
 /** Connected reference inputs of `nodeId`, ordered by port index. */
@@ -61,6 +70,39 @@ export function getTaggableInputs(
     });
   }
   return inputs.sort((a, b) => a.portIndex - b.portIndex);
+}
+
+/** Image Generation nodes fed by `promptNodeId`'s prompt output. */
+export function getPromptTargets(promptNodeId: string, nodes: Node<NodeData>[], edges: Edge[]): Node<NodeData>[] {
+  const targetIds = new Set(
+    edges.filter((e) => e.source === promptNodeId && e.sourceHandle === 'prompt').map((e) => e.target),
+  );
+  return nodes.filter((n) => targetIds.has(n.id) && n.type === 'imageGenNode');
+}
+
+/**
+ * Positional inputs for a Prompt node: the union of reference ports connected
+ * on every Image Generation node it feeds. "@image2" then means port 2 on each
+ * of those nodes. The thumbnail is the first image found for that port.
+ */
+export function getDownstreamTaggableInputs(
+  promptNodeId: string,
+  nodes: Node<NodeData>[],
+  edges: Edge[],
+): TaggableInput[] {
+  const byPort = new Map<number, TaggableInput>();
+  for (const target of getPromptTargets(promptNodeId, nodes, edges)) {
+    const data = target.data as ImageGenNodeData;
+    for (const input of getTaggableInputs(target.id, edges, data.inputImageUrls)) {
+      const existing = byPort.get(input.portIndex);
+      if (!existing) {
+        byPort.set(input.portIndex, { label: input.label, portIndex: input.portIndex, url: input.url });
+      } else if (!existing.url && input.url) {
+        existing.url = input.url;
+      }
+    }
+  }
+  return [...byPort.values()].sort((a, b) => a.portIndex - b.portIndex);
 }
 
 export type PromptSegment =
@@ -110,9 +152,7 @@ export function syncTagsWithText(
   for (const label of present) {
     if (have.has(label)) continue;
     const input = taggable.find((i) => i.label === label);
-    if (input) {
-      added.push({ label, portIndex: input.portIndex, edgeId: input.edgeId, sourceNodeId: input.sourceNodeId });
-    }
+    if (input) added.push(tagFromInput(input));
   }
   if (kept.length === tags.length && added.length === 0) return tags;
   return [...kept, ...added];
@@ -218,9 +258,14 @@ export function compilePromptForModel(
 // ── Keeping tags honest ──────────────────────────────────────────────────────
 
 /**
- * Drop tags whose connection no longer exists exactly as it did when the tag
- * was picked (same edge id, same target port, same source node). Their
- * "@label" text becomes plain "label". Returns null when nothing changed.
+ * For an Image Generation node that owns its prompt: drop tags whose
+ * connection no longer exists exactly as it did when the tag was picked (same
+ * edge id, same target port, same source node). Their "@label" text becomes
+ * plain "label". Returns null when nothing changed.
+ *
+ * Positional tags (inherited from a Prompt node that has since been
+ * disconnected) are adopted: pinned to the node's own connection on that port
+ * if there is one, otherwise untagged.
  *
  * Because the check is by edge identity, replacing the image on a port with a
  * different connection untags too — a chip never silently re-points.
@@ -234,8 +279,16 @@ export function reconcilePromptTags(
   if (tags.length === 0) return null;
   const edgeById = new Map(edges.map((e) => [e.id, e]));
   let nextPrompt = prompt;
+  let changed = false;
   const kept: PromptTag[] = [];
   for (const tag of tags) {
+    if (!tag.edgeId) {
+      const own = edges.find((e) => e.target === nodeId && referenceHandleIndex(e.targetHandle) === tag.portIndex);
+      changed = true;
+      if (own) kept.push({ label: tag.label, portIndex: tag.portIndex, edgeId: own.id, sourceNodeId: own.source });
+      else nextPrompt = untagLabel(nextPrompt, tag.label);
+      continue;
+    }
     const edge = edgeById.get(tag.edgeId);
     const stillValid =
       !!edge &&
@@ -243,6 +296,30 @@ export function reconcilePromptTags(
       edge.source === tag.sourceNodeId &&
       referenceHandleIndex(edge.targetHandle) === tag.portIndex;
     if (stillValid) kept.push(tag);
+    else { nextPrompt = untagLabel(nextPrompt, tag.label); changed = true; }
+  }
+  if (!changed) return null;
+  return { prompt: nextPrompt, tags: kept };
+}
+
+/**
+ * For a Prompt node: a positional tag stays valid while at least one Image
+ * Generation node it feeds has a connection on that port. Otherwise untag.
+ * Returns null when nothing changed.
+ */
+export function reconcilePositionalTags(
+  promptNodeId: string,
+  prompt: string,
+  tags: PromptTag[],
+  nodes: Node<NodeData>[],
+  edges: Edge[],
+): { prompt: string; tags: PromptTag[] } | null {
+  if (tags.length === 0) return null;
+  const available = new Set(getDownstreamTaggableInputs(promptNodeId, nodes, edges).map((i) => i.portIndex));
+  let nextPrompt = prompt;
+  const kept: PromptTag[] = [];
+  for (const tag of tags) {
+    if (available.has(tag.portIndex)) kept.push(tag);
     else nextPrompt = untagLabel(nextPrompt, tag.label);
   }
   if (kept.length === tags.length) return null;
