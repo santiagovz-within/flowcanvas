@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { notifyUserApproved, resolveAccessRequestsForUser } from '@/lib/access-requests';
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -35,8 +36,35 @@ export async function PATCH(
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
   }
 
+  // Snapshot the previous approval state so we only email on a real transition.
+  let wasApproved: boolean | null = null;
+  if (updates.approved === true) {
+    const { data: before } = await supabase
+      .from('profiles').select('approved, display_name').eq('id', id).maybeSingle();
+    wasApproved = before?.approved ?? null;
+  }
+
   const { error } = await supabase.from('profiles').update(updates).eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Approving from the panel also closes any pending email approval links and
+  // tells the user they can sign in.
+  if (updates.approved === true) {
+    await resolveAccessRequestsForUser(id, admin.id, supabase);
+
+    if (wasApproved === false) {
+      const { origin } = new URL(request.url);
+      after(async () => {
+        const [{ data: authUser }, { data: profile }] = await Promise.all([
+          supabase.auth.admin.getUserById(id),
+          supabase.from('profiles').select('display_name').eq('id', id).maybeSingle(),
+        ]);
+        const email = authUser.user?.email;
+        if (!email) return;
+        await notifyUserApproved({ email, displayName: profile?.display_name ?? null, requestOrigin: origin });
+      });
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

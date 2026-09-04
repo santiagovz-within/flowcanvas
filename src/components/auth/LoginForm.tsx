@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react';
 import NextImage from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 function GoogleIcon() {
   return (
@@ -21,6 +21,13 @@ function LoginFormInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const errorParam = searchParams.get('error');
+  const justApproved = searchParams.get('approved') === '1';
+  // Optional same-origin path to return to after sign-in (e.g. an email approval link).
+  const rawNext = searchParams.get('next');
+  const nextPath =
+    rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes('\\')
+      ? rawNext
+      : null;
 
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
@@ -54,7 +61,7 @@ function LoginFormInner() {
       if (!profile?.approved) { router.push('/pending'); return; }
     }
 
-    router.push('/dashboard');
+    router.push(nextPath ?? '/dashboard');
     router.refresh();
   }
 
@@ -63,7 +70,11 @@ function LoginFormInner() {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: nextPath
+          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
+          : `${window.location.origin}/auth/callback`,
+      },
     });
   }
 
@@ -81,6 +92,17 @@ function LoginFormInner() {
           Enter your @within.co details to login.
         </p>
       </div>
+
+      {/* Access approved banner (from the approval email link) */}
+      {justApproved && !bannerError && (
+        <div
+          className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-sm"
+          style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', color: '#4ade80' }}
+        >
+          <CheckCircle2 size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          Your access to Glide has been approved! Sign in with Google to get started.
+        </div>
+      )}
 
       {/* Domain / callback error banner */}
       {bannerError && (

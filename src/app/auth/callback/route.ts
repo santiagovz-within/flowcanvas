@@ -1,11 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { notifyAdminsOfAccessRequest, safeNextPath } from '@/lib/access-requests';
 
 const ALLOWED_DOMAIN = 'within.co';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
+  // Optional same-origin path to land on after sign-in (e.g. an email approval link).
+  const next = safeNextPath(searchParams.get('next'));
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=no_code`);
@@ -86,8 +89,15 @@ export async function GET(request: NextRequest) {
   // ── Route based on approval ────────────────────────────────────────────────
   const approved = existing?.approved ?? false;
   if (!approved) {
+    // Email every admin an approval link. Runs after the redirect is sent so
+    // it never slows down or breaks sign-in; de-duplicated per open request.
+    const userId = user.id;
+    const email  = user.email;
+    const displayName = googleDisplayName ?? existing?.display_name ?? null;
+    after(() => notifyAdminsOfAccessRequest({ userId, email, displayName, requestOrigin: origin }));
+
     return NextResponse.redirect(`${origin}/pending`);
   }
 
-  return NextResponse.redirect(`${origin}/dashboard`);
+  return NextResponse.redirect(`${origin}${next ?? '/dashboard'}`);
 }

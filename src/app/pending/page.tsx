@@ -11,9 +11,18 @@ export default function PendingPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.replace('/login'); return; }
       setEmail(user.email ?? null);
+
+      // If an admin approved this account while the user was parked here,
+      // clear the stale session and send them to log back in with Google.
+      const { data: profile } = await supabase
+        .from('profiles').select('approved').eq('id', user.id).maybeSingle();
+      if (profile?.approved) {
+        await supabase.auth.signOut();
+        router.replace('/login?approved=1');
+      }
     });
   }, [router]);
 
@@ -53,7 +62,7 @@ export default function PendingPage() {
           </h1>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--color-white-muted)' }}>
             Your account is waiting for an admin to approve access to WITHIN Glide.
-            You&rsquo;ll be able to sign in once approved.
+            The admins have been notified by email and you&rsquo;ll be able to sign in once approved.
           </p>
         </div>
 
