@@ -372,3 +372,11 @@ function renderApprovedHtml(t: ApprovedTemplateInput): string {
   </body>
 </html>`;
 }
+
+/** Template renderers exposed for scripts/send-test-emails.mts. Not for app code. */
+export const __test__ = {
+  renderAccessRequestHtml,
+  renderAccessRequestText,
+  renderApprovedHtml,
+  renderApprovedText,
+};
