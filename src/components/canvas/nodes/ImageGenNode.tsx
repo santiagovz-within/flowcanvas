@@ -22,7 +22,7 @@ import {
 import { ModelSelect } from './ModelSelect';
 import { NodeSelect } from './NodeSelect';
 import { PromptEditor } from './PromptEditor';
-import { compilePromptForModel, getTaggableInputs } from '@/lib/promptTags';
+import { compilePromptForModel, findBrokenTags, getTaggableInputs } from '@/lib/promptTags';
 import { ASPECT_RATIOS } from '@/lib/utils/constants';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { generationJobId, useGenerationStore } from '@/lib/stores/generationStore';
@@ -62,10 +62,17 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
 
   const [localPrompt, setLocalPrompt] = useState(() => data.prompt ?? '');
   const isFocused = useRef(false);
-  useEffect(() => {
-    if (!isFocused.current) setLocalPrompt(data.prompt ?? '');
-  }, [data.prompt]);
   const promptTags = data.promptTags ?? [];
+  const promptTagCount = promptTags.length;
+  const lastTagCount = useRef(promptTagCount);
+  useEffect(() => {
+    // External prompt changes are ignored while typing — except when a chip
+    // was untagged (connection removed), which rewrites the text and must win.
+    const tagsChanged = lastTagCount.current !== promptTagCount;
+    lastTagCount.current = promptTagCount;
+    if (!isFocused.current || tagsChanged) setLocalPrompt(data.prompt ?? '');
+  }, [data.prompt, promptTagCount]);
+  const [tagError, setTagError] = useState<string | null>(null);
 
   const modelConfig = IMAGE_MODELS.find((m) => m.id === data.model);
   const aspectOptions = modelConfig?.supportedAspectRatios.length
@@ -183,6 +190,20 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
 
   function handleGenerate() {
     if (isGenerating || !currentFlow) return;
+
+    // Refuse to run with a chip that points at nothing the model will receive.
+    const broken = findBrokenTags(id, promptTags, useFlowStore.getState().edges, data.inputImageUrls);
+    if (broken.length > 0) {
+      const labels = broken.map((t) => `@${t.label}`).join(', ');
+      setTagError(
+        broken.length === 1
+          ? `${labels} has no image yet. Connect an image to that input or remove the tag.`
+          : `${labels} have no images yet. Connect images to those inputs or remove the tags.`,
+      );
+      return;
+    }
+    setTagError(null);
+
     const slotCount = requestedImageCount;
     const endpoint = modelConfig?.provider === 'google' ? '/api/google/generate' : '/api/fal/generate';
     const inputImageUrls = (data.inputImageUrls ?? []).filter(Boolean);
@@ -410,9 +431,18 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           onFocusChange={(focused) => { isFocused.current = focused; }}
           onChange={({ prompt, tags }) => {
             setLocalPrompt(prompt);
+            setTagError(null);
             updateData(tags === promptTags ? { prompt } : { prompt, promptTags: tags });
           }}
         />
+      )}
+      {tagError && (
+        <p
+          className="text-[10px] leading-snug px-1 nodrag"
+          style={{ color: 'var(--color-error)' }}
+        >
+          {tagError}
+        </p>
       )}
 
       {/* ── Model selector ───────────────────────────────────── */}

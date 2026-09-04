@@ -48,7 +48,7 @@ import {
 } from './mediaOutputs';
 import type { NodeType, NodeData, ImageGenNodeData, ImageToPromptNodeData, MediaInputNodeData, PromptTag } from '@/types';
 import { getImageReferenceLimit } from '@/lib/api/models';
-import { untagLabel } from '@/lib/promptTags';
+import { reconcilePromptTags, untagLabel } from '@/lib/promptTags';
 import { setPendingFile } from '@/lib/utils/pendingFiles';
 
 const nodeTypes = {
@@ -247,6 +247,20 @@ export function FlowCanvas({ isTestUser = false, readOnly = false, focusNodeId =
 
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
   useEffect(() => { edgesRef.current = edges; }, [edges]);
+
+  // Whenever connections change, untag "@imageN" chips whose connection is
+  // gone or replaced. Runs on every edge change (delete, replace, model
+  // switch, node removal, undo) so a chip never points at different media,
+  // and autosave never persists a stale mapping.
+  useEffect(() => {
+    for (const node of useFlowStore.getState().nodes) {
+      if (node.type !== 'imageGenNode') continue;
+      const d = node.data as ImageGenNodeData;
+      if (!d.promptTags?.length) continue;
+      const fixed = reconcilePromptTags(node.id, d.prompt ?? '', d.promptTags, edges);
+      if (fixed) updateNodeData(node.id, fixed);
+    }
+  }, [edges, updateNodeData]);
 
   // Listen for node data updates from child components
   useEffect(() => {

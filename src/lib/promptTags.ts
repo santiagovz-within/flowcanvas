@@ -214,3 +214,54 @@ export function compilePromptForModel(
 
   return { prompt: compiled, unresolved };
 }
+
+// ── Keeping tags honest ──────────────────────────────────────────────────────
+
+/**
+ * Drop tags whose connection no longer exists exactly as it did when the tag
+ * was picked (same edge id, same target port, same source node). Their
+ * "@label" text becomes plain "label". Returns null when nothing changed.
+ *
+ * Because the check is by edge identity, replacing the image on a port with a
+ * different connection untags too — a chip never silently re-points.
+ */
+export function reconcilePromptTags(
+  nodeId: string,
+  prompt: string,
+  tags: PromptTag[],
+  edges: Edge[],
+): { prompt: string; tags: PromptTag[] } | null {
+  if (tags.length === 0) return null;
+  const edgeById = new Map(edges.map((e) => [e.id, e]));
+  let nextPrompt = prompt;
+  const kept: PromptTag[] = [];
+  for (const tag of tags) {
+    const edge = edgeById.get(tag.edgeId);
+    const stillValid =
+      !!edge &&
+      edge.target === nodeId &&
+      edge.source === tag.sourceNodeId &&
+      referenceHandleIndex(edge.targetHandle) === tag.portIndex;
+    if (stillValid) kept.push(tag);
+    else nextPrompt = untagLabel(nextPrompt, tag.label);
+  }
+  if (kept.length === tags.length) return null;
+  return { prompt: nextPrompt, tags: kept };
+}
+
+/**
+ * Tags that would break a generation: their port is connected but has no
+ * image to send yet (e.g. an upstream node hasn't generated). Tags with a
+ * missing connection are expected to have been untagged already by
+ * reconcilePromptTags, but are reported here too as a safety net.
+ */
+export function findBrokenTags(
+  nodeId: string,
+  tags: PromptTag[],
+  edges: Edge[],
+  inputImageUrls: string[] | undefined,
+): PromptTag[] {
+  const valid = reconcilePromptTags(nodeId, '', tags, edges)?.tags ?? tags;
+  const validLabels = new Set(valid.map((t) => t.label));
+  return tags.filter((t) => !validLabels.has(t.label) || !inputImageUrls?.[t.portIndex]);
+}
