@@ -385,6 +385,18 @@ export type NodeStatus = 'idle' | 'processing' | 'completed' | 'error';
 export type MediaType = 'image' | 'video';
 export type Provider = 'fal' | 'google';
 
+/**
+ * How a model lets a prompt point at one of its input images.
+ *  - native: the model has its own token syntax (e.g. "@Image{n}"); substituted verbatim.
+ *  - plain:  natural language only (e.g. "the {ordinal} image attached", "image {n}").
+ * `{n}` is the 1-based position among the images actually sent; `{ordinal}` is
+ * that position as a word.
+ */
+export interface PromptReferenceStyle {
+  kind: 'native' | 'plain';
+  template: string;
+}
+
 export interface ModelConfig {
   id: string;
   name: string;
@@ -397,6 +409,8 @@ export interface ModelConfig {
   supportsNegativePrompt: boolean;
   estimatedTimeSeconds: number;
   maxReferenceImages?: number;
+  /** How "@imageN" chips are rewritten for this model at submit time. Defaults to plain "the {ordinal} image attached". */
+  promptReference?: PromptReferenceStyle;
 }
 
 export interface GenerateImageRequest {

@@ -6,7 +6,9 @@
 // exists, and a PromptTag only survives while its connection does.
 
 import type { Edge } from '@xyflow/react';
-import type { PromptTag } from '@/types';
+import type { PromptReferenceStyle, PromptTag } from '@/types';
+
+export type { PromptReferenceStyle };
 
 /**
  * Matches "@image12" as a standalone token: not "@image12abc" and not
@@ -135,4 +137,80 @@ export function activeMentionQuery(
   if (!match) return null;
   const start = caret - match[2].length - 1; // index of "@"
   return { start, query: match[2] };
+}
+
+// ── Submit-time conversion ───────────────────────────────────────────────────
+//
+// Models differ in how (or whether) a prompt can point at a specific input
+// image. Each image model declares a `promptReference` style in the model
+// config; chips are rewritten to that style right before the request is sent.
+//
+//   native → the model has its own token syntax, e.g. "@Image{n}" (Seedance
+//            reference-to-video) or "@Element{n}" (Kling elements). The token
+//            is substituted verbatim.
+//   plain  → the model only understands natural language; the chip becomes a
+//            phrase like "the first image attached" or "image 1".
+//
+// `{n}` is the 1-based position of the image among the images actually sent,
+// and `{ordinal}` is that position as a word ("first"). Positions are counted
+// over the compacted list the API receives, not over port numbers, so a chip
+// for port 3 becomes "the second image" when port 2 is empty.
+
+export const DEFAULT_PROMPT_REFERENCE: PromptReferenceStyle = {
+  kind: 'plain',
+  template: 'the {ordinal} image attached',
+};
+
+const ORDINALS = [
+  'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth',
+  'ninth', 'tenth', 'eleventh', 'twelfth', 'thirteenth', 'fourteenth', 'fifteenth', 'sixteenth',
+];
+
+export function ordinalWord(n: number): string {
+  return ORDINALS[n - 1] ?? `${n}th`;
+}
+
+export function formatPromptReference(style: PromptReferenceStyle, position: number): string {
+  return style.template
+    .replaceAll('{n}', String(position))
+    .replaceAll('{ordinal}', ordinalWord(position));
+}
+
+export interface CompiledPrompt {
+  prompt: string;
+  /** Tags whose port has no image to send; their "@" was dropped in `prompt`. */
+  unresolved: PromptTag[];
+}
+
+/**
+ * Rewrite live chips in `prompt` for the model. `inputImageUrls` is the node's
+ * port-indexed array (holes allowed); the model receives `filter(Boolean)` of
+ * it, so positions are computed over the non-empty entries in port order.
+ */
+export function compilePromptForModel(
+  prompt: string,
+  tags: PromptTag[],
+  inputImageUrls: string[] | undefined,
+  style: PromptReferenceStyle = DEFAULT_PROMPT_REFERENCE,
+): CompiledPrompt {
+  const positionByPort = new Map<number, number>();
+  let position = 0;
+  (inputImageUrls ?? []).forEach((url, portIndex) => {
+    if (url) positionByPort.set(portIndex, ++position);
+  });
+
+  const byLabel = new Map(tags.map((t) => [t.label, t]));
+  const unresolved: PromptTag[] = [];
+  const compiled = prompt.replace(IMAGE_TAG_PATTERN, (token, num: string) => {
+    const tag = byLabel.get(`image${num}`);
+    if (!tag) return token; // not a live chip: leave the text alone
+    const pos = positionByPort.get(tag.portIndex);
+    if (pos === undefined) {
+      unresolved.push(tag);
+      return tag.label;
+    }
+    return formatPromptReference(style, pos);
+  });
+
+  return { prompt: compiled, unresolved };
 }

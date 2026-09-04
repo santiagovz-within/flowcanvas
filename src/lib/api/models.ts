@@ -1,5 +1,6 @@
-import type { ModelConfig } from '@/types';
+import type { ModelConfig, PromptReferenceStyle } from '@/types';
 import type { FalPricingRule } from '@/lib/falPricing';
+import { DEFAULT_PROMPT_REFERENCE } from '@/lib/promptTags';
 
 // Google Gemini image generation model IDs — keyed by our internal model ID
 export const GOOGLE_IMAGE_MODELS: Record<string, string> = {};
@@ -235,6 +236,8 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 8,
     maxReferenceImages: 14,
+    // No documented way to address a specific input image; use plain language.
+    promptReference: { kind: 'plain', template: 'the {ordinal} image attached' },
   },
   'nano-banana-pro': {
     id: 'nano-banana-pro',
@@ -248,6 +251,8 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 12,
     maxReferenceImages: 14,
+    // No documented way to address a specific input image; use plain language.
+    promptReference: { kind: 'plain', template: 'the {ordinal} image attached' },
   },
   'seedream-5': {
     id: 'seedream-5',
@@ -261,6 +266,8 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 20,
     maxReferenceImages: 10,
+    // fal's own Seedream edit example addresses inputs as "Figure 1", "Figure 2".
+    promptReference: { kind: 'plain', template: 'Figure {n}' },
   },
   'qwen-image-3': {
     id: 'qwen-image-3',
@@ -274,6 +281,8 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: true,
     estimatedTimeSeconds: 15,
     maxReferenceImages: 3,
+    // Documented by fal: "Order matters: reference as 'image 1', 'image 2', 'image 3' in prompt."
+    promptReference: { kind: 'plain', template: 'image {n}' },
   },
   'gpt-image-2': {
     id: 'gpt-image-2',
@@ -287,6 +296,8 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 15,
     maxReferenceImages: 16,
+    // No documented way to address a specific input image; use plain language.
+    promptReference: { kind: 'plain', template: 'the {ordinal} image attached' },
   },
   'krea-2-large': {
     id: 'krea-2-large',
@@ -300,6 +311,8 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 10,
     maxReferenceImages: 1,
+    // Connected images are style references only; plain language is the best available.
+    promptReference: { kind: 'plain', template: 'the {ordinal} image attached' },
   },
   'recraft-v4': {
     id: 'recraft-v4',
@@ -313,6 +326,8 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 15,
     maxReferenceImages: 10,
+    // Connected images are style references only; plain language is the best available.
+    promptReference: { kind: 'plain', template: 'the {ordinal} image attached' },
   },
   'flux-2-pro': {
     id: 'flux-2-pro',
@@ -503,6 +518,17 @@ export function supportsMultipleImageReferences(modelId: string): boolean {
     'editImageParam' in falConfig &&
     falConfig.editImageParam === 'image_urls'
   );
+}
+
+/**
+ * How "@imageN" prompt chips are written for this model when a request is
+ * sent. Video models are intentionally absent for now: the endpoints we call
+ * (image-to-video with start/end frames) have no reference syntax. Seedance's
+ * reference-to-video ("@Image{n}") and Kling elements ("@Element{n}") belong
+ * here as `kind: 'native'` entries once those modes exist.
+ */
+export function getPromptReferenceStyle(modelId: string): PromptReferenceStyle {
+  return MODELS[modelId]?.promptReference ?? DEFAULT_PROMPT_REFERENCE;
 }
 
 export function getImageReferenceLimit(modelId: string): number {

@@ -15,13 +15,14 @@ import {
   IMAGE_MODELS,
   FAL_MODELS,
   getImageReferenceLimit,
+  getPromptReferenceStyle,
   supportsMultipleImageReferences,
   usesStyleReferences,
 } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { NodeSelect } from './NodeSelect';
 import { PromptEditor } from './PromptEditor';
-import { getTaggableInputs } from '@/lib/promptTags';
+import { compilePromptForModel, getTaggableInputs } from '@/lib/promptTags';
 import { ASPECT_RATIOS } from '@/lib/utils/constants';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { generationJobId, useGenerationStore } from '@/lib/stores/generationStore';
@@ -189,9 +190,18 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       useFlowStore.getState().consumeGcsOnlyEligibility();
     }
 
+    // Rewrite "@imageN" chips into this model's vocabulary. Positions follow
+    // the compacted list above, so the text and the images sent always agree.
+    const { prompt: compiledPrompt } = compilePromptForModel(
+      data.prompt ?? '',
+      data.promptTags ?? [],
+      data.inputImageUrls,
+      getPromptReferenceStyle(data.model),
+    );
+
     const payload = {
       model: data.model,
-      prompt: data.prompt ?? '',
+      prompt: compiledPrompt,
       aspectRatio: selectedAspectRatio,
       resolution: selectedResolution,
       referenceImageUrls: inputImageUrls,
