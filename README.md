@@ -54,6 +54,7 @@ All generation runs through the [FAL AI](https://fal.ai) platform.
 | GPT Image 2 (OpenAI) | Image generation |
 | Qwen Image 3.0 (Alibaba) | Image generation and editing |
 | Krea 2 Large | Image generation with style references |
+| Recraft V4 | Image generation with style references |
 | FLUX 2 Pro | Image generation |
 | Google Omni Flash | Image-to-video generation |
 | Kling 3 Pro | Video generation |

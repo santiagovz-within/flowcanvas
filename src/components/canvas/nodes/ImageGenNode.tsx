@@ -108,7 +108,9 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   const pricingEndpoint = falConfig
     ? isEditMode && 'editEndpoint' in falConfig
       ? falConfig.editEndpoint
-      : falConfig.endpoint
+      : hasImageInput && 'styleReferenceEndpoint' in falConfig
+        ? falConfig.styleReferenceEndpoint
+        : falConfig.endpoint
     : null;
 
   useLayoutEffect(() => {

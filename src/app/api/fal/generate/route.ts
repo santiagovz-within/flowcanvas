@@ -260,12 +260,18 @@ export async function POST(request: NextRequest) {
 
     // Image generation
     const useEditEndpoint = referenceImageUrls.length > 0 && 'editEndpoint' in modelConfig;
-    const endpoint = useEditEndpoint ? modelConfig.editEndpoint : modelConfig.endpoint;
+    const useStyleEndpoint = referenceImageUrls.length > 0 && 'styleReferenceEndpoint' in modelConfig;
+    const endpoint = useEditEndpoint
+      ? modelConfig.editEndpoint
+      : useStyleEndpoint
+        ? modelConfig.styleReferenceEndpoint
+        : modelConfig.endpoint;
     const usesAspectRatio = 'usesAspectRatio' in modelConfig && modelConfig.usesAspectRatio;
     const supportsResolution = 'supportsResolution' in modelConfig && (modelConfig as { supportsResolution: boolean }).supportsResolution;
     const usesImageSize = 'usesImageSize' in modelConfig && modelConfig.usesImageSize;
     const editImageParam = 'editImageParam' in modelConfig ? (modelConfig as { editImageParam: string }).editImageParam : null;
     const styleReferenceParam = 'styleReferenceParam' in modelConfig ? modelConfig.styleReferenceParam : null;
+    const styleReferenceShape = 'styleReferenceShape' in modelConfig ? modelConfig.styleReferenceShape : 'urls';
     const hasOwnQuality = 'hasOwnQuality' in modelConfig && (modelConfig as { hasOwnQuality: boolean }).hasOwnQuality;
     const maxReferenceImages = 'maxReferenceImages' in modelConfig
       ? modelConfig.maxReferenceImages
@@ -294,11 +300,12 @@ export async function POST(request: NextRequest) {
     if (referenceImageUrls[0]) {
       const usableReferenceImageUrls = referenceImageUrls.filter(Boolean);
       if (styleReferenceParam) {
-        // Style-only models (Krea) take `{ image_url, strength }` entries and
-        // stay on the text-to-image endpoint.
-        baseInput[styleReferenceParam] = usableReferenceImageUrls
-          .slice(0, maxReferenceImages ?? usableReferenceImageUrls.length)
-          .map((url) => ({ image_url: url, strength: 1 }));
+        // Style-only models: Krea takes weighted `{ image_url, strength }`
+        // entries, Recraft takes plain URLs on its style endpoint.
+        const styleUrls = usableReferenceImageUrls.slice(0, maxReferenceImages ?? usableReferenceImageUrls.length);
+        baseInput[styleReferenceParam] = styleReferenceShape === 'weighted'
+          ? styleUrls.map((url) => ({ image_url: url, strength: 1 }))
+          : styleUrls;
       } else if (editImageParam === 'image_urls') {
         baseInput.image_urls = maxReferenceImages === undefined
           ? usableReferenceImageUrls

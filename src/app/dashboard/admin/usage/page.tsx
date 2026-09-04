@@ -52,6 +52,7 @@ const MODEL_COLOR_MAP: Record<string, string> = {
   'gpt-image-2':     '#22d3ee',
   'qwen-image-3':    '#a3e635',
   'krea-2-large':    '#2dd4bf',
+  'recraft-v4':      '#e879f9',
   'flux-2-pro':      '#f59e0b',
   'google-omni-flash': '#f87171',
   'kling-3-pro':     '#34d399',

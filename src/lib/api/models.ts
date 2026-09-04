@@ -71,9 +71,24 @@ export const FAL_MODELS = {
     // Krea has no image-to-image mode: a connected image only steers the
     // style through `image_style_references`, so there is no edit endpoint.
     styleReferenceParam: 'image_style_references',
+    styleReferenceShape: 'weighted' as const,
     maxReferenceImages: 1,
     // Fal charges $0.060 per image, or $0.065 when a style reference is sent.
     pricing: { kind: 'fixed', referenceMultiplier: 0.065 / 0.06 },
+    type: 'image' as const,
+  },
+  'recraft-v4': {
+    endpoint: 'fal-ai/recraft/v4/pro/text-to-image',
+    // Recraft has no image-to-image mode either; connected images become
+    // style references, which live on a separate endpoint taking plain URLs.
+    styleReferenceEndpoint: 'recraft/v4/style/pro/text-to-image',
+    styleReferenceParam: 'image_urls',
+    styleReferenceShape: 'urls' as const,
+    usesImageSize: true,
+    maxReferenceImages: 10,
+    // Fal charges $0.25/image on the pro endpoint. The style endpoint is
+    // $0.10/image plus $0.005 per request to build a style from the references.
+    pricing: { kind: 'fixed', referenceMultiplier: 0.105 / 0.1 },
     type: 'image' as const,
   },
   'flux-2-pro': {
@@ -184,6 +199,7 @@ export function getFalPricingRule(endpoint: string): FalPricingRule | undefined 
     if (
       config.endpoint === endpoint
       || ('editEndpoint' in config && config.editEndpoint === endpoint)
+      || ('styleReferenceEndpoint' in config && config.styleReferenceEndpoint === endpoint)
       || ('imageToVideoEndpoint' in config && config.imageToVideoEndpoint === endpoint)
     ) {
       return config.pricing as FalPricingRule;
@@ -199,6 +215,7 @@ export function getFalPricingEndpointIds(): string[] {
   for (const config of Object.values(FAL_MODELS)) {
     endpoints.add(config.endpoint);
     if ('editEndpoint' in config) endpoints.add(config.editEndpoint);
+    if ('styleReferenceEndpoint' in config) endpoints.add(config.styleReferenceEndpoint);
     if ('imageToVideoEndpoint' in config) endpoints.add(config.imageToVideoEndpoint);
   }
   for (const config of Object.values(FAL_NODE_ENDPOINTS)) endpoints.add(config.endpoint);
@@ -283,6 +300,19 @@ export const MODELS: Record<string, ModelConfig> = {
     supportsNegativePrompt: false,
     estimatedTimeSeconds: 10,
     maxReferenceImages: 1,
+  },
+  'recraft-v4': {
+    id: 'recraft-v4',
+    name: 'Recraft V4',
+    provider: 'fal',
+    type: 'image',
+    supportedAspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4', '4:5', '21:9'],
+    supportedResolutions: ['1K', '2K'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: false,
+    estimatedTimeSeconds: 15,
+    maxReferenceImages: 10,
   },
   'flux-2-pro': {
     id: 'flux-2-pro',
@@ -436,6 +466,7 @@ export const IMAGE_MODELS = [
   MODELS['nano-banana-pro'],
   MODELS['gpt-image-2'],
   MODELS['qwen-image-3'],
+  MODELS['recraft-v4'],
   MODELS['krea-2-large'],
   MODELS['flux-2-pro'],
 ];
