@@ -8,6 +8,7 @@ import { Clock, LogOut, Mail } from 'lucide-react';
 export default function PendingPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -22,6 +23,21 @@ export default function PendingPage() {
       if (profile?.approved) {
         await supabase.auth.signOut();
         router.replace('/login?approved=1');
+        return;
+      }
+
+      // Make sure admins were emailed. Safe to call on every visit: the server
+      // sends at most one email per open request.
+      try {
+        const res = await fetch('/api/access-requests/notify', { method: 'POST' });
+        const data = await res.json().catch(() => ({})) as { status?: string };
+        setNotice(
+          data.status === 'sent' || data.status === 'already_open'
+            ? 'The admins have been notified by email.'
+            : 'We couldn\u2019t email the admins automatically. Please reach out to one directly.'
+        );
+      } catch {
+        setNotice(null);
       }
     });
   }, [router]);
@@ -62,8 +78,11 @@ export default function PendingPage() {
           </h1>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--color-white-muted)' }}>
             Your account is waiting for an admin to approve access to WITHIN Glide.
-            The admins have been notified by email and you&rsquo;ll be able to sign in once approved.
+            You&rsquo;ll be able to sign in once approved.
           </p>
+          {notice && (
+            <p className="text-xs" style={{ color: 'var(--color-white-subtle)' }}>{notice}</p>
+          )}
         </div>
 
         {/* Email chip */}

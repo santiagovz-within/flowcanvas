@@ -46,8 +46,8 @@ const emails = [
 
 if (isEmailConfigured()) {
   for (const e of emails) {
-    const ok = await sendEmail({ to: [to], subject: e.subject, html: e.html, text: e.text, replyTo: e.replyTo });
-    console.log(`${ok ? 'sent  ' : 'FAILED'}  ${e.subject}  -> ${to}`);
+    const r = await sendEmail({ to: [to], subject: e.subject, html: e.html, text: e.text, replyTo: e.replyTo });
+    console.log(r.ok ? `sent    ${e.subject}  -> ${to}` : `FAILED  ${e.subject}: ${r.error}`);
   }
 } else {
   const dir = resolve(process.cwd(), '.context/email-previews');

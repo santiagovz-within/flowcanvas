@@ -33,7 +33,7 @@ export function safeNextPath(value: string | null | undefined): string | null {
   return value;
 }
 
-async function getAdminEmails(admin: AdminClient): Promise<string[]> {
+export async function getAdminEmails(admin: AdminClient = createAdminClient()): Promise<string[]> {
   const { data: admins, error } = await admin
     .from('profiles')
     .select('id')
@@ -61,22 +61,32 @@ interface NotifyInput {
   requestOrigin?: string;
 }
 
+export type NotifyResult =
+  | { status: 'sent'; recipients: string[] }
+  | { status: 'already_open' }
+  | { status: 'not_configured' }
+  | { status: 'no_recipients' }
+  | { status: 'db_error'; detail: string }
+  | { status: 'send_failed'; detail: string }
+  | { status: 'error'; detail: string };
+
 /**
  * Create an access request for `userId` (if there isn't an open one already)
- * and email every admin an approval link. Never throws.
+ * and email every admin an approval link. Never throws; the returned status
+ * says exactly what happened so callers can surface it.
  */
-export async function notifyAdminsOfAccessRequest(input: NotifyInput): Promise<void> {
+export async function notifyAdminsOfAccessRequest(input: NotifyInput): Promise<NotifyResult> {
   try {
     if (!isEmailConfigured()) {
       console.warn('[access-requests] email not configured — admins not notified for', input.email);
-      return;
+      return { status: 'not_configured' };
     }
 
     const admin = createAdminClient();
     const nowIso = new Date().toISOString();
 
     // Skip if an open, unexpired request already exists — one email per request.
-    const { data: open } = await admin
+    const { data: open, error: openError } = await admin
       .from('access_requests')
       .select('id')
       .eq('user_id', input.userId)
@@ -84,7 +94,17 @@ export async function notifyAdminsOfAccessRequest(input: NotifyInput): Promise<v
       .gt('expires_at', nowIso)
       .limit(1)
       .maybeSingle();
-    if (open) return;
+    if (openError) {
+      console.error('[access-requests] lookup failed:', openError.message);
+      return { status: 'db_error', detail: openError.message };
+    }
+    if (open) return { status: 'already_open' };
+
+    const recipients = await getAdminEmails(admin);
+    if (recipients.length === 0) {
+      console.warn('[access-requests] no admin emails found — nobody to notify');
+      return { status: 'no_recipients' };
+    }
 
     const token     = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + TOKEN_TTL_MS).toISOString();
@@ -101,13 +121,9 @@ export async function notifyAdminsOfAccessRequest(input: NotifyInput): Promise<v
       .single();
 
     if (insertError || !created) {
-      console.error('[access-requests] failed to create request:', insertError?.message);
-      return;
-    }
-
-    const recipients = await getAdminEmails(admin);
-    if (recipients.length === 0) {
-      console.warn('[access-requests] no admin emails found — nobody to notify');
+      const detail = insertError?.message ?? 'insert returned no row';
+      console.error('[access-requests] failed to create request:', detail);
+      return { status: 'db_error', detail };
     }
 
     const baseUrl    = getAppUrl(input.requestOrigin);
@@ -122,12 +138,18 @@ export async function notifyAdminsOfAccessRequest(input: NotifyInput): Promise<v
       text:    renderAccessRequestText({ ...input, approveUrl, usersUrl }),
     });
 
-    if (!sent) {
-      // Drop the row so the next sign-in retries instead of waiting for expiry.
+    if (!sent.ok) {
+      // Drop the row so the next attempt retries instead of waiting for expiry.
       await admin.from('access_requests').delete().eq('id', created.id);
+      return { status: 'send_failed', detail: sent.error };
     }
+
+    console.log(`[access-requests] notified ${recipients.length} admin(s) about ${input.email} (resend id ${sent.id})`);
+    return { status: 'sent', recipients };
   } catch (err) {
-    console.error('[access-requests] notify failed:', err);
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[access-requests] notify failed:', detail);
+    return { status: 'error', detail };
   }
 }
 
@@ -212,12 +234,13 @@ export async function notifyUserApproved(input: ApprovedInput): Promise<void> {
     }
     const baseUrl  = getAppUrl(input.requestOrigin);
     const loginUrl = `${baseUrl}/auth/approved`;
-    await sendEmail({
+    const sent = await sendEmail({
       to:      [input.email],
       subject: 'Your access to Glide has been approved!',
       html:    renderApprovedHtml({ ...input, loginUrl }),
       text:    renderApprovedText({ ...input, loginUrl }),
     });
+    if (!sent.ok) console.error('[access-requests] approval email failed:', sent.error);
   } catch (err) {
     console.error('[access-requests] approval email failed:', err);
   }

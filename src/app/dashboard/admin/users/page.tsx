@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Users, Plus, Trash2, Shield, ShieldOff, RefreshCw, Edit2, Check, X, AlertTriangle, UserCheck, UserX, Clock, FlaskConical } from 'lucide-react';
+import { Users, Plus, Trash2, Shield, ShieldOff, RefreshCw, Edit2, Check, X, AlertTriangle, UserCheck, UserX, Clock, FlaskConical, Mail, Send } from 'lucide-react';
 
 interface AdminUser {
   id: string;
@@ -17,6 +17,136 @@ interface AdminUser {
     approved: boolean;
     created_at: string;
   } | null;
+}
+
+interface EmailDiagnostics {
+  email: { configured: boolean; hasApiKey: boolean; from: string | null; appUrl: string | null };
+  table: { ok: boolean; error: string | null };
+  recipients: string[];
+  requests: { id: string; email: string; created_at: string; expires_at: string; approved_at: string | null }[];
+}
+
+function AccessRequestEmailsCard() {
+  const [diag, setDiag]           = useState<EmailDiagnostics | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [sending, setSending]     = useState(false);
+  const [testMsg, setTestMsg]     = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/access-requests')
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.ok) setDiag(await res.json());
+        setLoading(false);
+      })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [reloadKey]);
+
+  function refresh() {
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  }
+
+  async function sendTest() {
+    setSending(true);
+    setTestMsg(null);
+    const res = await fetch('/api/admin/access-requests/test', { method: 'POST' });
+    const d = await res.json().catch(() => ({}));
+    setTestMsg(res.ok
+      ? { ok: true,  text: `Test email sent to ${d.to}. Check your inbox and spam folder.` }
+      : { ok: false, text: d.error ?? 'Failed to send test email' });
+    setSending(false);
+  }
+
+  const problems: string[] = [];
+  if (diag) {
+    if (!diag.email.hasApiKey) problems.push('RESEND_API_KEY is not set on the server.');
+    if (!diag.email.from)      problems.push('EMAIL_FROM is not set on the server.');
+    if (!diag.table.ok)        problems.push(`access_requests table: ${diag.table.error ?? 'unavailable'} — run supabase/migrations/015_access_requests.sql.`);
+    if (diag.recipients.length === 0) problems.push('No admin has an email address to notify.');
+  }
+  const healthy = diag !== null && problems.length === 0;
+  const openRequests = diag?.requests.filter((r) => !r.approved_at) ?? [];
+
+  return (
+    <div
+      className="mb-6 rounded-xl p-5 space-y-3"
+      style={{ background: 'var(--color-bg-elevated)', border: 'var(--border-default)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Mail size={15} style={{ color: 'var(--color-accent)' }} />
+          <p className="text-sm font-semibold" style={{ color: 'var(--color-white)' }}>Access request emails</p>
+          {loading ? (
+            <RefreshCw size={12} className="animate-spin" style={{ color: 'var(--color-white-muted)' }} />
+          ) : healthy ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>
+              <Check size={10} /> Configured
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>
+              <AlertTriangle size={10} /> Not working
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="p-1.5 rounded-lg transition-colors hover:bg-white/10 disabled:opacity-40"
+            title="Refresh"
+          >
+            <RefreshCw size={13} style={{ color: 'var(--color-white-muted)' }} />
+          </button>
+          <button
+            onClick={sendTest}
+            disabled={sending || loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity disabled:opacity-40 hover:opacity-90"
+            style={{ background: '#fff', color: '#000' }}
+          >
+            {sending ? <RefreshCw size={12} className="animate-spin" /> : <Send size={12} />}
+            {sending ? 'Sending…' : 'Send me a test email'}
+          </button>
+        </div>
+      </div>
+
+      {diag && (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs" style={{ color: 'var(--color-white-muted)' }}>
+          <p>From: <span style={{ color: 'var(--color-white)' }}>{diag.email.from ?? '—'}</span></p>
+          <p>Links use: <span style={{ color: 'var(--color-white)' }}>{diag.email.appUrl ?? 'request origin'}</span></p>
+          <p className="col-span-2">
+            Notifies: <span style={{ color: 'var(--color-white)' }}>{diag.recipients.length ? diag.recipients.join(', ') : '—'}</span>
+          </p>
+        </div>
+      )}
+
+      {problems.map((msg) => (
+        <p key={msg} className="text-xs flex items-start gap-1.5" style={{ color: 'var(--color-error)' }}>
+          <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} /> {msg}
+        </p>
+      ))}
+
+      {testMsg && (
+        <p className="text-xs flex items-start gap-1.5" style={{ color: testMsg.ok ? '#4ade80' : 'var(--color-error)' }}>
+          {testMsg.ok ? <Check size={12} style={{ flexShrink: 0, marginTop: 1 }} /> : <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />}
+          {testMsg.text}
+        </p>
+      )}
+
+      {diag && diag.table.ok && (
+        <p className="text-xs" style={{ color: 'var(--color-white-muted)' }}>
+          {openRequests.length === 0
+            ? 'No open access requests have been emailed yet.'
+            : `Open requests emailed: ${openRequests.map((r) => r.email).join(', ')}`}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export default function AdminUsersPage() {
@@ -232,6 +362,8 @@ export default function AdminUsersPage() {
           New User
         </button>
       </div>
+
+      <AccessRequestEmailsCard />
 
       {/* Create user form */}
       {showCreate && (
