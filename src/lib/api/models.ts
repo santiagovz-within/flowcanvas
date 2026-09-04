@@ -461,8 +461,8 @@ export const MODELS: Record<string, ModelConfig> = {
 };
 
 export const IMAGE_MODELS = [
-  MODELS['seedream-5'],
   MODELS['nano-banana-2'],
+  MODELS['seedream-5'],
   MODELS['nano-banana-pro'],
   MODELS['gpt-image-2'],
   MODELS['qwen-image-3'],

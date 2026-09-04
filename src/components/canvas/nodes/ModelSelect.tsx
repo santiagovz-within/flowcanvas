@@ -39,8 +39,8 @@ function measureDropdown(trigger: HTMLButtonElement): DropdownPosition {
 }
 
 const MODEL_SUBTITLES: Record<string, string> = {
-  'seedream-5': 'BEST & MOST CREATIVE MODEL',
-  'nano-banana-2': 'EXCELLENT ALL-AROUND MODEL',
+  'nano-banana-2': 'BEST & MOST CREATIVE MODEL',
+  'seedream-5': 'EXCELLENT ALL-AROUND MODEL',
   'nano-banana-pro': 'VERY GOOD ALL-AROUND MODEL',
   'gpt-image-2': 'GOOD FOR TEXT & BRANDING DESIGN',
   'qwen-image-3': 'GREAT TEXT RENDERING & GOOD IMAGE QUALITY',
