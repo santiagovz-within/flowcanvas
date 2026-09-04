@@ -265,6 +265,7 @@ export async function POST(request: NextRequest) {
     const supportsResolution = 'supportsResolution' in modelConfig && (modelConfig as { supportsResolution: boolean }).supportsResolution;
     const usesImageSize = 'usesImageSize' in modelConfig && modelConfig.usesImageSize;
     const editImageParam = 'editImageParam' in modelConfig ? (modelConfig as { editImageParam: string }).editImageParam : null;
+    const styleReferenceParam = 'styleReferenceParam' in modelConfig ? modelConfig.styleReferenceParam : null;
     const hasOwnQuality = 'hasOwnQuality' in modelConfig && (modelConfig as { hasOwnQuality: boolean }).hasOwnQuality;
     const maxReferenceImages = 'maxReferenceImages' in modelConfig
       ? modelConfig.maxReferenceImages
@@ -291,8 +292,14 @@ export async function POST(request: NextRequest) {
     };
 
     if (referenceImageUrls[0]) {
-      if (editImageParam === 'image_urls') {
-        const usableReferenceImageUrls = referenceImageUrls.filter(Boolean);
+      const usableReferenceImageUrls = referenceImageUrls.filter(Boolean);
+      if (styleReferenceParam) {
+        // Style-only models (Krea) take `{ image_url, strength }` entries and
+        // stay on the text-to-image endpoint.
+        baseInput[styleReferenceParam] = usableReferenceImageUrls
+          .slice(0, maxReferenceImages ?? usableReferenceImageUrls.length)
+          .map((url) => ({ image_url: url, strength: 1 }));
+      } else if (editImageParam === 'image_urls') {
         baseInput.image_urls = maxReferenceImages === undefined
           ? usableReferenceImageUrls
           : usableReferenceImageUrls.slice(0, maxReferenceImages);

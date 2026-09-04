@@ -65,6 +65,17 @@ export const FAL_MODELS = {
     pricing: { kind: 'image-resolution', resolutionMultipliers: { '1K': 1, '2K': 1.53, '4K': 2.77 } },
     type: 'image' as const,
   },
+  'krea-2-large': {
+    endpoint: 'krea/v2/large/text-to-image',
+    usesAspectRatio: true,
+    // Krea has no image-to-image mode: a connected image only steers the
+    // style through `image_style_references`, so there is no edit endpoint.
+    styleReferenceParam: 'image_style_references',
+    maxReferenceImages: 1,
+    // Fal charges $0.060 per image, or $0.065 when a style reference is sent.
+    pricing: { kind: 'fixed', referenceMultiplier: 0.065 / 0.06 },
+    type: 'image' as const,
+  },
   'flux-2-pro': {
     endpoint: 'fal-ai/flux-pro/v1.1-ultra',
     usesAspectRatio: true,
@@ -260,6 +271,19 @@ export const MODELS: Record<string, ModelConfig> = {
     estimatedTimeSeconds: 15,
     maxReferenceImages: 16,
   },
+  'krea-2-large': {
+    id: 'krea-2-large',
+    name: 'Krea 2 Large',
+    provider: 'fal',
+    type: 'image',
+    supportedAspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:2', '2:3', '4:5', '2.35:1'],
+    supportedResolutions: ['1K'],
+    maxBatchSize: 1,
+    supportsImageInput: true,
+    supportsNegativePrompt: false,
+    estimatedTimeSeconds: 10,
+    maxReferenceImages: 1,
+  },
   'flux-2-pro': {
     id: 'flux-2-pro',
     name: 'Flux 2 Pro',
@@ -412,6 +436,7 @@ export const IMAGE_MODELS = [
   MODELS['nano-banana-pro'],
   MODELS['gpt-image-2'],
   MODELS['qwen-image-3'],
+  MODELS['krea-2-large'],
   MODELS['flux-2-pro'],
 ];
 export const VIDEO_MODELS = [
@@ -431,11 +456,18 @@ export const CHAT_VIDEO_MODELS = VIDEO_MODELS.filter(
 );
 export const UPSCALE_MODELS = Object.values(MODELS).filter(m => m.type === 'upscale');
 
+/** Models whose connected images steer style only (no image-to-image). */
+export function usesStyleReferences(modelId: string): boolean {
+  const falConfig = FAL_MODELS[modelId as keyof typeof FAL_MODELS];
+  return !!falConfig && 'styleReferenceParam' in falConfig;
+}
+
+/** Whether the image node renders per-image `ref_N` slots for this model. */
 export function supportsMultipleImageReferences(modelId: string): boolean {
   const model = MODELS[modelId];
   const falConfig = FAL_MODELS[modelId as keyof typeof FAL_MODELS];
 
-  return model?.provider === 'google' || (
+  return model?.provider === 'google' || usesStyleReferences(modelId) || (
     !!falConfig &&
     'editImageParam' in falConfig &&
     falConfig.editImageParam === 'image_urls'

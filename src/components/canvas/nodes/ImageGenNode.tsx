@@ -16,6 +16,7 @@ import {
   FAL_MODELS,
   getImageReferenceLimit,
   supportsMultipleImageReferences,
+  usesStyleReferences,
 } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { NodeSelect } from './NodeSelect';
@@ -87,6 +88,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     : resolutionOptions[0];
   const falConfig = FAL_MODELS[data.model as keyof typeof FAL_MODELS];
   const isMultiImageModel = supportsMultipleImageReferences(data.model);
+  const usesStyleReference = usesStyleReferences(data.model);
   const maxReferenceImages = getImageReferenceLimit(data.model);
   const portCount = isMultiImageModel
     ? Math.min(Math.max(data.imagePortCount ?? 1, 1), maxReferenceImages)
@@ -99,7 +101,8 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   const connectedCount = connectedReferenceHandles.size;
 
   const hasEditVariant = !!falConfig && 'editEndpoint' in falConfig;
-  const hasImageInput = (data.inputImageUrls ?? []).some(Boolean);
+  const connectedImageCount = (data.inputImageUrls ?? []).filter(Boolean).length;
+  const hasImageInput = connectedImageCount > 0;
   const isEditMode = hasEditVariant && hasImageInput;
   const requestedImageCount = Math.min(4, Math.max(1, Math.round(data.numImages)));
   const pricingEndpoint = falConfig
@@ -282,6 +285,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
             aspectRatio: selectedAspectRatio,
             resolution: selectedResolution,
             outputCount: requestedImageCount,
+            referenceImageCount: connectedImageCount,
           } : null} />
         </span>
       </button>
@@ -417,18 +421,25 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       />
 
       {/* ── Image-to-image / Text-to-image badge ─────────────── */}
-      {hasEditVariant && (
-        <span
-          className={cn(
-            glassStyles.glassSurface,
-            glassStyles.modePill,
-            isEditMode ? glassStyles.modePillImage : glassStyles.modePillText,
-          )}
-        >
-          <span className={glassStyles.glassContent}>
-            ● {isEditMode ? 'Image-to-image' : 'Text-to-image'}
+      {(hasEditVariant || usesStyleReference) && (
+        <div className={glassStyles.modePillRow}>
+          <span
+            className={cn(
+              glassStyles.glassSurface,
+              glassStyles.modePill,
+              isEditMode ? glassStyles.modePillImage : glassStyles.modePillText,
+            )}
+          >
+            <span className={glassStyles.glassContent}>
+              ● {isEditMode ? 'Image-to-image' : 'Text-to-image'}
+            </span>
           </span>
-        </span>
+          {usesStyleReference && (
+            <span className={cn(glassStyles.glassSurface, glassStyles.modePill, glassStyles.modePillStyle)}>
+              <span className={glassStyles.glassContent}>● Style-reference</span>
+            </span>
+          )}
+        </div>
       )}
 
       {/* ── Aspect ratio + resolution ─────────────────────────── */}
@@ -521,7 +532,8 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       {isMultiImageModel && (
         <div className={glassStyles.referenceSection}>
           <label className={glassStyles.microLabel}>
-            Reference Images{connectedCount > 0 ? ` ( ${connectedCount} / ${maxReferenceImages} )` : ''}
+            {usesStyleReference ? 'Style Reference' : 'Reference Images'}
+            {connectedCount > 0 ? ` ( ${connectedCount} / ${maxReferenceImages} )` : ''}
           </label>
           <div ref={rowsListRef} className={glassStyles.connectorRows}>
             {Array.from({ length: portCount }, (_, i) => {
@@ -536,7 +548,9 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
                     isConnected ? glassStyles.connectorActive : glassStyles.connectorInactive,
                   )}
                 >
-                  <span className={glassStyles.glassContent}>@image{i + 1}</span>
+                  <span className={glassStyles.glassContent}>
+                    {usesStyleReference ? `Style Reference ${i + 1}` : `@image${i + 1}`}
+                  </span>
                 </div>
               );
             })}

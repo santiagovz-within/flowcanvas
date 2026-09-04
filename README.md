@@ -53,6 +53,7 @@ All generation runs through the [FAL AI](https://fal.ai) platform.
 | Seedream v5 (ByteDance) | Image generation and editing |
 | GPT Image 2 (OpenAI) | Image generation |
 | Qwen Image 3.0 (Alibaba) | Image generation and editing |
+| Krea 2 Large | Image generation with style references |
 | FLUX 2 Pro | Image generation |
 | Google Omni Flash | Image-to-video generation |
 | Kling 3 Pro | Video generation |

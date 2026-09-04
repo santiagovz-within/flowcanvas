@@ -6,7 +6,11 @@ export interface FalEndpointPrice {
 }
 
 export type FalPricingRule =
-  | { kind: 'fixed' }
+  | {
+      kind: 'fixed';
+      /** Rate multiplier applied when at least one reference image is sent. */
+      referenceMultiplier?: number;
+    }
   | { kind: 'image-resolution'; resolutionMultipliers: Record<string, number> }
   | ({
       /**
@@ -55,6 +59,8 @@ export interface FalCostEstimateInput {
   duration?: number;
   generateAudio?: boolean;
   outputCount?: number;
+  /** Reference/style images attached to the request, when the rate depends on it. */
+  referenceImageCount?: number;
   scaleFactor?: number;
   targetFps?: number | null;
   fps?: number;
@@ -188,9 +194,13 @@ export function estimateFalCost(
   let billableUnits: number | null = null;
 
   switch (rule.kind) {
-    case 'fixed':
-      billableUnits = outputCount;
+    case 'fixed': {
+      const multiplier = rule.referenceMultiplier && positive(input.referenceImageCount)
+        ? rule.referenceMultiplier
+        : 1;
+      billableUnits = outputCount * multiplier;
       break;
+    }
 
     case 'image-resolution': {
       const multiplier = rule.resolutionMultipliers[input.resolution ?? ''];
