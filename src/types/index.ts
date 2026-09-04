@@ -159,6 +159,19 @@ export interface GenerationFailure {
   requestId?: string;
 }
 
+/**
+ * An inline `@imageN` reference inside a prompt, pinned to the media the user
+ * picked. `label` is the text without the "@" (e.g. "image1"); `portIndex` is
+ * the 0-based reference port it was picked from; `edgeId`/`sourceNodeId`
+ * identify the connection so the tag can be dropped if that media goes away.
+ */
+export interface PromptTag {
+  label: string;
+  portIndex: number;
+  edgeId: string;
+  sourceNodeId: string;
+}
+
 export interface ImageGenNodeData extends Record<string, unknown> {
   model: string;
   aspectRatio: string;
@@ -166,6 +179,8 @@ export interface ImageGenNodeData extends Record<string, unknown> {
   numImages: number;
   prompt?: string;
   promptConnected?: boolean;
+  /** Live `@imageN` references in `prompt`. See PromptTag. */
+  promptTags?: PromptTag[];
   inputImageUrls?: string[];
   imagePortCount?: number;
   generatedImages?: string[];

@@ -20,6 +20,8 @@ import {
 } from '@/lib/api/models';
 import { ModelSelect } from './ModelSelect';
 import { NodeSelect } from './NodeSelect';
+import { PromptEditor } from './PromptEditor';
+import { getTaggableInputs } from '@/lib/promptTags';
 import { ASPECT_RATIOS } from '@/lib/utils/constants';
 import { useFlowStore } from '@/lib/stores/flowStore';
 import { generationJobId, useGenerationStore } from '@/lib/stores/generationStore';
@@ -32,11 +34,6 @@ import FalCostEstimate from './FalCostEstimate';
 const REF_ROW_HEIGHT = 29;
 const ROW_GAP = 10;
 const GLASS_PERFORMANCE_NODE_THRESHOLD = 20;
-
-function autoResize(el: HTMLTextAreaElement) {
-  el.style.height = 'auto';
-  el.style.height = `${el.scrollHeight}px`;
-}
 
 export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGenNodeData }) {
   const currentFlow = useFlowStore((state) => state.currentFlow);
@@ -58,7 +55,6 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
     prevHistLen.current = genHistory.length;
   }, [genHistory.length]);
   const promptSectionRef = useRef<HTMLDivElement>(null);
-  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const rowsListRef = useRef<HTMLDivElement>(null);
   const [promptHandleTop, setPromptHandleTop] = useState(50);
   const [rowsStartTop, setRowsStartTop] = useState(220);
@@ -68,10 +64,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
   useEffect(() => {
     if (!isFocused.current) setLocalPrompt(data.prompt ?? '');
   }, [data.prompt]);
-
-  useEffect(() => {
-    if (promptTextareaRef.current) autoResize(promptTextareaRef.current);
-  }, [localPrompt]);
+  const promptTags = data.promptTags ?? [];
 
   const modelConfig = IMAGE_MODELS.find((m) => m.id === data.model);
   const aspectOptions = modelConfig?.supportedAspectRatios.length
@@ -99,6 +92,7 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       .map((edge) => edge.targetHandle)
   );
   const connectedCount = connectedReferenceHandles.size;
+  const taggableInputs = getTaggableInputs(id, storeEdges, data.inputImageUrls);
 
   const hasEditVariant = !!falConfig && 'editEndpoint' in falConfig;
   const connectedImageCount = (data.inputImageUrls ?? []).filter(Boolean).length;
@@ -378,16 +372,16 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
       ))}
 
       {/* ── Inline prompt ────────────────────────────────────── */}
-      <div
-        ref={promptSectionRef}
-        className={cn(
-          glassStyles.glassSurface,
-          glassStyles.promptSection,
-          glassStyles.promptSurface,
-          data.promptConnected && glassStyles.connectedTextPrompt,
-        )}
-      >
-        {data.promptConnected ? (
+      {data.promptConnected ? (
+        <div
+          ref={promptSectionRef}
+          className={cn(
+            glassStyles.glassSurface,
+            glassStyles.promptSection,
+            glassStyles.promptSurface,
+            glassStyles.connectedTextPrompt,
+          )}
+        >
           <div
             className={cn(
               glassStyles.glassContent,
@@ -396,23 +390,20 @@ export function ImageGenNode({ data, selected, id }: NodeProps & { data: ImageGe
           >
             Prompt connected
           </div>
-        ) : (
-          <textarea
-            ref={promptTextareaRef}
-            className={cn(
-              glassStyles.glassContent,
-              glassStyles.promptContent,
-              'outline-none nodrag',
-            )}
-            rows={2}
-            placeholder="Write your prompt here…"
-            value={localPrompt}
-            onFocus={() => { isFocused.current = true; }}
-            onBlur={() => { isFocused.current = false; }}
-            onChange={(e) => { const v = e.target.value; setLocalPrompt(v); autoResize(e.target); updateData({ prompt: v }); }}
-          />
-        )}
-      </div>
+        </div>
+      ) : (
+        <PromptEditor
+          containerRef={promptSectionRef}
+          value={localPrompt}
+          tags={promptTags}
+          taggable={taggableInputs}
+          onFocusChange={(focused) => { isFocused.current = focused; }}
+          onChange={({ prompt, tags }) => {
+            setLocalPrompt(prompt);
+            updateData(tags === promptTags ? { prompt } : { prompt, promptTags: tags });
+          }}
+        />
+      )}
 
       {/* ── Model selector ───────────────────────────────────── */}
       <ModelSelect

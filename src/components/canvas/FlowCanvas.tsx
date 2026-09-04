@@ -46,8 +46,9 @@ import {
   getNodeMediaUrls,
   getSourceMediaType,
 } from './mediaOutputs';
-import type { NodeType, NodeData, ImageGenNodeData, ImageToPromptNodeData, MediaInputNodeData } from '@/types';
+import type { NodeType, NodeData, ImageGenNodeData, ImageToPromptNodeData, MediaInputNodeData, PromptTag } from '@/types';
 import { getImageReferenceLimit } from '@/lib/api/models';
+import { untagLabel } from '@/lib/promptTags';
 import { setPendingFile } from '@/lib/utils/pendingFiles';
 
 const nodeTypes = {
@@ -133,6 +134,17 @@ function pasteCleanData(nodeType: string | undefined, data: NodeData): NodeData 
   // Reset array input ports
   if ('inputImageUrls' in d) d.inputImageUrls = [];
   if ('imagePortCount' in d) d.imagePortCount = 0;
+  // A pasted node has none of the original's connections, so its inline
+  // "@imageN" chips point at nothing: untag them (keep the words, drop the "@").
+  if (Array.isArray(d.promptTags) && d.promptTags.length > 0) {
+    if (typeof d.prompt === 'string') {
+      d.prompt = (d.promptTags as PromptTag[]).reduce(
+        (text, tag) => untagLabel(text, tag.label),
+        d.prompt,
+      );
+    }
+    d.promptTags = [];
+  }
   // Reset processing status
   if ('status' in d) d.status = 'idle';
   return d as NodeData;
